@@ -7,5 +7,42 @@
   "back": "Voltar",
   "cancel": "Cancelar",
   "save": "Salvar",
-  "confirm": "Confirmar"
+  "confirm": "Confirmar",
+  "close": "Fechar",
+  "open": "Abrir",
+  "next": "Próximo",
+  "prev": "Anterior",
+  "search": "Buscar",
+  "searchPlaceholder": "Buscar produtos, marcas e mais...",
+  "account": "Minha conta",
+  "cart": "Carrinho",
+  "menu": "Menu",
+  "language": "Idioma",
+  "taxonomy": {
+    "ferragens": "Ferragens",
+    "ferramentas": "Ferramentas",
+    "eletrica": "Elétrica",
+    "hidraulica": "Hidráulica",
+    "tintas": "Tintas & Acabamentos",
+    "construcao": "Construção",
+    "jardim": "Jardim & Irrigação",
+    "seguranca": "Segurança"
+  },
+  "footer": {
+    "rights": "Todos os direitos reservados",
+    "lgpd": "Seus dados estão protegidos conforme a LGPD.",
+    "privacyPolicy": "Política de Privacidade",
+    "terms": "Termos de Uso",
+    "contact": "Contato",
+    "about": "Sobre nós",
+    "help": "Ajuda",
+    "paymentMethods": "Formas de pagamento"
+  },
+  "pagination": {
+    "showing": "Exibindo",
+    "of": "de",
+    "previous": "Anterior",
+    "next": "Próximo",
+    "page": "Página"
+  }
 }

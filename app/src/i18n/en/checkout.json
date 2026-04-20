@@ -1,0 +1,39 @@
+{
+  "cart": {
+    "title": "Cart",
+    "empty": "Your cart is empty",
+    "subtotal": "Subtotal",
+    "shipping": "Shipping",
+    "total": "Total",
+    "proceed": "Proceed to checkout",
+    "continueShopping": "Continue shopping",
+    "remove": "Remove",
+    "quantity": "Quantity"
+  },
+  "payment": {
+    "title": "Payment",
+    "pix": "Pix",
+    "boleto": "Bank slip",
+    "creditCard": "Credit card",
+    "debitCard": "Debit card",
+    "installments": "{{count}}x interest-free",
+    "pixDiscount": "5% Pix discount"
+  },
+  "address": {
+    "title": "Delivery address",
+    "cep": "ZIP code",
+    "street": "Street",
+    "number": "Number",
+    "complement": "Complement",
+    "neighborhood": "Neighborhood",
+    "city": "City",
+    "state": "State",
+    "searchCep": "Search ZIP"
+  },
+  "order": {
+    "summary": "Order summary",
+    "place": "Place order",
+    "success": "Order placed successfully!",
+    "number": "Order #{{number}}"
+  }
+}

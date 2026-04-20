@@ -1,0 +1,37 @@
+{
+  "searchPlaceholder": "Search products, brands and more...",
+  "noResults": "No products found",
+  "results": "{{count}} result",
+  "results_plural": "{{count}} results",
+  "filters": "Filters",
+  "clearFilters": "Clear filters",
+  "sort": {
+    "label": "Sort by",
+    "relevance": "Relevance",
+    "priceAsc": "Lowest price",
+    "priceDesc": "Highest price",
+    "newest": "Newest",
+    "topRated": "Top rated"
+  },
+  "product": {
+    "price": "Price",
+    "inStock": "In stock",
+    "outOfStock": "Out of stock",
+    "specifications": "Specifications",
+    "relatedProducts": "Related products",
+    "brand": "Brand",
+    "sku": "SKU",
+    "rating": "Rating",
+    "addToCart": "Add to cart"
+  },
+  "category": {
+    "allProducts": "All products",
+    "productsCount": "{{count}} product",
+    "productsCount_plural": "{{count}} products"
+  },
+  "facets": {
+    "price": "Price range",
+    "brand": "Brand",
+    "inStock": "In stock only"
+  }
+}

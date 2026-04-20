@@ -4,14 +4,14 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 
 ## Estado atual
 
-**Fase 1 — Fundação.** Sprint 01 concluído. Sprint 02 (design system + i18n) é o próximo.
+**Fase 1 — Fundação.** Sprints 01 e 02 concluídos. Sprint 03 (catálogo + taxonomia) é o próximo.
 
 ## Índice de sprints
 
 | # | Sprint | Fase | Status |
 |---|--------|-------|--------|
 | 01 | [Scaffold + tooling](docs/sprints/sprint-01-scaffold.md) | 1 — Fundação | ✅ Concluído |
-| 02 | [Design system + i18n](docs/sprints/sprint-02-design-system.md) | 1 — Fundação | ⬜ Não iniciado |
+| 02 | [Design system + i18n](docs/sprints/sprint-02-design-system.md) | 1 — Fundação | ✅ Concluído |
 | 03 | [Catálogo + taxonomia](docs/sprints/sprint-03-catalog.md) | 2 — Catálogo | ⬜ Não iniciado |
 | 04 | [Detalhe do produto (specs JSONB)](docs/sprints/sprint-04-product-detail.md) | 2 — Catálogo | ⬜ Não iniciado |
 | 05 | [Busca + filtros (ILIKE)](docs/sprints/sprint-05-search-filters.md) | 2 — Catálogo | ⬜ Não iniciado |
@@ -61,4 +61,4 @@ Cada sprint termina com:
 
 ## Histórico recente
 
-_Nada ainda._
+**Sprint 02 — Design system + i18n** (2026-04-20): PublicLayout, Navbar, CategoryRail, Footer, LocaleSwitcher, 13 primitivos de UI (Button/Input/Select/Checkbox/Radio/Card/Badge/Tag/Modal/Drawer/Toast/Skeleton/Pagination/Breadcrumb), página `/_dev/ui`, i18n com 4 namespaces (common, catalog, checkout, account), Tailwind dark-mode class, Google Fonts (Archivo/Inter/JetBrains Mono).

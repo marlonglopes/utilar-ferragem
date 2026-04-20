@@ -1,0 +1,32 @@
+{
+  "login": "Sign in",
+  "register": "Create account",
+  "logout": "Sign out",
+  "email": "Email",
+  "password": "Password",
+  "forgotPassword": "Forgot password",
+  "profile": {
+    "title": "My profile",
+    "name": "Name",
+    "phone": "Phone",
+    "cpf": "CPF",
+    "saveChanges": "Save changes"
+  },
+  "orders": {
+    "title": "My orders",
+    "empty": "You haven't placed any orders yet",
+    "status": {
+      "pending": "Awaiting payment",
+      "paid": "Paid",
+      "shipped": "Shipped",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "notifications": "Notifications",
+    "language": "Language",
+    "deleteAccount": "Delete account"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "searchPlaceholder": "Buscar produtos, marcas e mais...",
+  "noResults": "Nenhum produto encontrado",
+  "results": "{{count}} resultado",
+  "results_plural": "{{count}} resultados",
+  "filters": "Filtros",
+  "clearFilters": "Limpar filtros",
+  "sort": {
+    "label": "Ordenar por",
+    "relevance": "Relevância",
+    "priceAsc": "Menor preço",
+    "priceDesc": "Maior preço",
+    "newest": "Mais recente",
+    "topRated": "Mais bem avaliado"
+  },
+  "product": {
+    "price": "Preço",
+    "inStock": "Em estoque",
+    "outOfStock": "Fora de estoque",
+    "specifications": "Especificações",
+    "relatedProducts": "Produtos relacionados",
+    "brand": "Marca",
+    "sku": "Código",
+    "rating": "Avaliação",
+    "addToCart": "Adicionar ao carrinho"
+  },
+  "category": {
+    "allProducts": "Todos os produtos",
+    "productsCount": "{{count}} produto",
+    "productsCount_plural": "{{count}} produtos"
+  },
+  "facets": {
+    "price": "Faixa de preço",
+    "brand": "Marca",
+    "inStock": "Apenas em estoque"
+  }
+}

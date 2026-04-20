@@ -1,0 +1,32 @@
+{
+  "login": "Entrar",
+  "register": "Criar conta",
+  "logout": "Sair",
+  "email": "E-mail",
+  "password": "Senha",
+  "forgotPassword": "Esqueci minha senha",
+  "profile": {
+    "title": "Meu perfil",
+    "name": "Nome",
+    "phone": "Telefone",
+    "cpf": "CPF",
+    "saveChanges": "Salvar alterações"
+  },
+  "orders": {
+    "title": "Meus pedidos",
+    "empty": "Você ainda não fez nenhum pedido",
+    "status": {
+      "pending": "Aguardando pagamento",
+      "paid": "Pago",
+      "shipped": "Enviado",
+      "delivered": "Entregue",
+      "cancelled": "Cancelado"
+    }
+  },
+  "settings": {
+    "title": "Configurações",
+    "notifications": "Notificações",
+    "language": "Idioma",
+    "deleteAccount": "Excluir conta"
+  }
+}

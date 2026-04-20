@@ -1,0 +1,39 @@
+{
+  "cart": {
+    "title": "Carrinho",
+    "empty": "Seu carrinho está vazio",
+    "subtotal": "Subtotal",
+    "shipping": "Frete",
+    "total": "Total",
+    "proceed": "Finalizar compra",
+    "continueShopping": "Continuar comprando",
+    "remove": "Remover",
+    "quantity": "Quantidade"
+  },
+  "payment": {
+    "title": "Pagamento",
+    "pix": "Pix",
+    "boleto": "Boleto bancário",
+    "creditCard": "Cartão de crédito",
+    "debitCard": "Cartão de débito",
+    "installments": "{{count}}x sem juros",
+    "pixDiscount": "5% de desconto no Pix"
+  },
+  "address": {
+    "title": "Endereço de entrega",
+    "cep": "CEP",
+    "street": "Rua",
+    "number": "Número",
+    "complement": "Complemento",
+    "neighborhood": "Bairro",
+    "city": "Cidade",
+    "state": "Estado",
+    "searchCep": "Buscar CEP"
+  },
+  "order": {
+    "summary": "Resumo do pedido",
+    "place": "Confirmar pedido",
+    "success": "Pedido realizado com sucesso!",
+    "number": "Pedido #{{number}}"
+  }
+}
