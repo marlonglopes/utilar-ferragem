@@ -28,7 +28,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe('Smoke test', () => {
   it('renders the home page without crashing', () => {
     render(<HomePage />, { wrapper })
-    expect(screen.getByText(/sprint 02/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
   })
 
   it('Navbar displays the UtiLar brand link', () => {

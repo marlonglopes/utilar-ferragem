@@ -24,6 +24,30 @@
     "becomeSeller": "Become a seller",
     "help": "Help center"
   },
+  "hero": {
+    "badge": "New · Same-day delivery in São Paulo",
+    "title": {
+      "prefix": "Everything for your",
+      "highlight": "project",
+      "suffix": ", straight from the hardware store."
+    },
+    "description": "Over 5,000 products — tools, construction and electrical — from hundreds of partner sellers, with Pix, bank slip or card payment.",
+    "cta": {
+      "catalog": "Explore catalog",
+      "sell": "Sell on Utilar"
+    }
+  },
+  "home": {
+    "categories": "Featured categories",
+    "featured": "Best sellers this week",
+    "seeAll": "See all"
+  },
+  "trust": {
+    "pix": { "title": "Instant Pix", "desc": "Payment confirmed immediately. Bank slip and card up to 12x." },
+    "verified": { "title": "Verified sellers", "desc": "All sellers with validated CNPJ and invoice." },
+    "delivery": { "title": "24h delivery", "desc": "Greater São Paulo. PAC/SEDEX nationwide." },
+    "support": { "title": "Brazilian support", "desc": "WhatsApp and email. Support in Portuguese, business hours." }
+  },
   "taxonomy": {
     "ferramentas": "Tools",
     "construcao": "Construction",

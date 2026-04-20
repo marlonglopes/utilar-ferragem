@@ -24,6 +24,30 @@
     "becomeSeller": "Seja um vendedor",
     "help": "Central de ajuda"
   },
+  "hero": {
+    "badge": "Novo · Entrega em até 24h em São Paulo",
+    "title": {
+      "prefix": "Tudo para sua",
+      "highlight": "obra",
+      "suffix": ", direto da ferragem."
+    },
+    "description": "Mais de 5 mil produtos de ferramentas, construção e elétrica — de centenas de vendedores parceiros, com pagamento em Pix, boleto ou cartão.",
+    "cta": {
+      "catalog": "Explorar catálogo",
+      "sell": "Vender no Utilar"
+    }
+  },
+  "home": {
+    "categories": "Categorias em destaque",
+    "featured": "Mais vendidos esta semana",
+    "seeAll": "Ver todos"
+  },
+  "trust": {
+    "pix": { "title": "Pix instantâneo", "desc": "Pagamento confirmado na hora. Boleto e cartão em até 12x." },
+    "verified": { "title": "Ferragens verificadas", "desc": "Todos os vendedores com CNPJ validado e nota fiscal." },
+    "delivery": { "title": "Entrega em 24h", "desc": "Na grande São Paulo. Correios PAC/SEDEX para o Brasil todo." },
+    "support": { "title": "Suporte brasileiro", "desc": "WhatsApp e e-mail. Atendimento em português, horário comercial." }
+  },
   "taxonomy": {
     "ferramentas": "Ferramentas",
     "construcao": "Construção",
