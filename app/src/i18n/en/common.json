@@ -13,20 +13,26 @@
   "next": "Next",
   "prev": "Previous",
   "search": "Search",
-  "searchPlaceholder": "Search products, brands and more...",
+  "searchPlaceholder": "Search tools, cement, cables, paint...",
   "account": "My account",
   "cart": "Cart",
   "menu": "Menu",
   "language": "Language",
+  "topbar": {
+    "promo": "Free shipping on orders over R$ 299 · Use coupon OBRA10 ·",
+    "cashback": "Earn cashback on every purchase",
+    "becomeSeller": "Become a seller",
+    "help": "Help center"
+  },
   "taxonomy": {
-    "ferragens": "Hardware",
     "ferramentas": "Tools",
+    "construcao": "Construction",
     "eletrica": "Electrical",
     "hidraulica": "Plumbing",
-    "tintas": "Paints & Finishes",
-    "construcao": "Construction",
-    "jardim": "Garden & Irrigation",
-    "seguranca": "Security"
+    "pintura": "Paint",
+    "jardim": "Garden",
+    "seguranca": "Safety / PPE",
+    "fixacao": "Fasteners"
   },
   "footer": {
     "rights": "All rights reserved",

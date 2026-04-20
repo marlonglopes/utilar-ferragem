@@ -21,7 +21,7 @@ export function Navbar() {
             <div className="hidden sm:flex flex-col leading-none">
               <span className="font-display font-black text-lg tracking-tight">
                 <span className="text-white">Uti</span>
-                <span className="text-brand-gold">Lar</span>
+                <span className="text-brand-blue">Lar</span>
               </span>
               <span className="text-[9px] font-bold tracking-widest uppercase text-white/70">
                 {t('tagline')}

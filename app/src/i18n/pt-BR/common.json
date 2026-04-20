@@ -13,20 +13,26 @@
   "next": "Próximo",
   "prev": "Anterior",
   "search": "Buscar",
-  "searchPlaceholder": "Buscar produtos, marcas e mais...",
+  "searchPlaceholder": "Buscar ferramentas, cimento, cabos, tinta...",
   "account": "Minha conta",
   "cart": "Carrinho",
   "menu": "Menu",
   "language": "Idioma",
+  "topbar": {
+    "promo": "Frete grátis em compras acima de R$ 299 · Use o cupom OBRA10 ·",
+    "cashback": "Ganhe cashback em todas as compras",
+    "becomeSeller": "Seja um vendedor",
+    "help": "Central de ajuda"
+  },
   "taxonomy": {
-    "ferragens": "Ferragens",
     "ferramentas": "Ferramentas",
+    "construcao": "Construção",
     "eletrica": "Elétrica",
     "hidraulica": "Hidráulica",
-    "tintas": "Tintas & Acabamentos",
-    "construcao": "Construção",
-    "jardim": "Jardim & Irrigação",
-    "seguranca": "Segurança"
+    "pintura": "Pintura",
+    "jardim": "Jardim",
+    "seguranca": "Segurança / EPI",
+    "fixacao": "Fixação"
   },
   "footer": {
     "rights": "Todos os direitos reservados",
