@@ -4,7 +4,7 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 
 ## Estado atual
 
-**Fase 1 — Fundação.** Sprints 01, 02 e 03 concluídos. Sprint 04 (detalhe do produto) é o próximo.
+**Fase 2 — Catálogo.** Sprints 01–05 concluídos. Sprint 06 (carrinho) é o ativo.
 
 ## Índice de sprints
 
@@ -13,9 +13,9 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 | 01 | [Scaffold + tooling](docs/sprints/sprint-01-scaffold.md) | 1 — Fundação | ✅ Concluído |
 | 02 | [Design system + i18n](docs/sprints/sprint-02-design-system.md) | 1 — Fundação | ✅ Concluído |
 | 03 | [Catálogo + taxonomia](docs/sprints/sprint-03-catalog.md) | 2 — Catálogo | ✅ Concluído |
-| 04 | [Detalhe do produto (specs JSONB)](docs/sprints/sprint-04-product-detail.md) | 2 — Catálogo | ⬜ Não iniciado |
-| 05 | [Busca + filtros (ILIKE)](docs/sprints/sprint-05-search-filters.md) | 2 — Catálogo | ⬜ Não iniciado |
-| 06 | [Carrinho (local + persistente)](docs/sprints/sprint-06-cart.md) | 3 — Comércio | ⬜ Não iniciado |
+| 04 | [Detalhe do produto (specs JSONB)](docs/sprints/sprint-04-product-detail.md) | 2 — Catálogo | ✅ Concluído |
+| 05 | [Busca + filtros (ILIKE)](docs/sprints/sprint-05-search-filters.md) | 2 — Catálogo | ✅ Concluído |
+| 06 | [Carrinho (local + persistente)](docs/sprints/sprint-06-cart.md) | 3 — Comércio | 🚧 Ativo |
 | 07 | [Auth do cliente + conta](docs/sprints/sprint-07-auth.md) | 3 — Comércio | ⬜ Não iniciado |
 | 08 | [Checkout (Pix / boleto / cartão)](docs/sprints/sprint-08-checkout.md) | 3 — Comércio | ⬜ Não iniciado |
 | 09 | [Histórico de pedidos + rastreio + e-mails](docs/sprints/sprint-09-orders.md) | 3 — Comércio | ⬜ Não iniciado |
@@ -62,3 +62,9 @@ Cada sprint termina com:
 ## Histórico recente
 
 **Sprint 02 — Design system + i18n** (2026-04-20): PublicLayout, Navbar, CategoryRail, Footer, LocaleSwitcher, 13 primitivos de UI (Button/Input/Select/Checkbox/Radio/Card/Badge/Tag/Modal/Drawer/Toast/Skeleton/Pagination/Breadcrumb), página `/_dev/ui`, i18n com 4 namespaces (common, catalog, checkout, account), Tailwind dark-mode class, Google Fonts (Archivo/Inter/JetBrains Mono).
+
+**Sprint 03 — Catálogo + taxonomia** (2026-04-20): HomePage com hero, rail de categorias, grid de produtos em destaque, CategoryPage com grid paginado, ProductCard, Breadcrumb, StockBadge, taxonomia completa.
+
+**Sprint 04 — Detalhe do produto** (2026-04-20): ProductDetailPage com ImageGallery, SellerCard, SpecSheet, tabs (Descrição/Specs/Avaliações), QuantitySelector, CTA fixo mobile, produtos relacionados.
+
+**Sprint 05 — Busca + filtros facetados** (2026-04-20): SearchPage, FacetSidebar, ActiveFilterChips, SortDropdown, query params compartilháveis, bottom sheet mobile, estado vazio.

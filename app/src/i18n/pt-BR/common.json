@@ -68,6 +68,22 @@
     "help": "Ajuda",
     "paymentMethods": "Formas de pagamento"
   },
+  "cartPage": {
+    "title": "Carrinho",
+    "empty": "Seu carrinho está vazio",
+    "emptyHint": "Explore o catálogo e encontre o que precisa.",
+    "exploreCatalog": "Explorar catálogo",
+    "subtotal": "Subtotal",
+    "total": "Total",
+    "goToCheckout": "Finalizar compra",
+    "viewCart": "Ver carrinho completo",
+    "remove": "Remover item",
+    "soldBy": "Vendido por",
+    "priceChanged": "Preço ou estoque mudou",
+    "items": "{{count}} item",
+    "items_plural": "{{count}} itens",
+    "shippingEstimate": "Frete estimado"
+  },
   "pagination": {
     "showing": "Exibindo",
     "of": "de",

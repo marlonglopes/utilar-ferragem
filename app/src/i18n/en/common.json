@@ -68,6 +68,22 @@
     "help": "Help",
     "paymentMethods": "Payment methods"
   },
+  "cartPage": {
+    "title": "Cart",
+    "empty": "Your cart is empty",
+    "emptyHint": "Explore the catalog and find what you need.",
+    "exploreCatalog": "Explore catalog",
+    "subtotal": "Subtotal",
+    "total": "Total",
+    "goToCheckout": "Proceed to checkout",
+    "viewCart": "View full cart",
+    "remove": "Remove item",
+    "soldBy": "Sold by",
+    "priceChanged": "Price or stock has changed",
+    "items": "{{count}} item",
+    "items_plural": "{{count}} items",
+    "shippingEstimate": "Estimated shipping"
+  },
   "pagination": {
     "showing": "Showing",
     "of": "of",

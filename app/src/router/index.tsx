@@ -4,6 +4,7 @@ import HomePage from '@/pages/home/HomePage'
 import CategoryPage from '@/pages/category/CategoryPage'
 import ProductDetailPage from '@/pages/product/ProductDetailPage'
 import SearchPage from '@/pages/search/SearchPage'
+import CartPage from '@/pages/cart/CartPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import UiPage from '@/pages/_dev/UiPage'
 
@@ -16,6 +17,7 @@ const router = createBrowserRouter([
       { path: 'categoria/:slug', element: <CategoryPage /> },
       { path: 'produto/:slug', element: <ProductDetailPage /> },
       { path: 'busca', element: <SearchPage /> },
+      { path: 'carrinho', element: <CartPage /> },
       { path: '404', element: <NotFoundPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],

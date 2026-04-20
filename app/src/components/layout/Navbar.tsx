@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Search, User, ShoppingCart, Menu, X } from 'lucide-react'
 import { LocaleSwitcher } from '@/components/common/LocaleSwitcher'
+import { CartDrawer } from '@/components/cart/CartDrawer'
+import { useCartStore } from '@/store/cartStore'
 import { cn } from '@/lib/cn'
 
 export function Navbar() {
@@ -10,7 +12,9 @@ export function Navbar() {
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchExpanded, setSearchExpanded] = useState(false)
+  const [cartOpen, setCartOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const cartCount = useCartStore((s) => s.items.reduce((sum, i) => sum + i.quantity, 0))
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -76,13 +80,18 @@ export function Navbar() {
               <User className="h-5 w-5" aria-hidden />
             </Link>
 
-            <Link
-              to="/carrinho"
-              className="flex items-center justify-center h-8 w-8 rounded-lg text-white hover:bg-white/10"
+            <button
+              onClick={() => setCartOpen(true)}
+              className="relative flex items-center justify-center h-8 w-8 rounded-lg text-white hover:bg-white/10"
               aria-label={t('cart')}
             >
               <ShoppingCart className="h-5 w-5" aria-hidden />
-            </Link>
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 min-w-4 px-0.5 rounded-full bg-brand-blue text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                  {cartCount > 99 ? '99+' : cartCount}
+                </span>
+              )}
+            </button>
 
             <LocaleSwitcher className="hidden sm:flex" />
 
@@ -103,6 +112,8 @@ export function Navbar() {
           <LocaleSwitcher />
         </div>
       )}
+
+      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
     </header>
   )
 }

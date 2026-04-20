@@ -10,6 +10,7 @@ import { SellerCard } from '@/components/catalog/SellerCard'
 import { SpecSheet } from '@/components/catalog/SpecSheet'
 import { ProductCard, ProductCardSkeleton } from '@/components/catalog/ProductCard'
 import { Breadcrumb, Skeleton } from '@/components/ui'
+import { useCartStore } from '@/store/cartStore'
 import { formatCurrency } from '@/lib/format'
 import { TOP_LEVEL_CATEGORIES } from '@/lib/taxonomy'
 import { cn } from '@/lib/cn'
@@ -86,6 +87,8 @@ export default function ProductDetailPage() {
   const { t } = useTranslation(['catalog', 'common'])
   const [qty, setQty] = useState(1)
   const [tab, setTab] = useState<Tab>('description')
+  const [added, setAdded] = useState(false)
+  const addItem = useCartStore((s) => s.addItem)
 
   const { data: product, isLoading, isError } = useProduct(slug)
 
@@ -101,6 +104,22 @@ export default function ProductDetailPage() {
   if (isLoading) return <DetailSkeleton />
   if (isError || product === null) return <Navigate to="/404" replace />
   if (!product) return null
+
+  function handleAddToCart() {
+    if (!product || product.stock === 0) return
+    addItem({
+      productId: product.id,
+      sellerId: product.sellerId ?? product.seller,
+      sellerName: product.seller,
+      name: product.name,
+      icon: product.icon,
+      priceSnapshot: product.price,
+      quantity: qty,
+      stock: product.stock,
+    })
+    setAdded(true)
+    setTimeout(() => setAdded(false), 2000)
+  }
 
   const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
@@ -172,16 +191,19 @@ export default function ProductDetailPage() {
 
             {/* CTA */}
             <button
+              onClick={handleAddToCart}
               disabled={product.stock === 0}
               className={cn(
                 'flex items-center justify-center gap-2 h-12 rounded-xl font-semibold text-base transition-colors',
                 product.stock === 0
                   ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : added
+                  ? 'bg-green-600 text-white'
                   : 'bg-brand-orange hover:bg-brand-orange-dark text-white'
               )}
             >
               <ShoppingCart className="h-5 w-5" />
-              {t('catalog:product.addToCart')}
+              {added ? 'Adicionado!' : t('catalog:product.addToCart')}
             </button>
 
             {/* Seller card */}
@@ -254,16 +276,19 @@ export default function ProductDetailPage() {
           <p className="text-lg font-bold text-gray-900 leading-tight">{formatCurrency(product.price)}</p>
         </div>
         <button
+          onClick={handleAddToCart}
           disabled={product.stock === 0}
           className={cn(
             'flex items-center gap-2 h-11 px-5 rounded-xl font-semibold text-sm transition-colors flex-shrink-0',
             product.stock === 0
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : added
+              ? 'bg-green-600 text-white'
               : 'bg-brand-orange hover:bg-brand-orange-dark text-white'
           )}
         >
           <ShoppingCart className="h-4 w-4" />
-          {t('catalog:product.addToCart')}
+          {added ? 'Adicionado!' : t('catalog:product.addToCart')}
         </button>
       </div>
     </>
