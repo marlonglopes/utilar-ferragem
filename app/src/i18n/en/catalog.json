@@ -16,13 +16,27 @@
   "product": {
     "price": "Price",
     "inStock": "In stock",
+    "lastUnits": "Last units",
     "outOfStock": "Out of stock",
+    "onRequest": "On request",
     "specifications": "Specifications",
+    "description": "Description",
+    "reviews": "Reviews",
     "relatedProducts": "Related products",
     "brand": "Brand",
     "sku": "SKU",
     "rating": "Rating",
-    "addToCart": "Add to cart"
+    "addToCart": "Add to cart",
+    "buyNow": "Buy now",
+    "quantity": "Quantity",
+    "seller": "Sold by",
+    "viewStore": "View store",
+    "installments": "in {{count}}x interest-free",
+    "cashback": "Earn {{amount}} cashback",
+    "soldBy": "Sold by",
+    "noDescription": "No description available.",
+    "reviewsStub": "Customer reviews will be available soon.",
+    "noSpecs": "Specifications not available for this product."
   },
   "category": {
     "allProducts": "All products",

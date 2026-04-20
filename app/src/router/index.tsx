@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import { PublicLayout } from '@/components/layout/PublicLayout'
 import HomePage from '@/pages/home/HomePage'
 import CategoryPage from '@/pages/category/CategoryPage'
+import ProductDetailPage from '@/pages/product/ProductDetailPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import UiPage from '@/pages/_dev/UiPage'
 
@@ -12,6 +13,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'categoria/:slug', element: <CategoryPage /> },
+      { path: 'produto/:slug', element: <ProductDetailPage /> },
       { path: '404', element: <NotFoundPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],

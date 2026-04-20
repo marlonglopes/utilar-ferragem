@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed -i 's/\\\\*\\\\*Fase 1 — Fundação.\\\\*\\\\* Sprint 01 concluído. Sprint 02 \\(design system + i18n\\) é o próximo./\\\\*\\\\*Fase 1 — Fundação.\\\\*\\\\* Sprints 01 e 02 concluídos. Sprint 03 \\(catálogo + taxonomia\\) é o próximo./' /home/marlon/gifthy/utilar-ferragem/SPRINT.md)",
+      "Bash(sed -i 's/| 02 | \\\\[Design system + i18n\\\\]\\(docs\\\\/sprints\\\\/sprint-02-design-system.md\\) | 1 — Fundação | ⬜ Não iniciado |/| 02 | [Design system + i18n]\\(docs\\\\/sprints\\\\/sprint-02-design-system.md\\) | 1 — Fundação | ✅ Concluído |/' /home/marlon/gifthy/utilar-ferragem/SPRINT.md)",
+      "Bash(sed -i 's/## Histórico recente\\\\n\\\\n_Nada ainda._//' /home/marlon/gifthy/utilar-ferragem/SPRINT.md)",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s http://localhost:5175)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('taxonomy'\\), indent=2\\)\\)\")",
+      "Bash(python3 -c \" import sys, re html = sys.stdin.read\\(\\) body = re.search\\(r'<body>\\(.*\\)</body>', html, re.DOTALL\\) content = re.sub\\(r'<style.*?</style>', '', body.group\\(1\\), flags=re.DOTALL\\) content = re.sub\\(r'<script.*?</script>', '', content, flags=re.DOTALL\\) print\\(content\\) \")",
+      "Bash(sed -i 's/| 03 | \\\\[Catálogo + taxonomia\\\\]\\(docs\\\\/sprints\\\\/sprint-03-catalog.md\\) | 2 — Catálogo | ⬜ Não iniciado |/| 03 | [Catálogo + taxonomia]\\(docs\\\\/sprints\\\\/sprint-03-catalog.md\\) | 2 — Catálogo | ✅ Concluído |/' SPRINT.md)",
+      "Bash(sed -i 's/Sprints 01 e 02 concluídos. Sprint 03 \\(catálogo + taxonomia\\) é o próximo./Sprints 01, 02 e 03 concluídos. Sprint 04 \\(detalhe do produto\\) é o próximo./' SPRINT.md)",
+      "Bash(npx vite *)"
+    ]
+  }
+}

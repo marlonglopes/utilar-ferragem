@@ -1,3 +1,8 @@
+export interface ProductImage {
+  url: string
+  alt: string
+}
+
 export interface Product {
   id: string
   name: string
@@ -7,8 +12,12 @@ export interface Product {
   originalPrice?: number
   currency: 'BRL'
   imageUrl?: string
+  images?: ProductImage[]
   icon: string
   seller: string
+  sellerId?: string
+  sellerRating?: number
+  sellerReviewCount?: number
   stock: number
   rating: number
   reviewCount: number
@@ -16,6 +25,8 @@ export interface Product {
   badge?: 'discount' | 'free_shipping' | 'last_units'
   badgeLabel?: string
   installments?: number
+  description?: string
+  specs?: Record<string, string>
 }
 
 export interface ProductsParams {

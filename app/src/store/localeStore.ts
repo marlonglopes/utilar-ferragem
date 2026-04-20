@@ -12,10 +12,13 @@ interface LocaleState {
 }
 
 function detectInitialLocale(): Locale {
-  if (typeof navigator === 'undefined') return 'pt-BR'
-  const nav = (navigator.language || '').toLowerCase()
-  if (nav.startsWith('en')) return 'en'
-  return 'pt-BR'
+  if (typeof window === 'undefined') return 'pt-BR'
+  try {
+    const raw = localStorage.getItem('utilar-locale-v2')
+    if (!raw) return 'pt-BR'
+    const stored = (JSON.parse(raw) as { state?: { locale?: string } }).state?.locale
+    return stored === 'en' ? 'en' : 'pt-BR'
+  } catch { return 'pt-BR' }
 }
 
 export const useLocaleStore = create<LocaleState>()(
@@ -31,7 +34,7 @@ export const useLocaleStore = create<LocaleState>()(
       },
     }),
     {
-      name: 'utilar-locale',
+      name: 'utilar-locale-v2',
       onRehydrateStorage: () => (state) => {
         if (state?.locale) {
           i18n.changeLanguage(state.locale)
