@@ -14,6 +14,7 @@ export interface Product {
   imageUrl?: string
   images?: ProductImage[]
   icon: string
+  brand?: string
   seller: string
   sellerId?: string
   sellerRating?: number
@@ -35,6 +36,10 @@ export interface ProductsParams {
   per_page?: number
   sort?: 'relevance' | 'price_asc' | 'price_desc' | 'newest' | 'top_rated'
   q?: string
+  brand?: string
+  price_min?: number
+  price_max?: number
+  in_stock?: boolean
 }
 
 export interface ProductsResponse {

@@ -38,6 +38,21 @@
     "reviewsStub": "As avaliações de clientes estarão disponíveis em breve.",
     "noSpecs": "Especificações não disponíveis para este produto."
   },
+  "search": {
+    "title": "Resultados para",
+    "titleEmpty": "Busca",
+    "resultsCount": "{{count}} produto encontrado",
+    "resultsCount_plural": "{{count}} produtos encontrados",
+    "emptyTitle": "Nenhum resultado para",
+    "emptySubtitle": "Tente termos mais simples ou explore as categorias abaixo.",
+    "clearFilters": "Limpar filtros",
+    "activeFilters": "Filtros ativos",
+    "allCategories": "Todas as categorias",
+    "priceRange": "Faixa de preço",
+    "inStockOnly": "Somente em estoque",
+    "apply": "Aplicar",
+    "brands": "Marca"
+  },
   "category": {
     "allProducts": "Todos os produtos",
     "productsCount": "{{count}} produto",

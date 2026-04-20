@@ -38,6 +38,21 @@
     "reviewsStub": "Customer reviews will be available soon.",
     "noSpecs": "Specifications not available for this product."
   },
+  "search": {
+    "title": "Results for",
+    "titleEmpty": "Search",
+    "resultsCount": "{{count}} product found",
+    "resultsCount_plural": "{{count}} products found",
+    "emptyTitle": "No results for",
+    "emptySubtitle": "Try simpler terms or explore categories below.",
+    "clearFilters": "Clear filters",
+    "activeFilters": "Active filters",
+    "allCategories": "All categories",
+    "priceRange": "Price range",
+    "inStockOnly": "In stock only",
+    "apply": "Apply",
+    "brands": "Brand"
+  },
   "category": {
     "allProducts": "All products",
     "productsCount": "{{count}} product",

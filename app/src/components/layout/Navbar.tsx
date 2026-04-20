@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useRef } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Search, User, ShoppingCart, Menu, X } from 'lucide-react'
 import { LocaleSwitcher } from '@/components/common/LocaleSwitcher'
@@ -7,8 +7,18 @@ import { cn } from '@/lib/cn'
 
 export function Navbar() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchExpanded, setSearchExpanded] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault()
+    const q = inputRef.current?.value.trim()
+    if (!q) return
+    navigate(`/busca?q=${encodeURIComponent(q)}`)
+    setSearchExpanded(false)
+  }
 
   return (
     <header className="bg-brand-orange shadow-sm sticky top-0 z-40">
@@ -29,7 +39,8 @@ export function Navbar() {
             </div>
           </Link>
 
-          <div
+          <form
+            onSubmit={handleSearch}
             className={cn(
               'flex-1 relative transition-all duration-200',
               searchExpanded ? 'block' : 'hidden sm:block'
@@ -40,12 +51,13 @@ export function Navbar() {
               aria-hidden
             />
             <input
+              ref={inputRef}
               type="search"
               placeholder={t('searchPlaceholder')}
               className="w-full pl-9 pr-4 py-2 rounded-lg bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-blue"
               aria-label={t('search')}
             />
-          </div>
+          </form>
 
           <div className="flex items-center gap-1 ml-auto sm:ml-0">
             <button

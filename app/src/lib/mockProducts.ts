@@ -63,6 +63,45 @@ export const MOCK_PRODUCTS: Product[] = [
   { id: '31', name: 'Fita Veda Rosca 18mm x 50m Tigre', slug: 'fita-veda-rosca-18x50m', category: 'fixacao', price: 7.5, currency: 'BRL', icon: '▣', seller: 'Materiais SP', sellerId: 'materiais-sp', sellerRating: 4.3, sellerReviewCount: 510, stock: 600, rating: 5, reviewCount: 187 },
 ]
 
+const KNOWN_BRANDS = ['Bosch', 'Makita', 'DeWalt', 'Black+Decker', 'Tramontina', 'Suvinil', 'Quartzolit', 'Schneider', 'Deca', 'Fortlev', 'Gerdau', 'Tigre', '3M', 'Sil', 'Votoran']
+
+export function extractBrand(name: string): string | undefined {
+  return KNOWN_BRANDS.find((b) => name.includes(b))
+}
+
+export function getMockFacets(params: Omit<ProductsParams, 'page' | 'per_page' | 'sort'>): {
+  brands: { value: string; count: number }[]
+  priceMin: number
+  priceMax: number
+} {
+  let filtered = [...MOCK_PRODUCTS]
+  if (params.category) filtered = filtered.filter((p) => p.category === params.category)
+  if (params.q) {
+    const q = params.q.toLowerCase()
+    filtered = filtered.filter((p) =>
+      p.name.toLowerCase().includes(q) ||
+      p.seller.toLowerCase().includes(q) ||
+      (p.description ?? '').toLowerCase().includes(q)
+    )
+  }
+
+  const brandCounts: Record<string, number> = {}
+  for (const p of filtered) {
+    const b = extractBrand(p.name)
+    if (b) brandCounts[b] = (brandCounts[b] ?? 0) + 1
+  }
+  const brands = Object.entries(brandCounts)
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => b.count - a.count)
+
+  const prices = filtered.map((p) => p.price)
+  return {
+    brands,
+    priceMin: prices.length ? Math.floor(Math.min(...prices)) : 0,
+    priceMax: prices.length ? Math.ceil(Math.max(...prices)) : 9999,
+  }
+}
+
 export function getMockProduct(slug: string): Promise<Product | null> {
   const product = MOCK_PRODUCTS.find((p) => p.slug === slug) ?? null
   return new Promise((resolve) => setTimeout(() => resolve(product), 200))
@@ -81,8 +120,27 @@ export function getMockProducts(params: ProductsParams): Promise<ProductsRespons
   if (params.q) {
     const q = params.q.toLowerCase()
     filtered = filtered.filter(
-      (p) => p.name.toLowerCase().includes(q) || p.seller.toLowerCase().includes(q)
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.seller.toLowerCase().includes(q) ||
+        (p.description ?? '').toLowerCase().includes(q)
     )
+  }
+
+  if (params.brand) {
+    filtered = filtered.filter((p) => extractBrand(p.name) === params.brand)
+  }
+
+  if (params.price_min != null) {
+    filtered = filtered.filter((p) => p.price >= params.price_min!)
+  }
+
+  if (params.price_max != null) {
+    filtered = filtered.filter((p) => p.price <= params.price_max!)
+  }
+
+  if (params.in_stock) {
+    filtered = filtered.filter((p) => p.stock > 0)
   }
 
   if (params.sort === 'price_asc') filtered.sort((a, b) => a.price - b.price)
