@@ -1,17 +1,10 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/cn'
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react'
+import { ToastContext, type ToastVariant } from './toastContext'
 
-export type ToastVariant = 'success' | 'error' | 'info' | 'warning'
+export type { ToastVariant }
 
 export interface ToastItem {
   id: string
@@ -19,12 +12,6 @@ export interface ToastItem {
   variant?: ToastVariant
   duration?: number
 }
-
-interface ToastContextValue {
-  toast: (message: string, variant?: ToastVariant, duration?: number) => void
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null)
 
 const icons: Record<ToastVariant, typeof CheckCircle> = {
   success: CheckCircle,
@@ -112,8 +99,3 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function useToast() {
-  const ctx = useContext(ToastContext)
-  if (!ctx) throw new Error('useToast must be used within ToastProvider')
-  return ctx
-}
