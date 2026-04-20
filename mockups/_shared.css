@@ -1,0 +1,433 @@
+/* Utilar Ferragem — shared styles for all mockup screens */
+
+:root {
+  --color-primary: #F47920;       /* Brand orange */
+  --color-primary-dark: #D06416;
+  --color-primary-light: #FFD4A8;
+  --color-accent: #1B3E8A;        /* Brand blue */
+  --color-accent-light: #E8EEF8;
+  --color-gold: #F5A623;          /* Stars + warm cashback tones */
+  --color-ink: #1A1A1A;
+  --color-ink-soft: #3D3D3D;
+  --color-surface: #F8F7F5;
+  --color-surface-alt: #F0EFEB;
+  --color-border: #D9D6CF;
+  --color-muted: #6B6660;
+  --color-success: #1E7D34;
+  --color-warning: #E07B00;
+  --color-danger: #C62828;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.font-display { font-family: 'Archivo', ui-sans-serif, system-ui, sans-serif; font-weight: 800; letter-spacing: 0.02em; }
+.font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+/* ---------- Brand mark ---------- */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  line-height: 1;
+}
+.brand .logo-icon {
+  width: 36px;
+  height: 36px;
+  background: white;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Archivo', sans-serif;
+  font-weight: 900;
+  font-size: 1.25rem;
+  font-style: italic;
+  color: var(--color-accent);
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+.brand .logo-wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.brand .logo-name {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 800;
+  font-size: 1.125rem;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+.brand .logo-name .uti { color: white; }
+.brand .logo-name .lar { color: var(--color-accent-on-navbar, var(--color-accent)); font-weight: 900; }
+.brand .logo-tagline {
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.75);
+  line-height: 1;
+}
+/* On white backgrounds (footer, etc.) override colours */
+.brand.brand-dark .logo-name .uti { color: var(--color-ink); }
+.brand.brand-dark .logo-name .lar { color: var(--color-primary); }
+.brand.brand-dark .logo-tagline { color: var(--color-muted); }
+.brand.brand-dark .logo-icon { background: var(--color-primary); color: white; box-shadow: none; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  line-height: 1;
+}
+.btn-primary {
+  background: var(--color-accent);    /* Blue CTA — pops on orange navbar */
+  color: white;
+}
+.btn-primary:hover { background: #152f6e; }
+.btn-primary-orange {
+  background: var(--color-primary);
+  color: white;
+}
+.btn-primary-orange:hover { background: var(--color-primary-dark); }
+.btn-secondary {
+  background: white;
+  color: var(--color-ink);
+  border-color: var(--color-border);
+}
+.btn-secondary:hover { background: var(--color-surface-alt); }
+.btn-ghost {
+  background: transparent;
+  color: var(--color-ink);
+}
+.btn-ghost:hover { background: var(--color-surface-alt); }
+.btn-lg { padding: 0.875rem 1.5rem; font-size: 1rem; }
+.btn-sm { padding: 0.375rem 0.75rem; font-size: 0.8125rem; }
+
+/* ---------- Cards ---------- */
+.card {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* ---------- Inputs ---------- */
+.input {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: white;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  color: var(--color-ink);
+}
+.input:focus {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: 1px;
+  border-color: var(--color-primary);
+}
+
+/* ---------- Badges ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--color-surface-alt);
+  color: var(--color-ink-soft);
+}
+.badge-success { background: #E8F5E9; color: var(--color-success); }
+.badge-warning { background: #FFF4E5; color: var(--color-warning); }
+.badge-danger { background: #FFEBEE; color: var(--color-danger); }
+.badge-primary { background: #FFF0E6; color: var(--color-primary-dark); }
+.badge-accent { background: var(--color-accent-light); color: var(--color-accent); }
+
+/* ---------- Nav ---------- */
+.navbar {
+  background: var(--color-primary);   /* Brand orange navbar */
+  border-bottom: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+.nav-link {
+  color: rgba(255,255,255,0.88);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  text-decoration: none;
+}
+.nav-link:hover { background: rgba(255,255,255,0.14); color: white; }
+/* Category rail sits below orange navbar, white bg */
+.category-nav .nav-link { color: var(--color-ink-soft); }
+.category-nav .nav-link:hover { background: var(--color-surface-alt); color: var(--color-ink); }
+
+/* ---------- Category pill ---------- */
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid var(--color-border);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.category-pill:hover { background: var(--color-surface-alt); border-color: var(--color-primary); }
+.category-pill.active { background: var(--color-accent); color: white; border-color: var(--color-accent); }
+
+/* ---------- Product card ---------- */
+.product-card {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.15s ease;
+}
+.product-card:hover { border-color: var(--color-primary); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(244,121,32,0.12); }
+.product-card-img {
+  aspect-ratio: 1;
+  background: var(--color-surface-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: var(--color-muted);
+  position: relative;
+}
+.product-card-body { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.375rem; flex: 1; }
+.product-card-seller { font-size: 0.6875rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.product-card-name { font-size: 0.875rem; font-weight: 500; line-height: 1.3; color: var(--color-ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.3em; }
+.product-card-price { font-family: 'Archivo', sans-serif; font-size: 1.125rem; font-weight: 800; color: var(--color-ink); margin-top: auto; }
+.product-card-price-old { text-decoration: line-through; color: var(--color-muted); font-size: 0.75rem; font-weight: 400; margin-right: 0.375rem; }
+
+/* ---------- Utility ---------- */
+.container { max-width: 1280px; margin: 0 auto; padding: 0 1.25rem; }
+.divider { height: 1px; background: var(--color-border); margin: 1.5rem 0; }
+.text-muted { color: var(--color-muted); }
+.text-primary { color: var(--color-primary); }
+.text-success { color: var(--color-success); }
+.text-warning { color: var(--color-warning); }
+.text-danger { color: var(--color-danger); }
+
+/* Icon placeholder */
+.icon-ph {
+  width: 20px; height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+/* Stars */
+.stars { color: var(--color-gold); letter-spacing: 1px; }
+
+/* Scrollbar styling for category rail */
+.scroll-x { overflow-x: auto; scroll-snap-type: x mandatory; }
+.scroll-x::-webkit-scrollbar { height: 6px; }
+.scroll-x::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+
+/* ---------- Cashback primitives ---------- */
+
+/* Small pill used on product cards + PDP */
+.cashback-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--color-accent);    /* Brand blue */
+  color: white;
+  font-weight: 600;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0.375rem 0.75rem;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+.cashback-badge::before {
+  content: '↻';
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+/* Larger highlighted block for cart/checkout/order confirmation */
+.cashback-card {
+  background: var(--color-accent-light);
+  border: 1px solid rgba(27,62,138,0.18);
+  border-left: 4px solid var(--color-accent);
+  border-radius: 12px;
+  padding: 1rem;
+  color: var(--color-ink);
+}
+.cashback-card h4 {
+  margin: 0 0 0.25rem;
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.cashback-card h4::before {
+  content: '↻';
+  color: var(--color-accent);
+  font-size: 1rem;
+}
+.cashback-card .cashback-amount {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: var(--color-accent);
+}
+.cashback-card .cashback-hint {
+  font-size: 0.75rem;
+  color: var(--color-ink-soft);
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+/* Hero-style card for the Cashback account page */
+.cashback-balance-card {
+  background: linear-gradient(135deg, var(--color-accent) 0%, #2a5cc7 100%);
+  color: white;
+  border-radius: 16px;
+  padding: 1.75rem 2rem;
+  position: relative;
+  overflow: hidden;
+}
+.cashback-balance-card::before {
+  content: '↻';
+  position: absolute;
+  right: -1rem;
+  top: -1.5rem;
+  font-size: 12rem;
+  color: rgba(255,255,255,0.12);
+  font-weight: 700;
+  pointer-events: none;
+}
+.cashback-balance-card .label {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  opacity: 0.9;
+  margin-bottom: 0.5rem;
+}
+.cashback-balance-card .balance {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 800;
+  font-size: 2.75rem;
+  line-height: 1;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.cashback-balance-card .sub {
+  font-size: 0.875rem;
+  opacity: 0.95;
+  margin-top: 0.625rem;
+  line-height: 1.5;
+}
+
+/* Compact pill in the topbar (sits on orange navbar) */
+.cashback-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: white;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1;
+}
+.cashback-pill:hover { background: rgba(255,255,255,0.25); }
+.cashback-pill::before {
+  content: '↻';
+  font-weight: 700;
+}
+
+/* Ledger row for the history table */
+.cashback-ledger-row {
+  display: grid;
+  grid-template-columns: 110px 100px 1fr 120px 110px;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.875rem;
+}
+.cashback-ledger-row:last-child { border-bottom: none; }
+.cashback-ledger-row .date { color: var(--color-muted); font-size: 0.8125rem; }
+.cashback-ledger-row .desc { color: var(--color-ink-soft); line-height: 1.4; }
+.cashback-ledger-row .desc strong { color: var(--color-ink); font-weight: 600; }
+.cashback-ledger-row .amount {
+  text-align: right;
+  font-family: 'Archivo', sans-serif;
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+.cashback-ledger-row .amount.positive { color: var(--color-success); }
+.cashback-ledger-row .amount.negative { color: var(--color-ink); }
+.cashback-ledger-row .amount.expired { color: var(--color-muted); text-decoration: line-through; }
+
+/* Sticky mockup frame chrome */
+.mockup-frame {
+  max-width: 1280px;
+  margin: 2rem auto;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+.mockup-label {
+  background: var(--color-ink);
+  color: white;
+  padding: 0.625rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.02em;
+}
+.mockup-page { background: var(--color-surface); }

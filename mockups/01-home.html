@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Utilar Ferragem — Início</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  .topbar { background: #0f2660; color: white; font-size: 0.8125rem; }
+  .topbar .container { padding: 0.5rem 1.25rem; display: flex; justify-content: space-between; align-items: center; }
+  .topbar a { color: var(--color-primary-light); text-decoration: none; }
+
+  .navbar .container { display: flex; align-items: center; gap: 1.5rem; padding: 1rem 1.25rem; }
+  .search-box {
+    flex: 1;
+    max-width: 560px;
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px;
+    padding: 0 0.875rem;
+    gap: 0.5rem;
+  }
+  .search-box input { flex: 1; background: transparent; border: none; padding: 0.75rem 0; outline: none; font-size: 0.9375rem; color: white; }
+  .search-box input::placeholder { color: rgba(255,255,255,0.6); }
+  .nav-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    text-decoration: none;
+    font-size: 0.875rem;
+    position: relative;
+  }
+  .nav-icon-btn:hover { background: rgba(255,255,255,0.12); }
+  .nav-icon-btn .count {
+    position: absolute;
+    top: -2px; right: 2px;
+    background: white;
+    color: var(--color-primary);
+    font-size: 0.625rem;
+    padding: 1px 5px;
+    border-radius: 999px;
+    font-weight: 700;
+  }
+
+  .category-rail { background: white; border-bottom: 1px solid var(--color-border); }
+  .category-rail .container { padding: 0.75rem 1.25rem; display: flex; gap: 0.5rem; overflow-x: auto; }
+
+  .hero {
+    position: relative;
+    background: linear-gradient(135deg, #0f2660 0%, #1B3E8A 100%);
+    color: white;
+    padding: 4rem 0;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle at 80% 50%, rgba(244,121,32,0.3), transparent 60%);
+  }
+  .hero .container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+  .hero h1 {
+    font-size: 3.25rem;
+    line-height: 1.05;
+    margin: 0 0 1rem;
+    font-family: 'Archivo', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .hero h1 span { color: var(--color-primary); }
+  .hero p {
+    font-size: 1.0625rem;
+    color: rgba(255,255,255,0.8);
+    margin: 0 0 1.5rem;
+    line-height: 1.5;
+    max-width: 440px;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: white;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    letter-spacing: 0.02em;
+  }
+  .hero-visual {
+    aspect-ratio: 4/3;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 8px;
+    padding: 8px;
+  }
+  .hero-tile {
+    background: rgba(255,255,255,0.06);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem;
+    color: rgba(255,255,255,0.4);
+  }
+  .hero-tile.accent { background: rgba(244,121,32,0.25); color: var(--color-primary-light); font-size: 2.5rem; }
+  .hero-tile.gold { background: rgba(27,62,138,0.25); color: rgba(255,255,255,0.7); }
+
+  section { padding: 3rem 0; }
+  .section-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; }
+  .section-head h2 { font-size: 1.75rem; margin: 0; }
+  .section-head a { color: var(--color-primary); font-weight: 600; font-size: 0.875rem; text-decoration: none; }
+
+  .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+  .cat-tile {
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.15s;
+    aspect-ratio: 5/3;
+  }
+  .cat-tile:hover { border-color: var(--color-primary); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.04); }
+  .cat-tile .cat-icon {
+    width: 44px; height: 44px;
+    background: var(--color-surface-alt);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem;
+  }
+  .cat-tile .cat-name { font-family: 'Archivo', sans-serif; font-weight: 700; font-size: 1rem; }
+  .cat-tile .cat-count { font-size: 0.75rem; color: var(--color-muted); margin-top: auto; }
+
+  .product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+
+  .trust-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    padding: 2rem;
+    background: white;
+    border-radius: 16px;
+    border: 1px solid var(--color-border);
+  }
+  .trust-item { display: flex; gap: 0.75rem; align-items: flex-start; }
+  .trust-icon {
+    width: 40px; height: 40px; flex-shrink: 0;
+    background: var(--color-surface-alt);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.125rem;
+  }
+  .trust-title { font-family: 'Archivo', sans-serif; font-weight: 700; font-size: 0.9375rem; margin: 0 0 0.125rem; }
+  .trust-desc { font-size: 0.8125rem; color: var(--color-muted); line-height: 1.4; margin: 0; }
+
+  footer {
+    background: var(--color-ink);
+    color: rgba(255,255,255,0.7);
+    padding: 3rem 0 1.5rem;
+    margin-top: 3rem;
+  }
+  footer .container {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    gap: 2rem;
+  }
+  footer h4 { color: white; font-size: 0.875rem; margin: 0 0 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; font-family: 'Archivo', sans-serif; }
+  footer a { display: block; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.875rem; line-height: 2; }
+  footer a:hover { color: white; }
+  .footer-bottom {
+    max-width: 1280px;
+    margin: 2rem auto 0;
+    padding: 1.5rem 1.25rem 0;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.5);
+  }
+  .payment-icons { display: flex; gap: 0.5rem; }
+  .payment-icons span {
+    background: rgba(255,255,255,0.08);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="container">
+    <span>Frete grátis em compras acima de R$ 299 · Use o cupom <strong>OBRA10</strong> · <strong style="color:var(--color-accent)">Ganhe cashback em todas as compras</strong></span>
+    <span><a href="#">Seja um vendedor</a> · <a href="#">Central de ajuda</a></span>
+  </div>
+</div>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="container">
+    <a href="01-home.html" class="brand">
+      <span class="logo-icon">U</span>
+      <span class="logo-wordmark">
+        <span class="logo-name"><span class="uti">Uti</span><span class="lar">Lar</span></span>
+        <span class="logo-tagline">Solução em Ferragem</span>
+      </span>
+    </a>
+
+    <div class="search-box">
+      <span class="icon-ph">⌕</span>
+      <input placeholder="Buscar ferramentas, cimento, cabos, tinta..." />
+    </div>
+
+    <a href="#" class="nav-icon-btn">⌂ Entregar em 01310-100</a>
+    <a href="#" class="nav-icon-btn">◉ Entrar</a>
+    <a href="04-cart.html" class="nav-icon-btn">
+      ⛒ Carrinho <span class="count">3</span>
+    </a>
+  </div>
+</nav>
+
+<!-- Category rail -->
+<div class="category-rail">
+  <div class="container">
+    <a class="category-pill" href="02-category.html">⚒ Ferramentas</a>
+    <a class="category-pill" href="#">◫ Construção</a>
+    <a class="category-pill" href="#">⚡ Elétrica</a>
+    <a class="category-pill" href="#">◡ Hidráulica</a>
+    <a class="category-pill" href="#">▥ Pintura</a>
+    <a class="category-pill" href="#">❀ Jardim</a>
+    <a class="category-pill" href="#">⚠ Segurança / EPI</a>
+    <a class="category-pill" href="#">▣ Fixação</a>
+    <a class="category-pill" href="#">Ofertas</a>
+    <a class="category-pill" href="#">Marcas</a>
+  </div>
+</div>
+
+<!-- Hero -->
+<section class="hero" style="padding: 5rem 0;">
+  <div class="container">
+    <div>
+      <span class="hero-badge">⚡ Novo · Entrega em até 24h em São Paulo</span>
+      <h1>Tudo para sua <span>obra</span>, direto da ferragem.</h1>
+      <p>Mais de 5 mil produtos de ferramentas, construção e elétrica — de centenas de vendedores parceiros, com pagamento em Pix, boleto ou cartão.</p>
+      <div style="display:flex; gap:0.75rem;">
+        <a href="02-category.html" class="btn btn-primary btn-lg">Explorar catálogo →</a>
+        <a href="07-seller-onboarding.html" class="btn btn-secondary btn-lg" style="background:transparent; color:white; border-color:rgba(255,255,255,0.3)">Vender no Utilar</a>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="hero-tile">⚒</div>
+      <div class="hero-tile gold">▦</div>
+      <div class="hero-tile">⚡</div>
+      <div class="hero-tile">◡</div>
+      <div class="hero-tile accent">⛏</div>
+      <div class="hero-tile">▥</div>
+      <div class="hero-tile">▣</div>
+      <div class="hero-tile gold">⚠</div>
+      <div class="hero-tile">❀</div>
+    </div>
+  </div>
+</section>
+
+<!-- Categories -->
+<section>
+  <div class="container">
+    <div class="section-head">
+      <h2>Categorias em destaque</h2>
+      <a href="#">Ver todas →</a>
+    </div>
+    <div class="cat-grid">
+      <a class="cat-tile" href="02-category.html">
+        <div class="cat-icon">⚒</div>
+        <div class="cat-name">Ferramentas Elétricas</div>
+        <div class="cat-count">1.234 produtos</div>
+      </a>
+      <a class="cat-tile" href="#">
+        <div class="cat-icon">◫</div>
+        <div class="cat-name">Construção</div>
+        <div class="cat-count">892 produtos</div>
+      </a>
+      <a class="cat-tile" href="#">
+        <div class="cat-icon">⚡</div>
+        <div class="cat-name">Elétrica</div>
+        <div class="cat-count">654 produtos</div>
+      </a>
+      <a class="cat-tile" href="#">
+        <div class="cat-icon">◡</div>
+        <div class="cat-name">Hidráulica</div>
+        <div class="cat-count">512 produtos</div>
+      </a>
+      <a class="cat-tile" href="#">
+        <div class="cat-icon">▥</div>
+        <div class="cat-name">Pintura</div>
+        <div class="cat-count">381 produtos</div>
+      </a>
+      <a class="cat-tile" href="#">
+        <div class="cat-icon">❀</div>
+        <div class="cat-name">Jardim e Externa</div>
+        <div class="cat-count">267 produtos</div>
+      </a>
+      <a class="cat-tile" href="#">
+        <div class="cat-icon">⚠</div>
+        <div class="cat-name">Segurança / EPI</div>
+        <div class="cat-count">203 produtos</div>
+      </a>
+      <a class="cat-tile" href="#">
+        <div class="cat-icon">▣</div>
+        <div class="cat-name">Fixação</div>
+        <div class="cat-count">1.087 produtos</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Featured products -->
+<section>
+  <div class="container">
+    <div class="section-head">
+      <h2>Mais vendidos esta semana</h2>
+      <a href="02-category.html">Ver todos →</a>
+    </div>
+    <div class="product-grid">
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">⚒<span class="badge badge-primary" style="position:absolute; top:10px; left:10px">-15%</span></div>
+        <div class="product-card-body">
+          <div class="product-card-seller">Ferragem Silva</div>
+          <div class="product-card-name">Furadeira de Impacto Bosch GSB 13 RE 650W 127V</div>
+          <div class="stars" style="font-size:0.75rem">★★★★★ <span style="color:var(--color-muted)">(142)</span></div>
+          <div class="product-card-price"><span class="product-card-price-old">R$ 389</span>R$ 329<span style="font-size:0.75rem; font-weight:400; color:var(--color-muted)"> em 12x</span></div>
+          <span class="cashback-badge">Ganhe R$ 24,90 em cashback</span>
+        </div>
+      </a>
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">◫</div>
+        <div class="product-card-body">
+          <div class="product-card-seller">Casa & Obra</div>
+          <div class="product-card-name">Cimento CP II-E-32 Votoran 50kg</div>
+          <div class="stars" style="font-size:0.75rem">★★★★☆ <span style="color:var(--color-muted)">(87)</span></div>
+          <div class="product-card-price">R$ 42,90</div>
+        </div>
+      </a>
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">⚡<span class="badge badge-success" style="position:absolute; top:10px; left:10px">Frete grátis</span></div>
+        <div class="product-card-body">
+          <div class="product-card-seller">Elétrica Costa</div>
+          <div class="product-card-name">Cabo Flexível 2,5mm² 100m Rolo Azul Sil</div>
+          <div class="stars" style="font-size:0.75rem">★★★★★ <span style="color:var(--color-muted)">(203)</span></div>
+          <div class="product-card-price">R$ 249,00</div>
+          <span class="cashback-badge">Ganhe R$ 12,50 em cashback</span>
+        </div>
+      </a>
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">◡</div>
+        <div class="product-card-body">
+          <div class="product-card-seller">Hidro Total</div>
+          <div class="product-card-name">Kit Tubo PVC Soldável 25mm 6m + 10 Conexões</div>
+          <div class="stars" style="font-size:0.75rem">★★★★☆ <span style="color:var(--color-muted)">(54)</span></div>
+          <div class="product-card-price">R$ 89,90</div>
+        </div>
+      </a>
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">▥</div>
+        <div class="product-card-body">
+          <div class="product-card-seller">Tintas Rio</div>
+          <div class="product-card-name">Tinta Acrílica Suvinil Fosco Premium 18L Branco</div>
+          <div class="stars" style="font-size:0.75rem">★★★★★ <span style="color:var(--color-muted)">(318)</span></div>
+          <div class="product-card-price">R$ 279,00</div>
+          <span class="cashback-badge">Ganhe R$ 25,00 em cashback</span>
+        </div>
+      </a>
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">▣</div>
+        <div class="product-card-body">
+          <div class="product-card-seller">Parafusos SP</div>
+          <div class="product-card-name">Kit Parafusos Autoatarraxantes Sortidos 500pç</div>
+          <div class="stars" style="font-size:0.75rem">★★★★☆ <span style="color:var(--color-muted)">(96)</span></div>
+          <div class="product-card-price">R$ 34,90</div>
+        </div>
+      </a>
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">⚠<span class="badge badge-warning" style="position:absolute; top:10px; left:10px">Últimas</span></div>
+        <div class="product-card-body">
+          <div class="product-card-seller">EPI Pro</div>
+          <div class="product-card-name">Capacete de Segurança Classe B Branco CA 31469</div>
+          <div class="stars" style="font-size:0.75rem">★★★★★ <span style="color:var(--color-muted)">(72)</span></div>
+          <div class="product-card-price">R$ 29,90</div>
+          <span class="cashback-badge">Ganhe R$ 6,00 em cashback</span>
+        </div>
+      </a>
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">⚒</div>
+        <div class="product-card-body">
+          <div class="product-card-seller">Ferragem Silva</div>
+          <div class="product-card-name">Parafusadeira Makita DF333DWYE 12V Bivolt</div>
+          <div class="stars" style="font-size:0.75rem">★★★★★ <span style="color:var(--color-muted)">(201)</span></div>
+          <div class="product-card-price">R$ 459,00</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Trust -->
+<section>
+  <div class="container">
+    <div class="trust-row">
+      <div class="trust-item">
+        <div class="trust-icon">⚡</div>
+        <div>
+          <h4 class="trust-title">Pix instantâneo</h4>
+          <p class="trust-desc">Pagamento confirmado na hora. Boleto e cartão em até 12x.</p>
+        </div>
+      </div>
+      <div class="trust-item">
+        <div class="trust-icon">✓</div>
+        <div>
+          <h4 class="trust-title">Ferragens verificadas</h4>
+          <p class="trust-desc">Todos os vendedores com CNPJ validado e nota fiscal.</p>
+        </div>
+      </div>
+      <div class="trust-item">
+        <div class="trust-icon">⎈</div>
+        <div>
+          <h4 class="trust-title">Entrega em 24h</h4>
+          <p class="trust-desc">Na grande São Paulo. Correios PAC/SEDEX para o Brasil todo.</p>
+        </div>
+      </div>
+      <div class="trust-item">
+        <div class="trust-icon">☎</div>
+        <div>
+          <h4 class="trust-title">Suporte brasileiro</h4>
+          <p class="trust-desc">WhatsApp e e-mail. Atendimento em português, horário comercial.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <div>
+      <div class="brand brand-dark" style="margin-bottom: 1rem;">
+        <span class="logo-icon">U</span>
+        <span class="logo-wordmark">
+          <span class="logo-name"><span class="uti">Uti</span><span class="lar">Lar</span></span>
+          <span class="logo-tagline">Solução em Ferragem</span>
+        </span>
+      </div>
+      <p style="font-size:0.875rem; line-height:1.5; margin:0 0 1rem;">Marketplace vertical de ferramentas e materiais de construção. Direto de ferragens brasileiras, para sua obra.</p>
+      <div class="payment-icons">
+        <span>PIX</span>
+        <span>BOLETO</span>
+        <span>VISA</span>
+        <span>MASTER</span>
+        <span>ELO</span>
+      </div>
+    </div>
+    <div>
+      <h4>Institucional</h4>
+      <a href="#">Sobre nós</a>
+      <a href="#">Trabalhe conosco</a>
+      <a href="#">Imprensa</a>
+      <a href="#">Política de privacidade (LGPD)</a>
+      <a href="#">Termos de uso</a>
+    </div>
+    <div>
+      <h4>Atendimento</h4>
+      <a href="#">Central de ajuda</a>
+      <a href="#">Meus pedidos</a>
+      <a href="#">Trocas e devoluções</a>
+      <a href="#">Fale conosco</a>
+    </div>
+    <div>
+      <h4>Venda no Utilar</h4>
+      <a href="07-seller-onboarding.html">Cadastre sua ferragem</a>
+      <a href="#">Portal do vendedor</a>
+      <a href="#">Regras e taxas</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Utilar Ferragem · CNPJ 00.000.000/0001-00 · São Paulo / SP</span>
+    <span>pt-BR / BRL</span>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meus Pedidos — Utilar Ferragem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  .topbar { background: #0f2660; color: white; font-size: 0.8125rem; }
+  .topbar .container { padding: 0.5rem 1.25rem; display: flex; justify-content: space-between; }
+  .navbar .container { display: flex; align-items: center; gap: 1.5rem; padding: 1rem 1.25rem; }
+  .search-box { flex:1; max-width:560px; display:flex; align-items:center; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:10px; padding:0 0.875rem; gap:0.5rem; }
+  .search-box input { flex:1; background:transparent; border:none; padding:0.75rem 0; outline:none; font-size:0.9375rem; color:white; }
+  .search-box input::placeholder { color: rgba(255,255,255,0.6); }
+  .nav-icon-btn { display:inline-flex; align-items:center; gap:0.375rem; padding:0.5rem 0.75rem; border-radius:8px; color:white; font-weight:500; text-decoration:none; font-size:0.875rem; position:relative; }
+  .nav-icon-btn:hover { background: rgba(255,255,255,0.12); }
+  .nav-icon-btn .count { position:absolute; top:-2px; right:2px; background:white; color:var(--color-primary); font-size:0.625rem; padding:1px 5px; border-radius:999px; font-weight:700; }
+
+  .account-layout { display: grid; grid-template-columns: 240px 1fr; gap: 2rem; padding: 2rem 0 3rem; }
+
+  .account-sidebar { background: white; border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem; align-self: start; position: sticky; top: 1rem; }
+  .user-block { padding: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 0.5rem; display: flex; gap: 0.75rem; align-items: center; }
+  .avatar-circle { width: 40px; height: 40px; background: var(--color-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: 'Archivo',sans-serif; }
+  .user-name { font-weight: 600; font-size: 0.9375rem; }
+  .user-email { font-size: 0.75rem; color: var(--color-muted); }
+  .account-nav a { display: flex; align-items: center; gap: 0.625rem; padding: 0.625rem 0.75rem; border-radius: 8px; color: var(--color-ink-soft); text-decoration: none; font-size: 0.875rem; }
+  .account-nav a.active { background: var(--color-ink); color: white; font-weight: 600; }
+  .account-nav a:hover:not(.active) { background: var(--color-surface-alt); color: var(--color-ink); }
+
+  .account-main h1 { font-size: 1.75rem; margin: 0 0 1.25rem; }
+  .filter-row { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; align-items: center; }
+  .search-orders { flex: 1; max-width: 320px; }
+
+  .order-card { background: white; border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
+  .order-head { padding: 1rem 1.25rem; background: var(--color-surface-alt); border-bottom: 1px solid var(--color-border); display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 1rem; font-size: 0.8125rem; align-items: center; }
+  .order-head .lbl { color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.6875rem; font-weight: 600; display: block; margin-bottom: 0.125rem; }
+  .order-head .val { font-weight: 600; font-size: 0.875rem; }
+  .order-head .order-number { font-family: 'JetBrains Mono',monospace; font-size: 0.8125rem; }
+
+  .order-body { padding: 1.25rem; }
+  .order-timeline { display: flex; align-items: center; gap: 0; margin-bottom: 1.25rem; }
+  .tl-step { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
+  .tl-dot { width: 32px; height: 32px; background: var(--color-surface-alt); border: 2px solid var(--color-border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; color: var(--color-muted); z-index: 1; background-color: white; }
+  .tl-step.done .tl-dot { background: var(--color-success); color: white; border-color: var(--color-success); }
+  .tl-step.active .tl-dot { background: var(--color-primary); color: white; border-color: var(--color-primary); box-shadow: 0 0 0 4px rgba(244,121,32,0.2); }
+  .tl-bar { flex: 1; height: 2px; background: var(--color-border); }
+  .tl-bar.done { background: var(--color-success); }
+  .tl-label { font-size: 0.75rem; color: var(--color-muted); margin-top: 0.375rem; text-align: center; font-weight: 500; }
+  .tl-step.done .tl-label, .tl-step.active .tl-label { color: var(--color-ink); font-weight: 600; }
+  .tl-date { font-size: 0.6875rem; color: var(--color-muted); margin-top: 0.125rem; }
+
+  .order-items { display: flex; gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
+  .order-thumb { width: 64px; height: 64px; background: var(--color-surface-alt); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--color-muted); flex-shrink: 0; }
+  .order-items-list { flex: 1; font-size: 0.8125rem; color: var(--color-ink-soft); line-height: 1.6; }
+  .order-items-list strong { color: var(--color-ink); }
+
+  .order-actions { display: flex; gap: 0.5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); justify-content: flex-end; }
+
+  footer { background: var(--color-ink); color: rgba(255,255,255,0.6); padding: 2rem 0; margin-top: 3rem; font-size: 0.8125rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="container"><span>pt-BR · BRL</span><span>Olá, João Pereira</span></div></div>
+
+<nav class="navbar"><div class="container">
+  <a href="01-home.html" class="brand">
+    <span class="logo-icon">U</span>
+    <span class="logo-wordmark">
+      <span class="logo-name"><span class="uti">Uti</span><span class="lar">Lar</span></span>
+      <span class="logo-tagline">Solução em Ferragem</span>
+    </span>
+  </a>
+  <div class="search-box">⌕ <input placeholder="Buscar..." /></div>
+  <a href="#" class="nav-icon-btn">◉ João</a>
+  <a href="04-cart.html" class="nav-icon-btn">⛒ Carrinho</a>
+</div></nav>
+
+<div class="container">
+  <div class="account-layout">
+
+    <!-- Sidebar -->
+    <aside class="account-sidebar">
+      <div class="user-block">
+        <div class="avatar-circle">JP</div>
+        <div>
+          <div class="user-name">João Pereira</div>
+          <div class="user-email">joao@exemplo.com</div>
+        </div>
+      </div>
+      <div style="margin:0.5rem 0.75rem 0.75rem;padding:0.75rem;background:color-mix(in srgb, var(--color-accent) 18%, white);border-radius:10px;border:1px solid color-mix(in srgb, var(--color-accent) 45%, white);">
+        <div style="font-size:0.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-muted);margin-bottom:0.25rem;">↻ Meu Cashback</div>
+        <div style="font-family:'Archivo',sans-serif;font-size:1.125rem;font-weight:800;color:var(--color-primary-dark);">R$ 127,40</div>
+        <div style="font-size:0.75rem;color:var(--color-ink-soft);">+ R$ 45,20 pendente</div>
+        <a href="08-account-cashback.html" style="font-size:0.75rem;color:var(--color-primary);font-weight:600;text-decoration:none;display:block;margin-top:0.25rem;">Ver histórico →</a>
+      </div>
+      <nav class="account-nav">
+        <a href="#">◉ Perfil</a>
+        <a href="#" class="active">▦ Meus pedidos</a>
+        <a href="08-account-cashback.html">↻ Meu Cashback <span style="background:var(--color-accent);color:var(--color-ink);font-size:0.625rem;padding:1px 6px;border-radius:999px;font-weight:700;margin-left:auto;">R$ 127</span></a>
+        <a href="#">⌂ Endereços</a>
+        <a href="#">◈ Cartões salvos</a>
+        <a href="#">❤ Favoritos</a>
+        <a href="#">✉ Notificações</a>
+        <a href="#">☰ Configurações</a>
+        <a href="#" style="margin-top: 1rem; color: var(--color-danger); font-size: 0.8125rem;">↗ Sair</a>
+      </nav>
+    </aside>
+
+    <!-- Main -->
+    <main class="account-main">
+      <h1>Meus pedidos</h1>
+
+      <div class="filter-row">
+        <div class="search-orders search-box" style="border:1px solid var(--color-border);background:var(--color-surface-alt);">⌕ <input placeholder="Buscar por número ou produto..." style="color:var(--color-ink);" /></div>
+        <select class="input" style="width:auto;">
+          <option>Todos os status</option>
+          <option>Aguardando pagamento</option>
+          <option>Pago</option>
+          <option>Enviado</option>
+          <option>Entregue</option>
+          <option>Cancelado</option>
+        </select>
+        <select class="input" style="width:auto;">
+          <option>Últimos 6 meses</option>
+          <option>Últimos 30 dias</option>
+          <option>Este ano</option>
+          <option>Anterior a 2026</option>
+        </select>
+      </div>
+
+      <!-- Order 1 — in transit -->
+      <div class="order-card">
+        <div class="order-head">
+          <div>
+            <span class="lbl">Pedido</span>
+            <span class="val order-number">#UT-2026-00142</span>
+          </div>
+          <div>
+            <span class="lbl">Data</span>
+            <span class="val">18 abr 2026</span>
+          </div>
+          <div>
+            <span class="lbl">Total</span>
+            <span class="val">R$ 461,27</span>
+          </div>
+          <div>
+            <span class="lbl">Status</span>
+            <span class="badge badge-primary">Em trânsito</span>
+          </div>
+          <a href="#" class="btn btn-ghost btn-sm">Ver detalhes →</a>
+        </div>
+
+        <div class="order-body">
+          <div class="order-timeline">
+            <div class="tl-step done">
+              <div class="tl-dot">✓</div>
+              <div class="tl-label">Pago</div>
+              <div class="tl-date">18/04</div>
+            </div>
+            <div class="tl-bar done"></div>
+            <div class="tl-step done">
+              <div class="tl-dot">✓</div>
+              <div class="tl-label">Separado</div>
+              <div class="tl-date">19/04</div>
+            </div>
+            <div class="tl-bar done"></div>
+            <div class="tl-step active">
+              <div class="tl-dot">⎈</div>
+              <div class="tl-label">Em trânsito</div>
+              <div class="tl-date">chega 21/04</div>
+            </div>
+            <div class="tl-bar"></div>
+            <div class="tl-step">
+              <div class="tl-dot">⌂</div>
+              <div class="tl-label">Entregue</div>
+              <div class="tl-date">—</div>
+            </div>
+          </div>
+
+          <div class="order-items">
+            <div class="order-thumb">⚒</div>
+            <div class="order-thumb">⚒</div>
+            <div class="order-thumb">⚠</div>
+            <div class="order-items-list">
+              <strong>Furadeira Bosch GSB 13 RE</strong>, <strong>Jogo de Brocas Bosch 5pç (×2)</strong>, <strong>Capacete Classe B (×3)</strong>
+              <div style="color: var(--color-muted); margin-top: 0.375rem;">Rastreamento: <a href="#" style="color:var(--color-primary);">OM184729351BR</a> · Correios SEDEX</div>
+            </div>
+          </div>
+
+          <div class="order-actions">
+            <a href="#" class="btn btn-secondary btn-sm">Rastrear</a>
+            <a href="#" class="btn btn-secondary btn-sm">Problema com pedido</a>
+            <span class="cashback-badge" style="font-size:0.75rem;padding:0.375rem 0.625rem;">↻ R$ 45,20 pendente — creditado na entrega</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Order 2 — delivered -->
+      <div class="order-card">
+        <div class="order-head">
+          <div>
+            <span class="lbl">Pedido</span>
+            <span class="val order-number">#UT-2026-00089</span>
+          </div>
+          <div>
+            <span class="lbl">Data</span>
+            <span class="val">02 abr 2026</span>
+          </div>
+          <div>
+            <span class="lbl">Total</span>
+            <span class="val">R$ 279,00</span>
+          </div>
+          <div>
+            <span class="lbl">Status</span>
+            <span class="badge badge-success">Entregue</span>
+          </div>
+          <a href="#" class="btn btn-ghost btn-sm">Ver detalhes →</a>
+        </div>
+
+        <div class="order-body">
+          <div class="order-items">
+            <div class="order-thumb">▥</div>
+            <div class="order-items-list">
+              <strong>Tinta Acrílica Suvinil Fosco Premium 18L Branco</strong>
+              <div style="color: var(--color-muted); margin-top: 0.375rem;">Entregue em 05/04 · avaliou com <span class="stars">★★★★★</span></div>
+            </div>
+          </div>
+
+          <div class="order-actions">
+            <a href="#" class="btn btn-secondary btn-sm">Comprar novamente</a>
+            <a href="#" class="btn btn-secondary btn-sm">Baixar nota fiscal</a>
+            <span class="badge badge-success" style="font-size:0.75rem;">↻ Cashback creditado: R$ 13,95</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Order 3 — awaiting payment -->
+      <div class="order-card">
+        <div class="order-head">
+          <div>
+            <span class="lbl">Pedido</span>
+            <span class="val order-number">#UT-2026-00154</span>
+          </div>
+          <div>
+            <span class="lbl">Data</span>
+            <span class="val">20 abr 2026</span>
+          </div>
+          <div>
+            <span class="lbl">Total</span>
+            <span class="val">R$ 89,90</span>
+          </div>
+          <div>
+            <span class="lbl">Status</span>
+            <span class="badge badge-warning">Aguardando boleto</span>
+          </div>
+          <a href="#" class="btn btn-ghost btn-sm">Ver detalhes →</a>
+        </div>
+
+        <div class="order-body">
+          <div class="order-items">
+            <div class="order-thumb">◡</div>
+            <div class="order-items-list">
+              <strong>Kit Tubo PVC Soldável 25mm + 10 Conexões</strong>
+              <div style="color: var(--color-warning); margin-top: 0.375rem; font-weight: 600;">⚠ Vence em 2 dias · Pague até 22/04</div>
+            </div>
+          </div>
+
+          <div class="order-actions">
+            <a href="#" class="btn btn-secondary btn-sm">Cancelar pedido</a>
+            <a href="#" class="btn btn-primary btn-sm">Visualizar boleto</a>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:center; margin-top: 1.5rem;">
+        <a href="#" class="btn btn-ghost">Ver pedidos mais antigos →</a>
+      </div>
+    </main>
+  </div>
+</div>
+
+<footer>© 2026 Utilar Ferragem</footer>
+</body>
+</html>

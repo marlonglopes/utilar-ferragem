@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Utilar Ferragem — Design Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  body { background: #EFEBE3; }
+  .deck-header {
+    padding: 4rem 1.5rem 2rem;
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .deck-header h1 {
+    font-family: 'Archivo', sans-serif;
+    font-weight: 800;
+    font-size: 3rem;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.75rem;
+  }
+  .deck-header p {
+    color: var(--color-muted);
+    font-size: 1.0625rem;
+    line-height: 1.5;
+    margin: 0;
+  }
+  .deck-brand {
+    font-family: 'Archivo', sans-serif;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 1rem;
+    margin-bottom: 2rem;
+  }
+  .deck-brand .p { color: var(--color-primary); }
+  .deck-palette {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 2rem auto 0;
+  }
+  .swatch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--color-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .swatch-chip {
+    width: 56px; height: 56px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .deck-grid {
+    max-width: 1280px;
+    margin: 3rem auto;
+    padding: 0 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1.5rem;
+  }
+  .screen-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(0,0,0,0.04);
+  }
+  .screen-card:hover { transform: translateY(-4px); box-shadow: 0 20px 48px rgba(244,121,32,0.15), 0 4px 12px rgba(0,0,0,0.06); }
+  .screen-thumb {
+    aspect-ratio: 16/10;
+    background: var(--color-surface-alt);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    color: var(--color-muted);
+    font-family: 'Archivo', sans-serif;
+    font-weight: 800;
+    position: relative;
+    overflow: hidden;
+  }
+  .screen-thumb::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 60%, rgba(244,121,32,0.08));
+  }
+  .screen-thumb .num {
+    font-size: 5rem;
+    color: var(--color-primary);
+    opacity: 0.15;
+    font-weight: 800;
+  }
+  .screen-thumb .icon {
+    position: absolute;
+    font-size: 3.5rem;
+    color: var(--color-primary);
+  }
+  .screen-body {
+    padding: 1.25rem 1.375rem 1.375rem;
+  }
+  .screen-kicker {
+    font-size: 0.6875rem;
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    margin-bottom: 0.375rem;
+  }
+  .screen-title {
+    font-family: 'Archivo', sans-serif;
+    font-weight: 700;
+    font-size: 1.125rem;
+    margin: 0 0 0.375rem;
+  }
+  .screen-desc {
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    margin: 0;
+  }
+  .deck-footer {
+    text-align: center;
+    padding: 3rem 1rem 4rem;
+    color: var(--color-muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="deck-header">
+  <div class="deck-brand">UTILAR <span class="p">FERRAGEM</span></div>
+  <h1>Design Deck</h1>
+  <p>Visual reference for the Utilar Ferragem marketplace. Click any screen below to open the full mockup. All screens are HTML prototypes — exact structure that will be built in the actual app.</p>
+
+  <div class="deck-palette">
+    <div class="swatch"><div class="swatch-chip" style="background:#F47920"></div>#F47920</div>
+    <div class="swatch"><div class="swatch-chip" style="background:#1B3E8A"></div>#1B3E8A</div>
+    <div class="swatch"><div class="swatch-chip" style="background:#0f2660"></div>#0f2660</div>
+    <div class="swatch"><div class="swatch-chip" style="background:#1F1F1F"></div>#1F1F1F</div>
+    <div class="swatch"><div class="swatch-chip" style="background:#FAFAF7;border-color:#D8D4CC"></div>#FAFAF7</div>
+    <div class="swatch"><div class="swatch-chip" style="background:#F0EEE8;border-color:#D8D4CC"></div>#F0EEE8</div>
+  </div>
+</div>
+
+<div class="deck-grid">
+
+  <a class="screen-card" href="01-home.html">
+    <div class="screen-thumb"><span class="num">01</span><span class="icon">⌂</span></div>
+    <div class="screen-body">
+      <div class="screen-kicker">Phase 2 · Sprint 03</div>
+      <h3 class="screen-title">Home — Catálogo</h3>
+      <p class="screen-desc">Hero, category rail, featured products, editorial block.</p>
+    </div>
+  </a>
+
+  <a class="screen-card" href="02-category.html">
+    <div class="screen-thumb"><span class="num">02</span><span class="icon">▦</span></div>
+    <div class="screen-body">
+      <div class="screen-kicker">Phase 2 · Sprint 03 + 05</div>
+      <h3 class="screen-title">Categoria — Ferramentas Elétricas</h3>
+      <p class="screen-desc">Grid, faceted filters, trade-specific attributes (voltagem, potência).</p>
+    </div>
+  </a>
+
+  <a class="screen-card" href="03-product-detail.html">
+    <div class="screen-thumb"><span class="num">03</span><span class="icon">◫</span></div>
+    <div class="screen-body">
+      <div class="screen-kicker">Phase 2 · Sprint 04</div>
+      <h3 class="screen-title">Produto — Furadeira Bosch</h3>
+      <p class="screen-desc">Galeria, ficha técnica, estoque, vendedor, relacionados.</p>
+    </div>
+  </a>
+
+  <a class="screen-card" href="04-cart.html">
+    <div class="screen-thumb"><span class="num">04</span><span class="icon">⛒</span></div>
+    <div class="screen-body">
+      <div class="screen-kicker">Phase 3 · Sprint 06</div>
+      <h3 class="screen-title">Carrinho</h3>
+      <p class="screen-desc">Drawer lateral com itens agrupados por vendedor e resumo.</p>
+    </div>
+  </a>
+
+  <a class="screen-card" href="05-checkout.html">
+    <div class="screen-thumb"><span class="num">05</span><span class="icon">◎</span></div>
+    <div class="screen-body">
+      <div class="screen-kicker">Phase 3 · Sprint 08</div>
+      <h3 class="screen-title">Checkout — Pagamento</h3>
+      <p class="screen-desc">Endereço (ViaCEP), entrega, pagamento Pix/boleto/cartão.</p>
+    </div>
+  </a>
+
+  <a class="screen-card" href="06-account-orders.html">
+    <div class="screen-thumb"><span class="num">06</span><span class="icon">☰</span></div>
+    <div class="screen-body">
+      <div class="screen-kicker">Phase 3 · Sprint 09</div>
+      <h3 class="screen-title">Meus Pedidos</h3>
+      <p class="screen-desc">Histórico + timeline de status + rastreio.</p>
+    </div>
+  </a>
+
+  <a class="screen-card" href="07-seller-onboarding.html">
+    <div class="screen-thumb"><span class="num">07</span><span class="icon">⚒</span></div>
+    <div class="screen-body">
+      <div class="screen-kicker">Phase 4 · Sprint 10</div>
+      <h3 class="screen-title">Cadastre sua ferragem</h3>
+      <p class="screen-desc">Wizard de onboarding: CNPJ, perfil, categorias, comercial.</p>
+    </div>
+  </a>
+
+  <a class="screen-card" href="08-account-cashback.html">
+    <div class="screen-thumb" style="background:linear-gradient(135deg, #1B3E8A, #2a5cc7);"><span class="num" style="color:white;opacity:0.2;">08</span><span class="icon" style="color:white;">↻</span></div>
+    <div class="screen-body">
+      <div class="screen-kicker">Phase 5 · Sprint 26</div>
+      <h3 class="screen-title">Meu Cashback</h3>
+      <p class="screen-desc">Saldo disponível e pendente, próxima expiração, histórico com filtros por tipo.</p>
+    </div>
+  </a>
+
+</div>
+
+<div class="deck-footer">
+  Utilar Ferragem · Marketplace vertical de ferramentas e materiais de construção · Protótipo de alta fidelidade · 8 telas
+</div>
+
+</body>
+</html>

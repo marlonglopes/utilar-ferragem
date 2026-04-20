@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meu Cashback — Utilar Ferragem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  .topbar { background: #0f2660; color: white; font-size: 0.8125rem; }
+  .topbar .container { padding: 0.5rem 1.25rem; display: flex; justify-content: space-between; }
+  .navbar .container { display: flex; align-items: center; gap: 1.5rem; padding: 1rem 1.25rem; }
+  .search-box { flex:1; max-width:560px; display:flex; align-items:center; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:10px; padding:0 0.875rem; gap:0.5rem; }
+  .search-box input { flex:1; background:transparent; border:none; padding:0.75rem 0; outline:none; font-size:0.9375rem; color:white; }
+  .search-box input::placeholder { color: rgba(255,255,255,0.6); }
+  .nav-icon-btn { display:inline-flex; align-items:center; gap:0.375rem; padding:0.5rem 0.75rem; border-radius:8px; color:white; font-weight:500; text-decoration:none; font-size:0.875rem; position:relative; }
+  .nav-icon-btn:hover { background: rgba(255,255,255,0.12); }
+
+  .account-layout { display: grid; grid-template-columns: 240px 1fr; gap: 2rem; padding: 2rem 0 3rem; }
+
+  .account-sidebar { background: white; border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem; align-self: start; position: sticky; top: 1rem; }
+  .user-block { padding: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 0.5rem; display: flex; gap: 0.75rem; align-items: center; }
+  .avatar-circle { width: 40px; height: 40px; background: var(--color-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: 'Archivo',sans-serif; }
+  .user-name { font-weight: 600; font-size: 0.9375rem; }
+  .user-email { font-size: 0.75rem; color: var(--color-muted); }
+  .account-nav a { display: flex; align-items: center; gap: 0.625rem; padding: 0.625rem 0.75rem; border-radius: 8px; color: var(--color-ink-soft); text-decoration: none; font-size: 0.875rem; }
+  .account-nav a.active { background: var(--color-ink); color: white; font-weight: 600; }
+  .account-nav a:hover:not(.active) { background: var(--color-surface-alt); color: var(--color-ink); }
+
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1.5rem 0; }
+  .stat-card { background: white; border: 1px solid var(--color-border); border-radius: 12px; padding: 1.125rem 1.25rem; }
+  .stat-card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; color: var(--color-muted); margin-bottom: 0.375rem; }
+  .stat-card .value { font-family: 'Archivo',sans-serif; font-weight: 800; font-size: 1.5rem; color: var(--color-ink); }
+  .stat-card .sub { font-size: 0.75rem; color: var(--color-muted); margin-top: 0.25rem; }
+
+  .how-it-works { background: white; border: 1px solid var(--color-border); border-radius: 12px; padding: 1.125rem 1.25rem; margin-bottom: 1.5rem; }
+  .how-it-works summary { font-weight: 600; font-size: 0.9375rem; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  .how-it-works summary::after { content: '▾'; color: var(--color-muted); }
+  .steps-row { display: flex; gap: 1.5rem; margin-top: 1rem; }
+  .step-item { flex: 1; text-align: center; }
+  .step-num { width: 36px; height: 36px; background: var(--color-primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; margin: 0 auto 0.5rem; }
+  .step-text { font-size: 0.8125rem; color: var(--color-ink-soft); line-height: 1.4; }
+  .step-text strong { display: block; color: var(--color-ink); font-weight: 600; margin-bottom: 0.125rem; }
+
+  .history-section { background: white; border: 1px solid var(--color-border); border-radius: 12px; overflow: hidden; }
+  .history-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; }
+  .history-header h2 { font-size: 1.0625rem; margin: 0; }
+  .filter-tabs { display: flex; gap: 0.25rem; }
+  .filter-tab { padding: 0.375rem 0.75rem; border-radius: 999px; border: 1px solid var(--color-border); font-size: 0.8125rem; font-weight: 500; cursor: pointer; background: white; color: var(--color-ink-soft); text-decoration: none; }
+  .filter-tab.active { background: var(--color-ink); color: white; border-color: var(--color-ink); }
+  .filter-tab:hover:not(.active) { background: var(--color-surface-alt); }
+
+  .ledger-header { display: grid; grid-template-columns: 110px 100px 1fr 120px 110px; gap: 1rem; padding: 0.625rem 1rem; background: var(--color-surface-alt); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-muted); }
+
+  .expiry-banner { background: #FFF8E1; border: 1px solid #FFD54F; border-radius: 10px; padding: 0.875rem 1rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; font-size: 0.875rem; }
+
+  footer { background: var(--color-ink); color: rgba(255,255,255,0.6); padding: 2rem 0; margin-top: 3rem; font-size: 0.8125rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="container"><span>pt-BR · BRL</span><span>Olá, João Pereira</span></div></div>
+
+<nav class="navbar"><div class="container">
+  <a href="01-home.html" class="brand">
+    <span class="logo-icon">U</span>
+    <span class="logo-wordmark">
+      <span class="logo-name"><span class="uti">Uti</span><span class="lar">Lar</span></span>
+      <span class="logo-tagline">Solução em Ferragem</span>
+    </span>
+  </a>
+  <div class="search-box">⌕ <input placeholder="Buscar..." /></div>
+  <a href="#" class="nav-icon-btn">◉ João</a>
+  <a href="#" class="cashback-pill" style="text-decoration:none;">R$ 127,40</a>
+  <a href="04-cart.html" class="nav-icon-btn">⛒ Carrinho</a>
+</div></nav>
+
+<div class="container">
+  <div class="account-layout">
+
+    <!-- Sidebar -->
+    <aside class="account-sidebar">
+      <div class="user-block">
+        <div class="avatar-circle">JP</div>
+        <div>
+          <div class="user-name">João Pereira</div>
+          <div class="user-email">joao@exemplo.com</div>
+        </div>
+      </div>
+      <nav class="account-nav">
+        <a href="#">◉ Perfil</a>
+        <a href="06-account-orders.html">▦ Meus pedidos</a>
+        <a href="#" class="active">↻ Meu Cashback</a>
+        <a href="#">⌂ Endereços</a>
+        <a href="#">◈ Cartões salvos</a>
+        <a href="#">❤ Favoritos</a>
+        <a href="#">✉ Notificações</a>
+        <a href="#">☰ Configurações</a>
+        <a href="#" style="margin-top: 1rem; color: var(--color-danger); font-size: 0.8125rem;">↗ Sair</a>
+      </nav>
+    </aside>
+
+    <!-- Main -->
+    <main>
+
+      <!-- Hero balance card -->
+      <div class="cashback-balance-card">
+        <div class="label">Seu saldo de cashback</div>
+        <p class="balance">R$ 127,40</p>
+        <div class="sub">
+          + R$ 45,20 pendente (creditado após entrega dos pedidos em aberto) ·
+          Próxima expiração: <strong>R$ 12,00</strong> em 14/07/2026
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="label">Disponível agora</div>
+          <div class="value">R$ 127,40</div>
+          <div class="sub">Use no próximo checkout</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Pendente</div>
+          <div class="value" style="color:var(--color-warning);">R$ 45,20</div>
+          <div class="sub">Aguardando entrega de 2 pedidos</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Total ganho</div>
+          <div class="value" style="color:var(--color-success);">R$ 312,80</div>
+          <div class="sub">Desde outubro de 2025</div>
+        </div>
+      </div>
+
+      <!-- Expiry warning -->
+      <div class="expiry-banner">
+        <span style="font-size:1.375rem;">⚠</span>
+        <div>
+          <strong>R$ 12,00 do seu cashback expira em 30 dias</strong> (14/07/2026 · Pedido #UT-2025-00312).<br>
+          <a href="#" style="color:var(--color-primary);font-weight:600;">Usar agora →</a>
+        </div>
+      </div>
+
+      <!-- How it works -->
+      <details class="how-it-works" open>
+        <summary>↻ Como funciona o cashback?</summary>
+        <div class="steps-row">
+          <div class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-text"><strong>Compre produtos com cashback</strong>Procure o selo ↻ em produtos do catálogo.</div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-text"><strong>Receba o crédito na entrega</strong>O cashback fica pendente até o pedido ser entregue.</div>
+          </div>
+          <div class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-text"><strong>Use em futuras compras</strong>Aplique até 50% do subtotal em qualquer compra (mín. R$ 5). Válido por 12 meses.</div>
+          </div>
+        </div>
+      </details>
+
+      <!-- History table -->
+      <div class="history-section">
+        <div class="history-header">
+          <h2>↻ Histórico</h2>
+          <div class="filter-tabs">
+            <a href="#" class="filter-tab active">Todos</a>
+            <a href="#" class="filter-tab">Ganhos</a>
+            <a href="#" class="filter-tab">Usados</a>
+            <a href="#" class="filter-tab">Expirados</a>
+            <a href="#" class="filter-tab">Estornados</a>
+          </div>
+        </div>
+
+        <div class="ledger-header">
+          <span>Data</span>
+          <span>Tipo</span>
+          <span>Descrição</span>
+          <span style="text-align:right;">Valor</span>
+          <span>Status</span>
+        </div>
+
+        <!-- Row: earned + available (delivered) -->
+        <div class="cashback-ledger-row">
+          <span class="date">19 abr 2026</span>
+          <span><span class="badge" style="background:#E8F5E9;color:var(--color-success);">↻ Ganho</span></span>
+          <span class="desc"><strong>Pedido #UT-2026-00089</strong><br>Tinta Acrílica Suvinil 18L · entregue em 05/04</span>
+          <span class="amount positive">+ R$ 13,95</span>
+          <span><span class="badge badge-success">Disponível</span></span>
+        </div>
+
+        <!-- Row: redeemed -->
+        <div class="cashback-ledger-row">
+          <span class="date">18 abr 2026</span>
+          <span><span class="badge badge-primary">↓ Usado</span></span>
+          <span class="desc"><strong>Pedido #UT-2026-00142</strong><br>Cashback aplicado no checkout</span>
+          <span class="amount negative">− R$ 20,00</span>
+          <span><span class="badge">Usado</span></span>
+        </div>
+
+        <!-- Row: earned, pending (order in transit) -->
+        <div class="cashback-ledger-row">
+          <span class="date">18 abr 2026</span>
+          <span><span class="badge" style="background:#FFF8E1;color:#B87900;">↻ Ganho</span></span>
+          <span class="desc"><strong>Pedido #UT-2026-00142</strong><br>Furadeira Bosch + Brocas + Capacetes · em trânsito</span>
+          <span class="amount positive">+ R$ 45,20</span>
+          <span><span class="badge badge-warning">Pendente</span></span>
+        </div>
+
+        <!-- Row: earned + available -->
+        <div class="cashback-ledger-row">
+          <span class="date">10 abr 2026</span>
+          <span><span class="badge" style="background:#E8F5E9;color:var(--color-success);">↻ Ganho</span></span>
+          <span class="desc"><strong>Pedido #UT-2026-00101</strong><br>Martelete Makita HR2470 · entregue em 14/04</span>
+          <span class="amount positive">+ R$ 32,67</span>
+          <span><span class="badge badge-success">Disponível</span></span>
+        </div>
+
+        <!-- Row: earned + available -->
+        <div class="cashback-ledger-row">
+          <span class="date">28 mar 2026</span>
+          <span><span class="badge" style="background:#E8F5E9;color:var(--color-success);">↻ Ganho</span></span>
+          <span class="desc"><strong>Pedido #UT-2026-00078</strong><br>Serra Circular Makita + Disco Diamantado</span>
+          <span class="amount positive">+ R$ 41,70</span>
+          <span><span class="badge badge-success">Disponível</span></span>
+        </div>
+
+        <!-- Row: redeemed earlier -->
+        <div class="cashback-ledger-row">
+          <span class="date">15 mar 2026</span>
+          <span><span class="badge badge-primary">↓ Usado</span></span>
+          <span class="desc"><strong>Pedido #UT-2026-00055</strong><br>Cashback aplicado no checkout</span>
+          <span class="amount negative">− R$ 15,00</span>
+          <span><span class="badge">Usado</span></span>
+        </div>
+
+        <!-- Row: reversed (cancelled order) -->
+        <div class="cashback-ledger-row">
+          <span class="date">02 mar 2026</span>
+          <span><span class="badge badge-danger">✕ Estornado</span></span>
+          <span class="desc"><strong>Pedido #UT-2026-00041</strong><br>Pedido cancelado antes da entrega</span>
+          <span class="amount expired">− R$ 8,90</span>
+          <span><span class="badge badge-danger">Estornado</span></span>
+        </div>
+
+        <!-- Row: older earned, expiring soon -->
+        <div class="cashback-ledger-row" style="background:#FFFDE7;">
+          <span class="date">14 jul 2025</span>
+          <span><span class="badge" style="background:#FFF8E1;color:#B87900;">↻ Ganho</span></span>
+          <span class="desc"><strong>Pedido #UT-2025-00312</strong><br>Nível Laser DeWalt · ⚠ Expira em 30 dias</span>
+          <span class="amount positive" style="color:var(--color-warning);">+ R$ 12,00</span>
+          <span><span class="badge badge-warning">Expira em breve</span></span>
+        </div>
+
+        <!-- Row: expired -->
+        <div class="cashback-ledger-row" style="opacity:0.65;">
+          <span class="date">03 fev 2025</span>
+          <span><span class="badge">✗ Expirado</span></span>
+          <span class="desc"><strong>Pedido #UT-2025-00089</strong><br>Chave de Impacto Vonder</span>
+          <span class="amount expired">R$ 5,25</span>
+          <span><span class="badge">Expirado</span></span>
+        </div>
+
+        <div style="padding:1rem 1.25rem;display:flex;justify-content:center;">
+          <a href="#" class="btn btn-ghost btn-sm">Carregar mais →</a>
+        </div>
+      </div>
+
+      <div style="margin-top:1.5rem;text-align:center;">
+        <a href="02-category.html" class="btn btn-primary btn-lg">↻ Continuar comprando e ganhando cashback →</a>
+        <div style="font-size:0.75rem;color:var(--color-muted);margin-top:0.5rem;">Procure o selo ↻ nos produtos para ganhar ainda mais</div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<footer>© 2026 Utilar Ferragem</footer>
+</body>
+</html>

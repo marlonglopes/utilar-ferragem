@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cadastre sua ferragem — Utilar Ferragem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  .checkout-nav { background: var(--color-primary); border-bottom: 1px solid rgba(255,255,255,0.15); padding: 1rem 0; }
+  .checkout-nav .container { display: flex; justify-content: space-between; align-items: center; }
+  .back-link { color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.875rem; }
+  .back-link:hover { color: white; }
+
+  .hero-sell { background: linear-gradient(135deg, #1F1F1F 0%, #3F2F1F 100%); color: white; padding: 3rem 0 2rem; }
+  .hero-sell h1 { font-size: 2.5rem; line-height: 1.1; margin: 0 0 0.5rem; }
+  .hero-sell h1 span { color: var(--color-accent); }
+  .hero-sell p { color: rgba(255,255,255,0.8); margin: 0; font-size: 1rem; max-width: 600px; }
+  .hero-stats { display: flex; gap: 2.5rem; margin-top: 1.5rem; }
+  .stat .num { font-family: 'Archivo',sans-serif; font-weight: 800; font-size: 1.75rem; color: var(--color-accent); }
+  .stat .lbl { font-size: 0.8125rem; color: rgba(255,255,255,0.7); }
+
+  .onboarding-layout { display: grid; grid-template-columns: 280px 1fr; gap: 2rem; padding: 2rem 0 3rem; }
+
+  /* Wizard steps sidebar */
+  .wizard-steps {
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 1.25rem 0.5rem;
+    align-self: start;
+    position: sticky;
+    top: 1rem;
+  }
+  .wz-step {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    position: relative;
+  }
+  .wz-step:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 30px;
+    top: 46px;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-border);
+  }
+  .wz-step.done:not(:last-child)::before { background: var(--color-success); }
+  .wz-num {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: var(--color-muted);
+    flex-shrink: 0;
+    z-index: 1;
+  }
+  .wz-step.done .wz-num { background: var(--color-success); color: white; border-color: var(--color-success); }
+  .wz-step.active .wz-num { background: var(--color-primary); color: white; border-color: var(--color-primary); box-shadow: 0 0 0 4px rgba(244,121,32,0.15); }
+  .wz-label .title { font-weight: 600; font-size: 0.9375rem; color: var(--color-ink); }
+  .wz-label .desc { font-size: 0.75rem; color: var(--color-muted); margin-top: 0.125rem; }
+  .wz-step.done .wz-label .title { color: var(--color-success); }
+  .wz-step.active .wz-label .title { color: var(--color-primary); }
+
+  /* Form card */
+  .wizard-card { background: white; border: 1px solid var(--color-border); border-radius: 12px; padding: 2rem; }
+  .wizard-card h2 { font-size: 1.625rem; margin: 0 0 0.375rem; }
+  .wizard-card .intro { color: var(--color-muted); margin: 0 0 2rem; font-size: 0.9375rem; }
+
+  .form-row { display: grid; gap: 1rem; margin-bottom: 1rem; }
+  .form-row.two { grid-template-columns: 1fr 1fr; }
+  .form-row.cep { grid-template-columns: 1fr 2fr 80px; }
+  label { display: block; font-size: 0.8125rem; color: var(--color-ink-soft); font-weight: 500; margin-bottom: 0.375rem; }
+  label .req { color: var(--color-danger); }
+  .hint { font-size: 0.75rem; color: var(--color-muted); margin-top: 0.25rem; display: block; }
+
+  /* CNPJ verified */
+  .cnpj-result { background: #E8F5E9; border: 1px solid #A5D6A7; border-radius: 10px; padding: 1rem 1.125rem; margin-top: 0.5rem; display: flex; gap: 0.875rem; align-items: flex-start; }
+  .cnpj-result .check { width: 28px; height: 28px; background: var(--color-success); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; flex-shrink: 0; }
+  .cnpj-result .info { flex: 1; font-size: 0.875rem; line-height: 1.5; }
+  .cnpj-result strong { display: block; }
+  .cnpj-result .muted { color: var(--color-muted); font-size: 0.8125rem; }
+
+  /* Category selector */
+  .cat-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+  .cat-opt {
+    border: 2px solid var(--color-border);
+    border-radius: 10px;
+    padding: 1rem 0.75rem;
+    text-align: center;
+    cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    position: relative;
+  }
+  .cat-opt:hover { border-color: var(--color-primary-light); }
+  .cat-opt.selected { border-color: var(--color-primary); background: #FFF7F0; color: var(--color-primary-dark); font-weight: 600; }
+  .cat-opt .icon { font-size: 1.5rem; }
+  .cat-opt.selected::after {
+    content: '✓';
+    position: absolute;
+    top: 6px; right: 8px;
+    background: var(--color-primary);
+    color: white;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    font-size: 0.6875rem;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+  }
+
+  /* Terms block */
+  .terms-block { background: var(--color-surface-alt); padding: 1rem 1.25rem; border-radius: 10px; font-size: 0.8125rem; color: var(--color-ink-soft); line-height: 1.6; margin-bottom: 0.75rem; max-height: 140px; overflow-y: auto; }
+
+  .wizard-footer { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); }
+  .steps-indicator { display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; color: var(--color-muted); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-border); }
+  .dot.active { background: var(--color-primary); width: 20px; border-radius: 3px; }
+  .dot.done { background: var(--color-success); }
+
+  footer { background: var(--color-ink); color: rgba(255,255,255,0.6); padding: 2rem 0; margin-top: 3rem; font-size: 0.8125rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="checkout-nav">
+  <div class="container">
+    <a href="01-home.html" class="brand">
+      <span class="logo-icon">U</span>
+      <span class="logo-wordmark">
+        <span class="logo-name"><span class="uti">Uti</span><span class="lar">Lar</span></span>
+        <span class="logo-tagline">Solução em Ferragem</span>
+      </span>
+    </a>
+    <span style="font-weight:600; font-size:0.875rem; color:white">Portal do Vendedor</span>
+    <a class="back-link" href="01-home.html">← Voltar</a>
+  </div>
+</div>
+
+<div class="hero-sell">
+  <div class="container">
+    <h1>Cadastre sua <span>ferragem</span>.<br>Venda pra todo o Brasil.</h1>
+    <p>Sem mensalidade. Comissão a partir de 6%. Vendas em Pix, boleto e cartão. Repasse em até 14 dias.</p>
+    <div class="hero-stats">
+      <div class="stat"><div class="num">+ 280</div><div class="lbl">ferragens parceiras</div></div>
+      <div class="stat"><div class="num">R$ 2,4M</div><div class="lbl">GMV mensal</div></div>
+      <div class="stat"><div class="num">24h</div><div class="lbl">aprovação média</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="onboarding-layout">
+
+    <!-- Wizard steps -->
+    <aside class="wizard-steps">
+      <div class="wz-step done">
+        <div class="wz-num">✓</div>
+        <div class="wz-label"><div class="title">CNPJ</div><div class="desc">Dados da empresa</div></div>
+      </div>
+      <div class="wz-step done">
+        <div class="wz-num">✓</div>
+        <div class="wz-label"><div class="title">Perfil da loja</div><div class="desc">Nome, telefone, endereço</div></div>
+      </div>
+      <div class="wz-step active">
+        <div class="wz-num">3</div>
+        <div class="wz-label"><div class="title">Categorias</div><div class="desc">O que você vende</div></div>
+      </div>
+      <div class="wz-step">
+        <div class="wz-num">4</div>
+        <div class="wz-label"><div class="title">Comercial</div><div class="desc">Comissão e expectativas</div></div>
+      </div>
+      <div class="wz-step">
+        <div class="wz-num">5</div>
+        <div class="wz-label"><div class="title">Dados bancários</div><div class="desc">Para receber repasses</div></div>
+      </div>
+      <div class="wz-step">
+        <div class="wz-num">6</div>
+        <div class="wz-label"><div class="title">Termos</div><div class="desc">Contrato + LGPD</div></div>
+      </div>
+    </aside>
+
+    <!-- Active step: Categories -->
+    <main>
+      <div class="wizard-card">
+        <h2>Quais categorias você vende?</h2>
+        <p class="intro">Selecione ao menos uma categoria. Você poderá ajustar depois.</p>
+
+        <div class="cat-picker">
+          <div class="cat-opt selected"><div class="icon">⚒</div>Ferramentas Elétricas</div>
+          <div class="cat-opt selected"><div class="icon">⛏</div>Ferramentas Manuais</div>
+          <div class="cat-opt"><div class="icon">◫</div>Construção</div>
+          <div class="cat-opt selected"><div class="icon">⚡</div>Elétrica</div>
+          <div class="cat-opt"><div class="icon">◡</div>Hidráulica</div>
+          <div class="cat-opt"><div class="icon">▥</div>Pintura</div>
+          <div class="cat-opt"><div class="icon">❀</div>Jardim</div>
+          <div class="cat-opt selected"><div class="icon">⚠</div>Segurança / EPI</div>
+          <div class="cat-opt"><div class="icon">▣</div>Fixação</div>
+          <div class="cat-opt"><div class="icon">⎈</div>Pneumáticas</div>
+          <div class="cat-opt"><div class="icon">▤</div>Medição</div>
+          <div class="cat-opt"><div class="icon">☼</div>Iluminação</div>
+        </div>
+
+        <div style="margin-top: 2rem;">
+          <label>Quantos SKUs você pretende cadastrar inicialmente? <span class="req">*</span></label>
+          <select class="input">
+            <option>Menos de 50</option>
+            <option selected>50 – 200</option>
+            <option>200 – 500</option>
+            <option>500 – 1.000</option>
+            <option>Mais de 1.000</option>
+          </select>
+          <span class="hint">Não se preocupe — nosso time vai ajudar no cadastro inicial.</span>
+        </div>
+
+        <div style="margin-top: 1.25rem;">
+          <label>Quer importar seu catálogo via planilha?</label>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+            <label style="display:inline-flex; align-items:center; gap:0.375rem; padding:0.625rem 1rem; border:1px solid var(--color-border); border-radius:8px; cursor:pointer;"><input type="radio" name="import" checked> Sim, tenho planilha pronta</label>
+            <label style="display:inline-flex; align-items:center; gap:0.375rem; padding:0.625rem 1rem; border:1px solid var(--color-border); border-radius:8px; cursor:pointer;"><input type="radio" name="import"> Preciso de ajuda do time Utilar</label>
+            <label style="display:inline-flex; align-items:center; gap:0.375rem; padding:0.625rem 1rem; border:1px solid var(--color-border); border-radius:8px; cursor:pointer;"><input type="radio" name="import"> Vou cadastrar manualmente depois</label>
+          </div>
+        </div>
+
+        <div class="wizard-footer">
+          <a href="#" class="btn btn-secondary">← Voltar</a>
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <div class="steps-indicator">
+              <span class="dot done"></span>
+              <span class="dot done"></span>
+              <span class="dot active"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span style="margin-left:0.25rem;">3 de 6</span>
+            </div>
+            <a href="#" class="btn btn-primary">Continuar →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview of step 1 content already filled -->
+      <details style="margin-top: 1rem; background: white; border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem 1.25rem;">
+        <summary style="cursor: pointer; font-weight: 600; color: var(--color-muted); font-size: 0.875rem;">▾ Passos anteriores preenchidos</summary>
+        <div style="margin-top: 1rem;">
+          <div style="font-weight: 600; margin-bottom: 0.375rem;">CNPJ</div>
+          <div class="cnpj-result">
+            <div class="check">✓</div>
+            <div class="info">
+              <strong>FERRAGEM SILVA COMÉRCIO DE FERRAMENTAS LTDA</strong>
+              <div>CNPJ 12.345.678/0001-90 · Ativa na Receita Federal</div>
+              <div class="muted">Abertura 02/05/2014 · MEI convertido em LTDA · Capital social R$ 50.000</div>
+            </div>
+          </div>
+
+          <div style="font-weight: 600; margin: 1.25rem 0 0.5rem;">Perfil da loja</div>
+          <div style="font-size: 0.875rem; color: var(--color-ink-soft); line-height: 1.7;">
+            <strong>Nome fantasia:</strong> Ferragem Silva<br>
+            <strong>Telefone:</strong> (11) 2345-6789<br>
+            <strong>Endereço:</strong> R. Voluntários da Pátria, 1234, Santana, São Paulo — SP · CEP 02010-000
+          </div>
+        </div>
+      </details>
+
+    </main>
+
+  </div>
+</div>
+
+<footer>© 2026 Utilar Ferragem · Portal do Vendedor</footer>
+</body>
+</html>

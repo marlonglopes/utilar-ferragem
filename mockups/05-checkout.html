@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Checkout — Utilar Ferragem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  .checkout-nav { background: var(--color-primary); border-bottom: 1px solid rgba(255,255,255,0.15); padding: 1rem 0; }
+  .checkout-nav .container { display: flex; justify-content: space-between; align-items: center; }
+  .back-link { color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.875rem; }
+  .back-link:hover { color: white; }
+  .secure { color: white; font-size: 0.8125rem; display: inline-flex; align-items: center; gap: 0.375rem; font-weight: 600; }
+
+  /* Stepper */
+  .stepper { padding: 2rem 0 1.5rem; display: flex; justify-content: center; gap: 0.75rem; }
+  .step {
+    display: flex; align-items: center; gap: 0.5rem;
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  .step .num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+  .step.done { color: var(--color-success); }
+  .step.done .num { background: var(--color-success); color: white; border-color: var(--color-success); }
+  .step.active { color: var(--color-ink); }
+  .step.active .num { background: var(--color-ink); color: white; border-color: var(--color-ink); }
+  .step-bar { width: 40px; height: 2px; background: var(--color-border); }
+  .step-bar.done { background: var(--color-success); }
+
+  .layout { display: grid; grid-template-columns: 1fr 380px; gap: 2rem; padding-bottom: 3rem; }
+
+  .section { background: white; border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+  .section .section-title { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 1rem; font-size: 1.0625rem; }
+  .section .section-title .check { width: 24px; height: 24px; background: var(--color-success); color: white; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; }
+  .section.muted { opacity: 0.6; }
+
+  /* Address */
+  .address-card { padding: 1rem 1.25rem; border: 2px solid var(--color-primary); border-radius: 10px; font-size: 0.9375rem; display: flex; gap: 1rem; }
+  .address-card .radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--color-primary); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .address-card .radio::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary); }
+  .address-card .details { flex: 1; line-height: 1.5; }
+  .address-card .tag { display: inline-block; background: var(--color-primary-light); color: var(--color-primary-dark); padding: 2px 8px; border-radius: 4px; font-size: 0.6875rem; font-weight: 700; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .address-card strong { display: block; margin-bottom: 0.125rem; }
+  .address-card .muted { color: var(--color-muted); font-size: 0.8125rem; }
+  .add-address { margin-top: 0.75rem; padding: 0.875rem 1.25rem; border: 1px dashed var(--color-border); border-radius: 10px; text-align: center; color: var(--color-muted); font-size: 0.875rem; cursor: pointer; }
+
+  /* Shipping */
+  .ship-option { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1rem; border: 1px solid var(--color-border); border-radius: 10px; margin-bottom: 0.5rem; cursor: pointer; }
+  .ship-option.selected { border-color: var(--color-primary); background: #FFF7F0; }
+  .ship-option input { accent-color: var(--color-primary); }
+  .ship-option .info { flex: 1; }
+  .ship-option .title { font-weight: 600; font-size: 0.9375rem; }
+  .ship-option .sub { font-size: 0.8125rem; color: var(--color-muted); }
+  .ship-option .price { font-weight: 700; }
+
+  /* Payment */
+  .pay-methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
+  .pay-method {
+    padding: 1rem 0.75rem;
+    border: 2px solid var(--color-border);
+    border-radius: 10px;
+    text-align: center;
+    cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 0.375rem;
+  }
+  .pay-method.selected { border-color: var(--color-primary); background: #FFF7F0; }
+  .pay-method .icon-big { font-size: 1.5rem; }
+  .pay-method .label { font-size: 0.875rem; font-weight: 600; }
+  .pay-method .hint { font-size: 0.75rem; color: var(--color-muted); }
+  .pay-method.selected .hint { color: var(--color-primary); font-weight: 600; }
+
+  /* Pix */
+  .pix-box {
+    background: #E8F5E9;
+    border: 1px solid #A5D6A7;
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 1.25rem;
+    align-items: center;
+  }
+  .pix-qr {
+    width: 140px; height: 140px;
+    background: white;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 3.5rem;
+    color: var(--color-ink);
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    background-image:
+      linear-gradient(45deg, #000 25%, transparent 25%),
+      linear-gradient(-45deg, #000 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #000 75%),
+      linear-gradient(-45deg, transparent 75%, #000 75%);
+    background-size: 12px 12px;
+    background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
+    color: transparent;
+    position: relative;
+  }
+  .pix-qr::before {
+    content: '';
+    position: absolute;
+    inset: 10px;
+    background: white;
+    background-image:
+      radial-gradient(circle at 22% 22%, black 8%, transparent 9%, transparent 14%, black 15%, black 17%, transparent 18%),
+      radial-gradient(circle at 78% 22%, black 8%, transparent 9%, transparent 14%, black 15%, black 17%, transparent 18%),
+      radial-gradient(circle at 22% 78%, black 8%, transparent 9%, transparent 14%, black 15%, black 17%, transparent 18%),
+      repeating-conic-gradient(from 0deg at 50% 50%, black 0deg 3deg, transparent 3deg 10deg);
+    border: 4px solid white;
+  }
+  .pix-box-info { font-size: 0.875rem; line-height: 1.5; }
+  .pix-box-info strong { font-family: 'Archivo',sans-serif; font-size: 1.125rem; color: var(--color-success); }
+  .pix-copy {
+    margin-top: 0.75rem;
+    display: flex; gap: 0.5rem;
+    background: white;
+    border-radius: 8px;
+    padding: 0.25rem 0.25rem 0.25rem 0.75rem;
+    border: 1px solid var(--color-border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    align-items: center;
+  }
+  .pix-copy code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-soft); }
+
+  /* Card form (hidden by default, shown for reference) */
+  .card-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; display: none; }
+  .card-form label { font-size: 0.8125rem; color: var(--color-muted); display: block; margin-bottom: 0.25rem; font-weight: 500; }
+  .card-form .full { grid-column: 1 / -1; }
+  .installments { display: grid; grid-template-columns: 1fr; gap: 0.5rem; padding: 0.875rem; background: var(--color-surface-alt); border-radius: 8px; margin-top: 0.5rem; }
+  .installment-opt { display: flex; justify-content: space-between; font-size: 0.875rem; padding: 0.25rem 0; cursor: pointer; }
+  .installment-opt.selected { color: var(--color-primary); font-weight: 600; }
+
+  /* Summary */
+  .summary { position: sticky; top: 1rem; align-self: start; }
+  .summary .card { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+  .summary h3 { font-size: 1.0625rem; margin: 0 0 0.25rem; }
+  .summary-item { display: flex; gap: 0.75rem; padding: 0.5rem 0; font-size: 0.875rem; align-items: center; }
+  .summary-item .thumb { width: 44px; height: 44px; background: var(--color-surface-alt); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; }
+  .summary-item .name { flex: 1; line-height: 1.3; font-size: 0.8125rem; }
+  .summary-item .qty { font-size: 0.75rem; color: var(--color-muted); }
+  .summary-item .p { font-weight: 600; font-size: 0.8125rem; }
+  .summary-row { display: flex; justify-content: space-between; font-size: 0.9375rem; padding: 0.25rem 0; }
+  .summary-row.muted { color: var(--color-muted); font-size: 0.875rem; }
+  .summary-row.total { font-size: 1.25rem; font-weight: 800; font-family: 'Archivo',sans-serif; padding-top: 0.75rem; margin-top: 0.25rem; border-top: 1px solid var(--color-border); }
+
+  footer { background: var(--color-ink); color: rgba(255,255,255,0.6); padding: 2rem 0; margin-top: 3rem; font-size: 0.8125rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- Simple checkout nav -->
+<div class="checkout-nav">
+  <div class="container">
+    <a href="01-home.html" class="brand">
+      <span class="logo-icon">U</span>
+      <span class="logo-wordmark">
+        <span class="logo-name"><span class="uti">Uti</span><span class="lar">Lar</span></span>
+        <span class="logo-tagline">Solução em Ferragem</span>
+      </span>
+    </a>
+    <span class="secure">🔒 Checkout seguro · SSL 256 bits</span>
+    <a class="back-link" href="04-cart.html">← Voltar ao carrinho</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="stepper">
+    <div class="step done"><span class="num">✓</span> Endereço</div>
+    <div class="step-bar done"></div>
+    <div class="step done"><span class="num">✓</span> Entrega</div>
+    <div class="step-bar done"></div>
+    <div class="step active"><span class="num">3</span> Pagamento</div>
+  </div>
+
+  <div class="layout">
+
+    <div>
+      <!-- Address (collapsed/done) -->
+      <div class="section">
+        <h3 class="section-title"><span class="check">✓</span> Endereço de entrega</h3>
+        <div class="address-card">
+          <div class="radio"></div>
+          <div class="details">
+            <span class="tag">Principal</span>
+            <strong>João Pereira</strong>
+            Rua Santa Cruz, 742, apto 21<br>
+            Vila Mariana, São Paulo — SP<br>
+            CEP 04121-000 · <span class="muted">(11) 98765-4321</span>
+          </div>
+          <a href="#" class="btn btn-ghost btn-sm">Trocar</a>
+        </div>
+      </div>
+
+      <!-- Shipping (collapsed/done) -->
+      <div class="section">
+        <h3 class="section-title"><span class="check">✓</span> Modalidade de entrega</h3>
+        <div class="ship-option selected">
+          <input type="radio" checked>
+          <div class="info">
+            <div class="title">SEDEX · chega amanhã</div>
+            <div class="sub">Ferragem Silva · entrega 21/04 até 18h</div>
+          </div>
+          <span class="price text-success">Grátis</span>
+        </div>
+        <div class="ship-option">
+          <input type="radio">
+          <div class="info">
+            <div class="title">PAC · até 22/04</div>
+            <div class="sub">EPI Pro · Correios · 3 dias úteis</div>
+          </div>
+          <span class="price">R$ 18,90</span>
+        </div>
+      </div>
+
+      <!-- Payment (active) -->
+      <div class="section">
+        <h3 class="section-title">3. Forma de pagamento</h3>
+
+        <!-- Cashback redemption -->
+        <div class="cashback-card" style="margin-bottom:1.25rem;">
+          <h4>Usar meu cashback</h4>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.625rem;">
+            <span style="font-size:0.875rem;">Saldo disponível: <strong>R$ 85,40</strong></span>
+            <span style="font-size:0.75rem;color:var(--color-muted);">Próx. expiração: R$ 12,00 em jun/2026</span>
+          </div>
+          <div style="display:flex;gap:0.75rem;align-items:center;margin-bottom:0.5rem;">
+            <div style="flex:1;">
+              <input type="range" min="0" max="42" value="20" style="width:100%;accent-color:var(--color-primary);" />
+            </div>
+            <input class="input" value="R$ 20,00" style="width:110px;font-weight:600;text-align:center;" />
+            <button class="btn btn-primary btn-sm">Aplicar</button>
+          </div>
+          <div class="cashback-hint">Você pode usar até <strong>R$ 42,50</strong> nesta compra (50% do subtotal de R$ 485,55)</div>
+          <div style="margin-top:0.625rem;padding-top:0.5rem;border-top:1px dashed rgba(0,0,0,0.12);font-size:0.8125rem;display:flex;align-items:center;gap:0.5rem;">
+            <span style="background:#E8F5E9;color:var(--color-success);padding:0.25rem 0.625rem;border-radius:999px;font-weight:600;">✓ R$ 20,00 aplicado</span>
+            <span style="color:var(--color-muted);">Novo total: <strong style="color:var(--color-ink)">R$ 465,55</strong></span>
+          </div>
+        </div>
+
+        <div class="pay-methods">
+          <div class="pay-method selected">
+            <span class="icon-big">⚡</span>
+            <span class="label">Pix</span>
+            <span class="hint">5% OFF · confirma na hora</span>
+          </div>
+          <div class="pay-method">
+            <span class="icon-big">▤</span>
+            <span class="label">Boleto</span>
+            <span class="hint">até 3 dias úteis</span>
+          </div>
+          <div class="pay-method">
+            <span class="icon-big">◈</span>
+            <span class="label">Cartão de crédito</span>
+            <span class="hint">até 12x sem juros</span>
+          </div>
+        </div>
+
+        <!-- Pix panel (active) -->
+        <div class="pix-box">
+          <div class="pix-qr"></div>
+          <div class="pix-box-info">
+            <div style="font-size: 0.8125rem; color: var(--color-muted); margin-bottom: 0.125rem;">Valor a pagar</div>
+            <strong>R$ 461,27</strong>
+            <div style="font-size: 0.8125rem; color: var(--color-muted); margin-top: 0.25rem;">5% de desconto aplicado · economia de R$ 24,28</div>
+            <div class="pix-copy">
+              <code>00020126580014br.gov.bcb.pix01367f8c0e...abcd5204000053039865802BR…</code>
+              <button class="btn btn-secondary btn-sm">Copiar</button>
+            </div>
+          </div>
+        </div>
+
+        <p style="font-size: 0.8125rem; color: var(--color-muted); margin: 1rem 0 0; display:flex; gap:0.5rem; align-items:center;">
+          <span>⏱</span> Este QR code expira em <strong style="color:var(--color-ink)">14:58</strong>. Pagamento confirmado automaticamente.
+        </p>
+
+      </div>
+
+      <button class="btn btn-primary btn-lg" style="width:100%;">Confirmar pedido e gerar Pix →</button>
+
+      <p style="font-size: 0.75rem; color: var(--color-muted); text-align: center; margin-top: 1rem;">
+        Ao confirmar, você concorda com os <a href="#" style="color: var(--color-primary);">Termos de uso</a> e a <a href="#" style="color: var(--color-primary);">Política de privacidade</a>. Seus dados são protegidos pela LGPD.
+      </p>
+    </div>
+
+    <!-- Summary -->
+    <aside class="summary">
+      <div class="card">
+        <h3>Resumo</h3>
+
+        <div class="summary-item">
+          <div class="thumb">⚒</div>
+          <div class="name">Furadeira Bosch GSB 13 RE<div class="qty">Qtd: 1</div></div>
+          <div class="p">R$ 329,00</div>
+        </div>
+        <div class="summary-item">
+          <div class="thumb">⚒</div>
+          <div class="name">Jogo de Brocas Bosch 5pç<div class="qty">Qtd: 2</div></div>
+          <div class="p">R$ 99,80</div>
+        </div>
+        <div class="summary-item">
+          <div class="thumb">⚠</div>
+          <div class="name">Capacete Classe B<div class="qty">Qtd: 3</div></div>
+          <div class="p">R$ 89,70</div>
+        </div>
+
+        <div class="divider" style="margin: 0.5rem 0;"></div>
+
+        <div class="summary-row muted"><span>Subtotal</span><span>R$ 518,50</span></div>
+        <div class="summary-row muted"><span>Frete</span><span>R$ 18,90</span></div>
+        <div class="summary-row muted"><span>Cupom OBRA10</span><span class="text-success">− R$ 51,85</span></div>
+        <div class="summary-row muted"><span style="color:var(--color-primary);font-weight:600;">↻ Cashback usado</span><span class="text-success">− R$ 20,00</span></div>
+        <div class="summary-row muted"><span>Desconto Pix (5%)</span><span class="text-success">− R$ 23,27</span></div>
+
+        <div class="summary-row total"><span>Total</span><span>R$ 441,28</span></div>
+
+        <div style="background: #E8F5E9; color: var(--color-success); padding: 0.75rem; border-radius: 8px; font-size: 0.8125rem; text-align: center; font-weight: 600;">⚡ Economizou R$ 97,22</div>
+
+        <div class="cashback-card" style="margin-top:0.75rem;">
+          <h4 style="font-size:0.8125rem;">Você vai ganhar</h4>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.875rem;">Cashback desta compra</span>
+            <span class="cashback-amount" style="font-size:1rem;">R$ 45,20</span>
+          </div>
+          <div class="cashback-hint">Creditado após a entrega · saldo: R$ 85,40 → R$ 130,60</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<footer>© 2026 Utilar Ferragem · 🔒 Pagamento processado por Mercado Pago</footer>
+</body>
+</html>

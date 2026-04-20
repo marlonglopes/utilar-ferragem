@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Furadeira Bosch GSB 13 RE — Utilar Ferragem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  .topbar { background: #0f2660; color: white; font-size: 0.8125rem; }
+  .topbar .container { padding: 0.5rem 1.25rem; display: flex; justify-content: space-between; }
+  .navbar .container { display: flex; align-items: center; gap: 1.5rem; padding: 1rem 1.25rem; }
+  .search-box { flex:1; max-width:560px; display:flex; align-items:center; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:10px; padding:0 0.875rem; gap:0.5rem; }
+  .search-box input { flex:1; background:transparent; border:none; padding:0.75rem 0; outline:none; font-size:0.9375rem; color:white; }
+  .search-box input::placeholder { color:rgba(255,255,255,0.6); }
+  .nav-icon-btn { display:inline-flex; align-items:center; gap:0.375rem; padding:0.5rem 0.75rem; border-radius:8px; color:white; font-weight:500; text-decoration:none; font-size:0.875rem; position:relative; }
+  .nav-icon-btn .count { position:absolute; top:-2px; right:2px; background:white; color:var(--color-primary); font-size:0.625rem; padding:1px 5px; border-radius:999px; font-weight:700; }
+
+  .breadcrumb { padding: 1rem 0; font-size: 0.8125rem; color: var(--color-muted); }
+  .breadcrumb a { color: var(--color-muted); text-decoration: none; }
+  .breadcrumb .sep { margin: 0 0.5rem; color: var(--color-border); }
+  .breadcrumb .current { color: var(--color-ink); font-weight: 500; }
+
+  .pdp-layout { display: grid; grid-template-columns: 1fr 1fr 360px; gap: 2rem; padding-bottom: 3rem; }
+
+  /* Gallery */
+  .gallery .main-img { aspect-ratio: 1; background: white; border: 1px solid var(--color-border); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 8rem; color: var(--color-muted); position: relative; }
+  .gallery .main-img .zoom { position: absolute; top: 1rem; right: 1rem; width: 36px; height: 36px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .gallery .thumbs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-top: 0.75rem; }
+  .gallery .thumb { aspect-ratio: 1; background: white; border: 1px solid var(--color-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--color-muted); cursor: pointer; }
+  .gallery .thumb.active { border: 2px solid var(--color-primary); }
+
+  /* Main info */
+  .info h1 { font-size: 1.625rem; line-height: 1.2; margin: 0.25rem 0 0.5rem; }
+  .info .seller-line { font-size: 0.8125rem; color: var(--color-muted); display: flex; align-items: center; gap: 0.5rem; }
+  .info .seller-line a { color: var(--color-primary); text-decoration: none; font-weight: 600; }
+  .info .rating-line { margin: 0.75rem 0; display: flex; align-items: center; gap: 0.75rem; font-size: 0.875rem; }
+  .info .rating-line .stars { color: var(--color-accent); font-size: 1rem; }
+  .info .price-block { margin: 1.5rem 0; }
+  .info .price-old { color: var(--color-muted); text-decoration: line-through; font-size: 1rem; }
+  .info .discount-pill { display: inline-block; background: var(--color-success); color: white; padding: 0.125rem 0.5rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; margin-left: 0.5rem; }
+  .info .price-main { font-family: 'Archivo', sans-serif; font-weight: 800; font-size: 2.5rem; line-height: 1; color: var(--color-ink); margin: 0.375rem 0; }
+  .info .price-installment { font-size: 0.875rem; color: var(--color-ink-soft); }
+  .info .price-pix { font-size: 0.875rem; color: var(--color-success); font-weight: 600; margin-top: 0.375rem; display: flex; align-items: center; gap: 0.25rem; }
+  .info .stock-line { color: var(--color-success); font-weight: 600; font-size: 0.875rem; margin-top: 1rem; }
+  .info .sku { color: var(--color-muted); font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; margin-top: 0.25rem; }
+
+  .specs { margin-top: 2rem; }
+  .specs h3 { font-size: 1rem; margin: 0 0 0.75rem; }
+  .spec-row { display: grid; grid-template-columns: 140px 1fr; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border); font-size: 0.875rem; }
+  .spec-row:last-child { border-bottom: none; }
+  .spec-row .k { color: var(--color-muted); }
+  .spec-row .v { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+
+  /* Buy box */
+  .buy-box { position: sticky; top: 1rem; background: white; border: 1px solid var(--color-border); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.875rem; align-self: start; }
+  .qty-row { display: flex; align-items: center; gap: 0.75rem; }
+  .qty-row label { font-size: 0.875rem; color: var(--color-muted); }
+  .qty { display: inline-flex; align-items: center; border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; }
+  .qty button { width: 36px; height: 36px; border: none; background: white; cursor: pointer; font-size: 1.125rem; color: var(--color-ink); }
+  .qty button:hover { background: var(--color-surface-alt); }
+  .qty .value { padding: 0 0.5rem; font-weight: 600; min-width: 30px; text-align: center; }
+  .cep-box { padding: 0.75rem; background: var(--color-surface-alt); border-radius: 8px; font-size: 0.8125rem; }
+  .cep-box strong { display: block; margin-bottom: 0.25rem; font-size: 0.875rem; }
+  .cep-box .row { display: flex; justify-content: space-between; padding: 0.25rem 0; }
+  .seller-card { padding: 0.875rem; border: 1px solid var(--color-border); border-radius: 10px; display: flex; align-items: center; gap: 0.75rem; }
+  .seller-card .avatar { width: 44px; height: 44px; background: var(--color-primary-light); color: var(--color-primary-dark); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .seller-card .name { font-weight: 600; font-size: 0.9375rem; }
+  .seller-card .stars { font-size: 0.75rem; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--color-border); margin: 3rem 0 0; }
+  .tab { padding: 0.75rem 1rem; font-size: 0.9375rem; color: var(--color-muted); font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: var(--color-ink); border-bottom-color: var(--color-primary); }
+  .tab-content { padding: 1.5rem 0; font-size: 0.9375rem; line-height: 1.6; color: var(--color-ink-soft); max-width: 800px; }
+  .tab-content h4 { color: var(--color-ink); margin-top: 1.5rem; }
+  .tab-content ul { padding-left: 1.25rem; }
+
+  /* Related */
+  .related { margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--color-border); }
+  .related h2 { font-size: 1.5rem; margin: 0 0 1.25rem; }
+  .product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+
+  footer { background: var(--color-ink); color: rgba(255,255,255,0.6); padding: 2rem 0; margin-top: 3rem; font-size: 0.8125rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="container"><span>Frete grátis em compras acima de R$ 299</span><span>pt-BR · BRL</span></div></div>
+
+<nav class="navbar"><div class="container">
+  <a href="01-home.html" class="brand">
+    <span class="logo-icon">U</span>
+    <span class="logo-wordmark">
+      <span class="logo-name"><span class="uti">Uti</span><span class="lar">Lar</span></span>
+      <span class="logo-tagline">Solução em Ferragem</span>
+    </span>
+  </a>
+  <div class="search-box">⌕ <input placeholder="Buscar..." /></div>
+  <a href="#" class="nav-icon-btn">◉ Entrar</a>
+  <a href="04-cart.html" class="nav-icon-btn">⛒ Carrinho <span class="count">3</span></a>
+</div></nav>
+
+<div class="container">
+  <div class="breadcrumb">
+    <a href="01-home.html">Início</a><span class="sep">/</span>
+    <a href="#">Ferramentas</a><span class="sep">/</span>
+    <a href="02-category.html">Ferramentas Elétricas</a><span class="sep">/</span>
+    <a href="#">Furadeiras</a><span class="sep">/</span>
+    <span class="current">Furadeira Bosch GSB 13 RE</span>
+  </div>
+
+  <div class="pdp-layout">
+
+    <!-- Gallery -->
+    <div class="gallery">
+      <div class="main-img">
+        ⚒
+        <div class="zoom">⎚</div>
+      </div>
+      <div class="thumbs">
+        <div class="thumb active">⚒</div>
+        <div class="thumb">⚒</div>
+        <div class="thumb">◫</div>
+        <div class="thumb">▦</div>
+        <div class="thumb">▤</div>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="info">
+      <div class="seller-line">Vendido por <a href="#">Ferragem Silva</a> · <span class="badge badge-success">✓ Verificado</span></div>
+      <h1>Furadeira de Impacto Bosch GSB 13 RE 650W 127V com Maleta</h1>
+      <div class="sku">SKU FER-BOSCH-GSB13-127V</div>
+      <div class="rating-line">
+        <span class="stars">★★★★★</span>
+        <span><strong>4,8</strong> · 142 avaliações · 284 vendidos</span>
+      </div>
+
+      <div class="price-block">
+        <div>
+          <span class="price-old">R$ 389,00</span>
+          <span class="discount-pill">15% OFF</span>
+        </div>
+        <div class="price-main">R$ 329,<span style="font-size:1.5rem">00</span></div>
+        <div class="price-installment">em até <strong>12x de R$ 27,42</strong> sem juros</div>
+        <div class="price-pix">⚡ R$ 312,55 no Pix (5% de desconto)</div>
+      </div>
+
+      <!-- Cashback callout -->
+      <div class="cashback-card">
+        <h4>Cashback nesta compra</h4>
+        <div>Ganhe <span class="cashback-amount">R$ 16,45</span> de volta na sua carteira</div>
+        <div class="cashback-hint">↻ Creditado após a entrega · válido por 12 meses · use em futuras compras</div>
+      </div>
+
+      <div style="background: var(--color-surface-alt); padding: 0.875rem 1rem; border-radius: 10px; font-size: 0.875rem; display: flex; align-items: center; gap: 0.75rem;">
+        <span style="font-size: 1.25rem;">⎈</span>
+        <span><strong>Chega em até 24h</strong> para o CEP 01310-100 · Frete grátis acima de R$ 299</span>
+      </div>
+
+      <div class="stock-line">✓ Em estoque · últimas 8 unidades</div>
+
+      <div class="specs">
+        <h3>Especificações</h3>
+        <div class="spec-row"><span class="k">Marca</span><span class="v">Bosch</span></div>
+        <div class="spec-row"><span class="k">Modelo</span><span class="v">GSB 13 RE</span></div>
+        <div class="spec-row"><span class="k">Potência</span><span class="v">650 W</span></div>
+        <div class="spec-row"><span class="k">Tensão</span><span class="v">127 V</span></div>
+        <div class="spec-row"><span class="k">Rotação</span><span class="v">0 – 2.800 rpm</span></div>
+        <div class="spec-row"><span class="k">Mandril</span><span class="v">13 mm com chave</span></div>
+        <div class="spec-row"><span class="k">Peso</span><span class="v">1,8 kg</span></div>
+        <div class="spec-row"><span class="k">Garantia</span><span class="v">12 meses</span></div>
+        <div class="spec-row"><span class="k">Acompanha</span><span class="v">Maleta + punho auxiliar + medidor</span></div>
+      </div>
+    </div>
+
+    <!-- Buy box -->
+    <div class="buy-box">
+      <div style="font-size:1.25rem; font-weight:800; font-family:'Archivo',sans-serif;">R$ 329,00</div>
+      <div style="font-size:0.8125rem; color:var(--color-muted);">em 12x de R$ 27,42 sem juros</div>
+
+      <div class="qty-row">
+        <label>Quantidade:</label>
+        <div class="qty">
+          <button>−</button>
+          <span class="value">1</span>
+          <button>+</button>
+        </div>
+        <span style="font-size:0.75rem; color:var(--color-muted);">(8 disp.)</span>
+      </div>
+
+      <a href="04-cart.html" class="btn btn-primary btn-lg" style="width:100%;">⛒ Adicionar ao carrinho</a>
+      <a href="05-checkout.html" class="btn btn-secondary btn-lg" style="width:100%;">Comprar agora</a>
+
+      <div class="cep-box">
+        <strong>Calcular frete</strong>
+        <input class="input" value="01310-100" style="font-size:0.875rem; padding:0.5rem 0.75rem; margin: 0.25rem 0 0.5rem;" />
+        <div class="row"><span>SEDEX</span><span><strong>R$ 0,00</strong> · 1 dia útil</span></div>
+        <div class="row"><span>PAC</span><span><strong>R$ 18,90</strong> · 3 dias úteis</span></div>
+        <div class="row"><span>Retirada no vendedor</span><span><strong>Grátis</strong></span></div>
+      </div>
+
+      <div class="seller-card">
+        <div class="avatar">FS</div>
+        <div style="flex:1;">
+          <div class="name">Ferragem Silva</div>
+          <div class="stars">★★★★★ <span style="color:var(--color-muted); font-weight:400">4,9 · 1.284 vendas</span></div>
+        </div>
+        <a href="#" class="btn btn-ghost btn-sm">Ver loja →</a>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--color-muted); padding-top: 0.5rem; border-top: 1px solid var(--color-border);">
+        <span style="font-size:1rem;">✓</span>
+        Compra 100% protegida · Nota fiscal · Garantia oficial
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab">Descrição</div>
+    <div class="tab active">Especificações</div>
+    <div class="tab">Avaliações (142)</div>
+    <div class="tab">Perguntas</div>
+  </div>
+
+  <div class="tab-content">
+    <h4>Sobre a Furadeira Bosch GSB 13 RE</h4>
+    <p>A furadeira de impacto Bosch GSB 13 RE combina potência e precisão em um equipamento compacto, ideal para uso doméstico e profissional. Com 650W de potência e sistema de impacto robusto, perfura madeira, alvenaria e metal com facilidade.</p>
+    <ul>
+      <li>Sistema de impacto acionável para perfuração em concreto e alvenaria</li>
+      <li>Velocidade variável de 0 a 2.800 rpm com gatilho eletrônico</li>
+      <li>Mandril de 13 mm com chave para melhor fixação de brocas</li>
+      <li>Punho auxiliar rotativo para maior controle em diversos ângulos</li>
+      <li>Design ergonômico Softgrip para uso prolongado sem fadiga</li>
+    </ul>
+  </div>
+
+  <!-- Related -->
+  <div class="related">
+    <h2>Produtos relacionados</h2>
+    <div class="product-grid">
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">⚒</div>
+        <div class="product-card-body">
+          <div class="product-card-seller">Ferragem Silva</div>
+          <div class="product-card-name">Jogo de Brocas para Concreto Bosch 5pç</div>
+          <div class="stars" style="font-size:0.75rem">★★★★★ <span style="color:var(--color-muted)">(89)</span></div>
+          <div class="product-card-price">R$ 49,90</div>
+        </div>
+      </a>
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">⚒</div>
+        <div class="product-card-body">
+          <div class="product-card-seller">Pro Tools BR</div>
+          <div class="product-card-name">Furadeira Bosch GSB 16 RE 750W Bivolt</div>
+          <div class="stars" style="font-size:0.75rem">★★★★★ <span style="color:var(--color-muted)">(214)</span></div>
+          <div class="product-card-price">R$ 419,00</div>
+        </div>
+      </a>
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">⚒</div>
+        <div class="product-card-body">
+          <div class="product-card-seller">Ferragem Silva</div>
+          <div class="product-card-name">Parafusadeira Bosch GSR 12V-15 sem fio</div>
+          <div class="stars" style="font-size:0.75rem">★★★★☆ <span style="color:var(--color-muted)">(96)</span></div>
+          <div class="product-card-price">R$ 449,00</div>
+        </div>
+      </a>
+      <a class="product-card" href="03-product-detail.html">
+        <div class="product-card-img">⚒</div>
+        <div class="product-card-body">
+          <div class="product-card-seller">Ferragem Silva</div>
+          <div class="product-card-name">Bucha Nylon S6 + Parafuso Chumbador Kit 100pç</div>
+          <div class="stars" style="font-size:0.75rem">★★★★★ <span style="color:var(--color-muted)">(156)</span></div>
+          <div class="product-card-price">R$ 19,90</div>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+
+<footer>© 2026 Utilar Ferragem</footer>
+</body>
+</html>
