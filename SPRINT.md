@@ -4,7 +4,7 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 
 ## Estado atual
 
-**Fase 1 — Fundação.** Sprints 01 e 02 concluídos. Sprint 03 (catálogo + taxonomia) é o próximo.
+**Fase 1 — Fundação.** Sprints 01, 02 e 03 concluídos. Sprint 04 (detalhe do produto) é o próximo.
 
 ## Índice de sprints
 
@@ -12,7 +12,7 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 |---|--------|-------|--------|
 | 01 | [Scaffold + tooling](docs/sprints/sprint-01-scaffold.md) | 1 — Fundação | ✅ Concluído |
 | 02 | [Design system + i18n](docs/sprints/sprint-02-design-system.md) | 1 — Fundação | ✅ Concluído |
-| 03 | [Catálogo + taxonomia](docs/sprints/sprint-03-catalog.md) | 2 — Catálogo | ⬜ Não iniciado |
+| 03 | [Catálogo + taxonomia](docs/sprints/sprint-03-catalog.md) | 2 — Catálogo | ✅ Concluído |
 | 04 | [Detalhe do produto (specs JSONB)](docs/sprints/sprint-04-product-detail.md) | 2 — Catálogo | ⬜ Não iniciado |
 | 05 | [Busca + filtros (ILIKE)](docs/sprints/sprint-05-search-filters.md) | 2 — Catálogo | ⬜ Não iniciado |
 | 06 | [Carrinho (local + persistente)](docs/sprints/sprint-06-cart.md) | 3 — Comércio | ⬜ Não iniciado |
