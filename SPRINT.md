@@ -4,13 +4,13 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 
 ## Estado atual
 
-**Fase 0 — Planejamento.** Nenhum sprint ativo. Plano de implementação completo redigido (25 sprints em 5 fases), aguardando go/no-go do usuário.
+**Fase 1 — Fundação.** Sprint 01 concluído. Sprint 02 (design system + i18n) é o próximo.
 
 ## Índice de sprints
 
 | # | Sprint | Fase | Status |
 |---|--------|-------|--------|
-| 01 | [Scaffold + tooling](docs/sprints/sprint-01-scaffold.md) | 1 — Fundação | ⬜ Não iniciado |
+| 01 | [Scaffold + tooling](docs/sprints/sprint-01-scaffold.md) | 1 — Fundação | ✅ Concluído |
 | 02 | [Design system + i18n](docs/sprints/sprint-02-design-system.md) | 1 — Fundação | ⬜ Não iniciado |
 | 03 | [Catálogo + taxonomia](docs/sprints/sprint-03-catalog.md) | 2 — Catálogo | ⬜ Não iniciado |
 | 04 | [Detalhe do produto (specs JSONB)](docs/sprints/sprint-04-product-detail.md) | 2 — Catálogo | ⬜ Não iniciado |
