@@ -5,6 +5,7 @@ import { Search, User, ShoppingCart, Menu, X } from 'lucide-react'
 import { LocaleSwitcher } from '@/components/common/LocaleSwitcher'
 import { CartDrawer } from '@/components/cart/CartDrawer'
 import { useCartStore } from '@/store/cartStore'
+import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/cn'
 
 export function Navbar() {
@@ -15,6 +16,8 @@ export function Navbar() {
   const [cartOpen, setCartOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const cartCount = useCartStore((s) => s.items.reduce((sum, i) => sum + i.quantity, 0))
+  const user = useAuthStore((s) => s.user)
+  const initials = user ? user.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase() : null
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -73,11 +76,17 @@ export function Navbar() {
             </button>
 
             <Link
-              to="/conta"
+              to={user ? '/conta' : '/entrar'}
               className="flex items-center justify-center h-8 w-8 rounded-lg text-white hover:bg-white/10"
               aria-label={t('account')}
             >
-              <User className="h-5 w-5" aria-hidden />
+              {initials ? (
+                <span className="w-6 h-6 rounded-full bg-brand-blue flex items-center justify-center text-[10px] font-bold text-white leading-none">
+                  {initials}
+                </span>
+              ) : (
+                <User className="h-5 w-5" aria-hidden />
+              )}
             </Link>
 
             <button

@@ -4,7 +4,7 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 
 ## Estado atual
 
-**Fase 2 — Catálogo.** Sprints 01–05 concluídos. Sprint 06 (carrinho) é o ativo.
+**Fase 3 — Comércio.** Sprints 01–06 concluídos. Sprint 07 (auth + conta) é o ativo.
 
 ## Índice de sprints
 
@@ -15,8 +15,8 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 | 03 | [Catálogo + taxonomia](docs/sprints/sprint-03-catalog.md) | 2 — Catálogo | ✅ Concluído |
 | 04 | [Detalhe do produto (specs JSONB)](docs/sprints/sprint-04-product-detail.md) | 2 — Catálogo | ✅ Concluído |
 | 05 | [Busca + filtros (ILIKE)](docs/sprints/sprint-05-search-filters.md) | 2 — Catálogo | ✅ Concluído |
-| 06 | [Carrinho (local + persistente)](docs/sprints/sprint-06-cart.md) | 3 — Comércio | 🚧 Ativo |
-| 07 | [Auth do cliente + conta](docs/sprints/sprint-07-auth.md) | 3 — Comércio | ⬜ Não iniciado |
+| 06 | [Carrinho (local + persistente)](docs/sprints/sprint-06-cart.md) | 3 — Comércio | ✅ Concluído |
+| 07 | [Auth do cliente + conta](docs/sprints/sprint-07-auth.md) | 3 — Comércio | 🚧 Ativo |
 | 08 | [Checkout (Pix / boleto / cartão)](docs/sprints/sprint-08-checkout.md) | 3 — Comércio | ⬜ Não iniciado |
 | 09 | [Histórico de pedidos + rastreio + e-mails](docs/sprints/sprint-09-orders.md) | 3 — Comércio | ⬜ Não iniciado |
 | 10 | [Wizard de onboarding de vendedor](docs/sprints/sprint-10-seller-onboarding.md) | 4 — Ops de vendedor | ⬜ Não iniciado |
@@ -68,3 +68,5 @@ Cada sprint termina com:
 **Sprint 04 — Detalhe do produto** (2026-04-20): ProductDetailPage com ImageGallery, SellerCard, SpecSheet, tabs (Descrição/Specs/Avaliações), QuantitySelector, CTA fixo mobile, produtos relacionados.
 
 **Sprint 05 — Busca + filtros facetados** (2026-04-20): SearchPage, FacetSidebar, ActiveFilterChips, SortDropdown, query params compartilháveis, bottom sheet mobile, estado vazio.
+
+**Sprint 06 — Carrinho** (2026-04-20): cartStore (Zustand persist), CartDrawer, CartPage `/carrinho`, badge na navbar, "Adicionar ao carrinho" funcional no ProductDetailPage.
