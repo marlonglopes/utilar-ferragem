@@ -10,7 +10,12 @@
       "Bash(python3 -c \" import sys, re html = sys.stdin.read\\(\\) body = re.search\\(r'<body>\\(.*\\)</body>', html, re.DOTALL\\) content = re.sub\\(r'<style.*?</style>', '', body.group\\(1\\), flags=re.DOTALL\\) content = re.sub\\(r'<script.*?</script>', '', content, flags=re.DOTALL\\) print\\(content\\) \")",
       "Bash(sed -i 's/| 03 | \\\\[Catálogo + taxonomia\\\\]\\(docs\\\\/sprints\\\\/sprint-03-catalog.md\\) | 2 — Catálogo | ⬜ Não iniciado |/| 03 | [Catálogo + taxonomia]\\(docs\\\\/sprints\\\\/sprint-03-catalog.md\\) | 2 — Catálogo | ✅ Concluído |/' SPRINT.md)",
       "Bash(sed -i 's/Sprints 01 e 02 concluídos. Sprint 03 \\(catálogo + taxonomia\\) é o próximo./Sprints 01, 02 e 03 concluídos. Sprint 04 \\(detalhe do produto\\) é o próximo./' SPRINT.md)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174)",
+      "WebFetch(domain:localhost)",
+      "Bash(go version *)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)"
     ]
   }
 }
