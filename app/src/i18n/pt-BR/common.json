@@ -125,6 +125,50 @@
     "saveAddress": "Salvar endereço",
     "cancel": "Cancelar"
   },
+  "orderStatus": {
+    "pending_payment": "Aguardando pagamento",
+    "paid": "Pago",
+    "picking": "Separando",
+    "shipped": "Enviado",
+    "delivered": "Entregue",
+    "cancelled": "Cancelado"
+  },
+  "orders": {
+    "number": "Pedido #{{number}}",
+    "placedOn": "Feito em {{date}}",
+    "items": "{{count}} item",
+    "items_plural": "{{count}} itens",
+    "viewDetail": "Ver detalhes",
+    "buyAgain": "Comprar novamente",
+    "buyAgainPartial": "{{count}} item adicionado ao carrinho (outros sem estoque)",
+    "buyAgainPartial_plural": "{{count}} itens adicionados ao carrinho (outros sem estoque)",
+    "cancelOrder": "Cancelar pedido",
+    "cancelConfirm": "Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.",
+    "cancelSuccess": "Pedido cancelado.",
+    "tracking": "Código de rastreamento",
+    "noTracking": "Disponível após o envio",
+    "shippingAddress": "Endereço de entrega",
+    "paymentMethod": "Forma de pagamento",
+    "support": "Problema com este pedido?",
+    "supportLink": "Falar com suporte",
+    "empty": "Você ainda não fez nenhum pedido",
+    "emptyHint": "Explore o catálogo e faça seu primeiro pedido.",
+    "lastUpdate": "Última atualização: {{date}}",
+    "soldBy": "Vendido por",
+    "unitPrice": "Preço unitário",
+    "filter": {
+      "all": "Todos",
+      "active": "Em andamento",
+      "done": "Concluídos"
+    },
+    "timeline": {
+      "pending_payment": "Aguardando pagamento",
+      "paid": "Pagamento confirmado",
+      "picking": "Separando pedido",
+      "shipped": "A caminho",
+      "delivered": "Entregue"
+    }
+  },
   "cartPage": {
     "title": "Carrinho",
     "empty": "Seu carrinho está vazio",

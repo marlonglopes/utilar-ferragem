@@ -125,6 +125,50 @@
     "saveAddress": "Save address",
     "cancel": "Cancel"
   },
+  "orderStatus": {
+    "pending_payment": "Awaiting payment",
+    "paid": "Paid",
+    "picking": "Picking",
+    "shipped": "Shipped",
+    "delivered": "Delivered",
+    "cancelled": "Cancelled"
+  },
+  "orders": {
+    "number": "Order #{{number}}",
+    "placedOn": "Placed on {{date}}",
+    "items": "{{count}} item",
+    "items_plural": "{{count}} items",
+    "viewDetail": "View details",
+    "buyAgain": "Buy again",
+    "buyAgainPartial": "{{count}} item added to cart (others out of stock)",
+    "buyAgainPartial_plural": "{{count}} items added to cart (others out of stock)",
+    "cancelOrder": "Cancel order",
+    "cancelConfirm": "Are you sure you want to cancel this order? This action cannot be undone.",
+    "cancelSuccess": "Order cancelled.",
+    "tracking": "Tracking code",
+    "noTracking": "Available after shipment",
+    "shippingAddress": "Shipping address",
+    "paymentMethod": "Payment method",
+    "support": "Problem with this order?",
+    "supportLink": "Contact support",
+    "empty": "You haven't placed any orders yet",
+    "emptyHint": "Explore the catalog and place your first order.",
+    "lastUpdate": "Last update: {{date}}",
+    "soldBy": "Sold by",
+    "unitPrice": "Unit price",
+    "filter": {
+      "all": "All",
+      "active": "Active",
+      "done": "Completed"
+    },
+    "timeline": {
+      "pending_payment": "Awaiting payment",
+      "paid": "Payment confirmed",
+      "picking": "Order picking",
+      "shipped": "On the way",
+      "delivered": "Delivered"
+    }
+  },
   "cartPage": {
     "title": "Cart",
     "empty": "Your cart is empty",

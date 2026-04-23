@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { User, MapPin, CreditCard, LogOut, Plus, Pencil, Trash2, Check } from 'lucide-react'
+import { User, MapPin, CreditCard, LogOut, Plus, Pencil, Trash2, Check, Package } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useNavigate } from 'react-router-dom'
 import { Input } from '@/components/ui'
 import { formatCEP } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import OrdersTab from './OrdersTab'
 
-type Tab = 'profile' | 'addresses' | 'payment'
+type Tab = 'profile' | 'addresses' | 'payment' | 'orders'
 
 interface Address {
   id: string
@@ -273,6 +274,7 @@ export default function AccountPage() {
   const [tab, setTab] = useState<Tab>('profile')
 
   const tabs: { id: Tab; label: string; icon: typeof User }[] = [
+    { id: 'orders', label: t('account.orders'), icon: Package },
     { id: 'profile', label: t('account.profile'), icon: User },
     { id: 'addresses', label: t('account.addresses'), icon: MapPin },
     { id: 'payment', label: t('account.paymentMethods'), icon: CreditCard },
@@ -317,6 +319,7 @@ export default function AccountPage() {
         ))}
       </div>
 
+      {tab === 'orders' && <OrdersTab />}
       {tab === 'profile' && <ProfileTab />}
       {tab === 'addresses' && <AddressesTab />}
       {tab === 'payment' && (

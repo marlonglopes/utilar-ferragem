@@ -4,7 +4,7 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 
 ## Estado atual
 
-**Fase 3 — Comércio.** Sprints 01–08b concluídos. Sprint 09 (histórico de pedidos) é o próximo.
+**Fase 3 — Comércio.** Sprints 01–09 concluídos. Sprint 10 (onboarding de vendedor) é o próximo.
 
 ## Índice de sprints
 
@@ -19,7 +19,7 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 | 07 | [Auth do cliente + conta](docs/sprints/sprint-07-auth.md) | 3 — Comércio | ✅ Concluído |
 | 08a | [payment-service Go + Mercado Pago](docs/sprints/sprint-08-checkout.md) | 3 — Comércio | ✅ Concluído |
 | 08b | [CheckoutPage SPA (Pix / boleto / cartão)](docs/sprints/sprint-08-checkout.md) | 3 — Comércio | ✅ Concluído |
-| 09 | [Histórico de pedidos + rastreio + e-mails](docs/sprints/sprint-09-orders.md) | 3 — Comércio | ⬜ Não iniciado |
+| 09 | [Histórico de pedidos + rastreio + e-mails](docs/sprints/sprint-09-orders.md) | 3 — Comércio | ✅ Concluído |
 | 10 | [Wizard de onboarding de vendedor](docs/sprints/sprint-10-seller-onboarding.md) | 4 — Ops de vendedor | ⬜ Não iniciado |
 | 11 | [Importação em massa de SKUs (CSV)](docs/sprints/sprint-11-bulk-import.md) | 4 — Ops de vendedor | ⬜ Não iniciado |
 | 12 | [Avaliações & notas](docs/sprints/sprint-12-reviews-ratings.md) | 5 — Crescimento | ⬜ Não iniciado |
@@ -77,3 +77,5 @@ Cada sprint termina com:
 **Sprint 08a — payment-service Go** (2026-04-22): scaffold Go, docker-compose (Redpanda + Postgres), migrations (payments/webhook_events/payments_outbox), MP client (Pix/boleto/cartão), webhook handler (HMAC + idempotência + outbox), outbox drainer → Redpanda, testes de integração.
 
 **Sprint 08b — CheckoutPage SPA** (2026-04-20): usePayment hook (mock mode + polling real), PixPayment (QR + copia-e-cola + countdown + auto-confirm mock), BoletoPayment (barcode + aviso + vencimento), CardPayment (hosted drop-in + simulate sandbox), CheckoutPage (wizard 3 passos: endereço/frete/pagamento + sidebar resumo), OrderConfirmationPage (Pix/boleto/cartão), rotas `/checkout` (ProtectedRoute) e `/pedido/:id`. 89 testes passando (12 arquivos).
+
+**Sprint 09 — Histórico de pedidos + rastreio** (2026-04-23): mockOrders (4 pedidos: entregue/enviado/pago/aguardando), useOrders + useOrder hooks (mock mode), OrdersTab com filtros all/active/done, OrderDetailPage (timeline 5 passos, itens, endereço, pagamento, rastreamento, cancelar pedido, comprar novamente), i18n completo (orderStatus + orders.* em pt-BR e en). 117 testes passando (15 arquivos).
