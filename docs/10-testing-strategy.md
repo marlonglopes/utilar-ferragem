@@ -15,10 +15,10 @@ Leituras complementares:
 
 | Camada | Ferramenta | Onde | Meta de cobertura | Executa em |
 |-------|------|-------|-----------------|---------|
-| Unitário | Vitest 2 / happy-dom / Testing Library | `utilar-ferragem/src/**/__tests__/` | ≥70% de linhas nas libs principais (`format`, `cpf`, `cep`, `taxonomy`, `filters`) | PR + main |
-| Unitário | RSpec | `services/*/spec/` | ≥80% em models + validators + services | PR + main |
-| Integração | Specs de request RSpec | `services/*/spec/requests/` | Todos os endpoints públicos, casos 2xx + 4xx | PR + main |
-| Contrato | Snapshot customizado + gem `json-schema` | `services/gateway/spec/contracts/`, `services/payment-service/spec/contracts/` | Mapa de rotas do gateway + payloads Kafka | PR + main |
+| Unitário | Vitest 2 / happy-dom / Testing Library | `app/src/test/` | ≥70% de linhas nas libs principais (`format`, `cpf`, `cep`, `taxonomy`, `filters`) | PR + main |
+| Unitário | Go stdlib `testing` + `net/http/httptest` | `services/payment-service/internal/**/*_test.go` | ≥80% em handlers + cliente MP | PR + main |
+| Integração | Go `testing` com DB real (Docker) | `services/payment-service/internal/**/*_test.go` (tag `integration`) | Todos os endpoints públicos, casos 2xx + 4xx | PR + main |
+| Contrato | Snapshot + validação de schema Go | `services/payment-service/internal/` | Payloads Kafka + contratos da API MP | PR + main |
 | E2E | Playwright | `utilar-ferragem/e2e/` | Caminho dourado do checkout + cadastro + navegação | Nightly + pré-deploy |
 | Carga | k6 | `infrastructure/k6/` | 100 RPS de navegação, 20 checkouts simultâneos | Semanal + pré-lançamento |
 | Acessibilidade | axe-core + Playwright | `utilar-ferragem/e2e/a11y/` | Todas as páginas de nível superior | PR + nightly |

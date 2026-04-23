@@ -1,6 +1,6 @@
 services:
   postgres-payment:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: utilar_payment_db
     environment:
       POSTGRES_USER: utilar
@@ -17,7 +17,7 @@ services:
       retries: 10
 
   redpanda:
-    image: redpandadata/redpanda:v23.3.11
+    image: redpandadata/redpanda:v26.1.6
     container_name: utilar_redpanda
     command:
       - redpanda
@@ -45,7 +45,7 @@ services:
       retries: 10
 
   redpanda-console:
-    image: redpandadata/console:v2.4.3
+    image: redpandadata/console:v3.7.1
     container_name: utilar_redpanda_console
     depends_on:
       redpanda:

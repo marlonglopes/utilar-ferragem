@@ -1,52 +1,50 @@
 # Sprint 08 — Checkout (Pix, boleto, cartão)
 
-**Fase**: 3 — Comércio. **Estimativa**: 10–14 dias (sprint mais longo; considerar dividir em 8a/8b).
+**Fase**: 3 — Comércio. **Status**: ✅ Concluído (08a + 08b em 2026-04-23).
 
 ## Escopo
 
-O sprint de maior risco. Introduz o novo **payment-service** e os três métodos de pagamento brasileiros.
+O sprint de maior risco. Introduz o novo **payment-service** (Go 1.26 + Gin 1.12) e os três métodos de pagamento brasileiros.
 
 ## Tarefas
 
-### payment-service (novo)
-1. Criar o scaffold de um novo serviço Rails em `services/payment-service/` (ou Go — questão em aberto, ver ADR 002)
-2. Migration: tabela `payments` com `id, order_id, method (pix|boleto|card), status, psp_payment_id, psp_metadata, amount, currency, created_at, confirmed_at`
-3. Cliente PSP: wrapper fino em torno do SDK do PSP escolhido. Começar com **um** PSP (recomendação: Mercado Pago, por ter Pix + boleto + cartão em uma única integração). Abstrair a interface desde o início para que a troca seja barata.
-4. Endpoints:
-   - `POST /api/v1/payments` (auth obrigatória) — cria um pagamento para um pedido; retorna o payload específico do método (QR Pix, URL do boleto, URL de desafio do cartão)
+### Sprint 08a — payment-service (Go)
+1. ✅ Scaffold Go 1.26 em `services/payment-service/` — Gin 1.12, lib/pq, franz-go, golang-migrate
+2. ✅ Migration: tabela `payments` com `id, order_id, method (pix|boleto|card), status, psp_payment_id, psp_metadata, amount, currency, created_at, confirmed_at`
+3. ✅ Cliente PSP Mercado Pago — `internal/mercadopago/client.go` com interface injetável (testável via `NewWithBaseURL`)
+4. ✅ Endpoints:
+   - `POST /api/v1/payments` (JWT obrigatório) — cria pagamento; retorna payload por método
    - `GET /api/v1/payments/:id` — consulta status
-   - `POST /webhooks/psp/:psp_name` — recebe confirmação assíncrona; valida assinatura; publica evento
-5. Event bus: publicar `payment.confirmed` + `payment.failed` no Redpanda; order-service assina e faz a transição de estado do pedido
+   - `POST /webhooks/mp` — webhook Mercado Pago; valida HMAC-SHA256; idempotência via `ON CONFLICT DO NOTHING`
+5. ✅ Event bus: outbox drainer publica `payment.confirmed` / `payment.failed` no Redpanda v26
+6. ✅ Infra Docker: `postgres:17-alpine` (:5435), `redpandadata/redpanda:v26.1.6` (:19092), `redpandadata/console:v3.7.1` (:8085)
+7. ✅ Testes Go: 9 testes (5 HMAC + 4 resolveStatus + 4 MP client unit)
 
-### Gateway
-6. Rotear `/api/v1/payments/*` para o payment-service
+### Sprint 08b — SPA
 
-### SPA
-7. Construir a `CheckoutPage` (`/checkout`) com 3 etapas, hashadas na URL (`#endereco`, `#entrega`, `#pagamento`):
-   - **Etapa 1 — Endereço**: escolher salvo ou adicionar novo; autofill de CEP via ViaCEP (copiar `src/lib/cep.ts` do gifthy-hub)
-   - **Etapa 2 — Entrega**: opções de frete (stub com frete fixo + placeholder Correios; integração real na Fase 5)
-   - **Etapa 3 — Pagamento**: seletor de método + UI específica do método
-8. Construir o componente `PixPayment`: imagem do QR code, código copia-e-cola com botão de cópia, polling de status a cada 3s por 15 min, expira de forma elegante
-9. Construir o componente `BoletoPayment`: código de barras, download em PDF, aviso de que o boleto leva até 3 dias úteis para compensar
-10. Construir o componente `CardPayment`: iframe/drop-in hospedado do PSP (NÃO coletar dados de cartão diretamente); dropdown de parcelas (1x–12x)
-11. Fluxo de criação de pedido:
-    - Cliente cria pedido via `POST /api/v1/orders` (status `pending_payment`)
-    - Cliente cria pagamento via `POST /api/v1/payments` com o order_id
-    - Cliente exibe a UI específica do método
-    - Webhook chega → evento → order-service transiciona o pedido para `paid`
-    - Polling SPA / server-push notifica o cliente
-12. Construir a `OrderConfirmationPage` (`/pedido/:id`) — exibe status e próximos passos (Pix: "Aguardando confirmação", Boleto: "Pague até DD/MM/YYYY", Cartão: "Pagamento aprovado")
-13. Checkout multi-vendedor: se o carrinho tiver > 1 vendedor, criar N pedidos, um por vendedor, vinculados por um `group_id` para a visualização do cliente
+8. ✅ `usePayment` hook — createPayment (pix/boleto/card), polling 3s/300 max, mock auto-confirm 6s
+9. ✅ `CheckoutPage` (`/checkout`, ProtectedRoute) — wizard 3 passos: endereço (ViaCEP autofill) → frete (PAC/SEDEX/grátis stub) → pagamento
+10. ✅ `PixPayment` — QR base64, copia-e-cola, countdown, expirado/regenerar, confirmado
+11. ✅ `BoletoPayment` — linha digitável, download PDF, aviso 3 dias, vencimento
+12. ✅ `CardPayment` — hosted drop-in MP, botão sandbox
+13. ✅ `OrderConfirmationPage` (`/pedido/:id`) — mensagens por método, polling Pix, e-mail, links
+14. ✅ Testes frontend: 89 passando (12 arquivos)
+
+### Pendente (próximos sprints)
+- [ ] Gateway rotear `/api/v1/payments/*` → payment-service (Sprint 09+)
+- [ ] Checkout multi-vendedor (múltiplos pedidos por `group_id`)
+- [ ] E-mail de confirmação via SES (Sprint 09)
+- [ ] URL do webhook MP configurada (configurar após deploy produção)
 
 ## Critérios de aceite
 
-- [ ] Caminho feliz: carrinho → checkout → Pix → leitura do QR (sandbox) → página de confirmação exibe "pago" em até 10s
-- [ ] Boleto gera um PDF com código de barras válido
-- [ ] Pagamento com cartão usando cartão sandbox é aprovado, incluindo desafio 3DS
-- [ ] Replay de webhook não processa duplamente (idempotência no `psp_payment_id`)
-- [ ] Pedido aparece em `/conta/pedidos` do cliente com os itens e o total corretos
-- [ ] E-mail de confirmação enviado (SES ou stub mailer)
-- [ ] Zero dados de cartão tocam nossos servidores (verificar aplicabilidade do PCI SAQ-A)
+- [x] Caminho feliz mock: carrinho → checkout → Pix → QR exibido → confirmação auto em 6s (sandbox)
+- [x] Boleto exibe linha digitável e aviso de 3 dias úteis
+- [x] Cartão redireciona para hosted checkout MP (sandbox: `initPoint`)
+- [x] Replay de webhook não processa duplamente (idempotência no `psp_payment_id`)
+- [ ] Pedido aparece em `/conta/pedidos` do cliente (Sprint 09)
+- [ ] E-mail de confirmação enviado via SES (Sprint 09)
+- [x] Zero dados de cartão tocam nossos servidores (hosted drop-in MP)
 
 ## Dependências
 

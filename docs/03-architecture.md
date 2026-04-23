@@ -35,7 +35,7 @@ Espelha o `gifthy-hub/` para maximizar reuso, sinal de treinamento e fluxo de co
 | Estilização | Tailwind CSS 3 + variáveis CSS para tema | Mesmo; permite trocar para a paleta Utilar via CSS vars |
 | Roteamento | React Router 6 | Mesmo |
 | Dados | TanStack Query 5 | Mesmo |
-| Estado | Zustand | Mesmo, já usado para auth/locale |
+| Estado | Zustand 4 | Mesmo, já usado para auth/locale |
 | Formulários | React Hook Form + Zod | Mesmo, incluindo o padrão Zod + i18n |
 | i18n | i18next + react-i18next | Mesmo — reutiliza o padrão `gifthy-hub/src/i18n/*`; **pt-BR é o padrão** |
 | Ícones | lucide-react | Mesmo |
@@ -43,7 +43,20 @@ Espelha o `gifthy-hub/` para maximizar reuso, sinal de treinamento e fluxo de co
 | Lint | ESLint (política zero-warning) + Prettier | Mesmo |
 | HTTP | `fetch` nativo via um `src/lib/api.ts` fino | Mesmo padrão |
 
-Dependência: **Node 20+** (conforme nota do projeto pai).
+Dependência: **Node 20** (v20.20.2 LTS — atualizado em 2026-04-23).
+
+### payment-service
+
+| Camada | Escolha |
+|--------|---------|
+| Linguagem | Go 1.26.2 |
+| Framework HTTP | Gin 1.12 |
+| Banco de dados | PostgreSQL 17 (Docker: `postgres:17-alpine`) |
+| Event bus | Redpanda v26.1.6 |
+| Console | Redpanda Console v3.7.1 |
+| Migrações | golang-migrate v4 |
+| PSP | Mercado Pago (Pix + boleto + cartão) |
+| Auth | golang-jwt/jwt v5 (JWT compartilhado com gateway) |
 
 ## Estrutura de diretórios
 
@@ -109,7 +122,7 @@ Cada item acima terá seu próprio ADR / migration quando chegarmos ao respectiv
 
 ### O que é totalmente novo (Fase 3 / Sprint 08)
 
-**payment-service** — novo serviço em Rails ou Go, responsável por:
+**payment-service** — serviço em Go 1.26, responsável por:
 - Geração de QR/copia-e-cola Pix (via PSP: Gerencianet, Mercado Pago, Stripe BR ou PagSeguro)
 - Emissão de boleto
 - Tokenização de cartão + 3DS
