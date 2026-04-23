@@ -4,7 +4,7 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 
 ## Estado atual
 
-**Fase 3 — Comércio.** Sprints 01–07 concluídos. Sprint 08a (payment-service Go) é o ativo.
+**Fase 3 — Comércio.** Sprints 01–08b concluídos. Sprint 09 (histórico de pedidos) é o próximo.
 
 ## Índice de sprints
 
@@ -17,8 +17,8 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 | 05 | [Busca + filtros (ILIKE)](docs/sprints/sprint-05-search-filters.md) | 2 — Catálogo | ✅ Concluído |
 | 06 | [Carrinho (local + persistente)](docs/sprints/sprint-06-cart.md) | 3 — Comércio | ✅ Concluído |
 | 07 | [Auth do cliente + conta](docs/sprints/sprint-07-auth.md) | 3 — Comércio | ✅ Concluído |
-| 08a | [payment-service Go + Mercado Pago](docs/sprints/sprint-08-checkout.md) | 3 — Comércio | 🚧 Ativo |
-| 08b | [CheckoutPage SPA (Pix / boleto / cartão)](docs/sprints/sprint-08-checkout.md) | 3 — Comércio | ⬜ Não iniciado |
+| 08a | [payment-service Go + Mercado Pago](docs/sprints/sprint-08-checkout.md) | 3 — Comércio | ✅ Concluído |
+| 08b | [CheckoutPage SPA (Pix / boleto / cartão)](docs/sprints/sprint-08-checkout.md) | 3 — Comércio | ✅ Concluído |
 | 09 | [Histórico de pedidos + rastreio + e-mails](docs/sprints/sprint-09-orders.md) | 3 — Comércio | ⬜ Não iniciado |
 | 10 | [Wizard de onboarding de vendedor](docs/sprints/sprint-10-seller-onboarding.md) | 4 — Ops de vendedor | ⬜ Não iniciado |
 | 11 | [Importação em massa de SKUs (CSV)](docs/sprints/sprint-11-bulk-import.md) | 4 — Ops de vendedor | ⬜ Não iniciado |
@@ -75,3 +75,5 @@ Cada sprint termina com:
 **Sprint 07 — Auth + conta** (2026-04-22): cpf.ts, authStore expandido, ProtectedRoute, LoginPage, RegisterPage, ForgotPasswordPage, AccountPage (perfil/endereços/CEP autofill), avatar na Navbar.
 
 **Sprint 08a — payment-service Go** (2026-04-22): scaffold Go, docker-compose (Redpanda + Postgres), migrations (payments/webhook_events/payments_outbox), MP client (Pix/boleto/cartão), webhook handler (HMAC + idempotência + outbox), outbox drainer → Redpanda, testes de integração.
+
+**Sprint 08b — CheckoutPage SPA** (2026-04-20): usePayment hook (mock mode + polling real), PixPayment (QR + copia-e-cola + countdown + auto-confirm mock), BoletoPayment (barcode + aviso + vencimento), CardPayment (hosted drop-in + simulate sandbox), CheckoutPage (wizard 3 passos: endereço/frete/pagamento + sidebar resumo), OrderConfirmationPage (Pix/boleto/cartão), rotas `/checkout` (ProtectedRoute) e `/pedido/:id`. 89 testes passando (12 arquivos).

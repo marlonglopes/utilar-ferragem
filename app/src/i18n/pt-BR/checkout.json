@@ -1,4 +1,9 @@
 {
+  "steps": {
+    "address": "Endereço",
+    "shipping": "Entrega",
+    "payment": "Pagamento"
+  },
   "cart": {
     "title": "Carrinho",
     "empty": "Seu carrinho está vazio",
@@ -10,15 +15,6 @@
     "remove": "Remover",
     "quantity": "Quantidade"
   },
-  "payment": {
-    "title": "Pagamento",
-    "pix": "Pix",
-    "boleto": "Boleto bancário",
-    "creditCard": "Cartão de crédito",
-    "debitCard": "Cartão de débito",
-    "installments": "{{count}}x sem juros",
-    "pixDiscount": "5% de desconto no Pix"
-  },
   "address": {
     "title": "Endereço de entrega",
     "cep": "CEP",
@@ -28,12 +24,80 @@
     "neighborhood": "Bairro",
     "city": "Cidade",
     "state": "Estado",
-    "searchCep": "Buscar CEP"
+    "searchCep": "Buscar CEP",
+    "noAddresses": "Nenhum endereço salvo. Preencha abaixo.",
+    "useThis": "Usar este endereço",
+    "addNew": "Usar outro endereço",
+    "continue": "Continuar"
+  },
+  "shipping": {
+    "title": "Opções de entrega",
+    "free": "Grátis",
+    "standard": "PAC — Correios",
+    "express": "SEDEX — Correios",
+    "days": "{{count}} dia útil",
+    "days_plural": "{{count}} dias úteis",
+    "stub": "Integração com Correios disponível em breve. Frete fixo aplicado.",
+    "continue": "Continuar para pagamento"
+  },
+  "payment": {
+    "title": "Pagamento",
+    "pix": "Pix",
+    "boleto": "Boleto bancário",
+    "creditCard": "Cartão de crédito",
+    "debitCard": "Cartão de débito",
+    "installments": "{{count}}x sem juros",
+    "pixDiscount": "5% de desconto no Pix",
+    "confirm": "Confirmar e pagar"
+  },
+  "pix": {
+    "title": "Pague com Pix",
+    "scanQR": "Escaneie o QR code com seu banco",
+    "orCopyPaste": "Ou copie o código Pix",
+    "copy": "Copiar código",
+    "copied": "Copiado!",
+    "expiresIn": "Expira em",
+    "expired": "QR code expirado",
+    "regenerate": "Gerar novo código",
+    "waiting": "Aguardando pagamento...",
+    "confirmed": "Pagamento confirmado!",
+    "discount": "5% de desconto aplicado"
+  },
+  "boleto": {
+    "title": "Boleto bancário",
+    "code": "Linha digitável",
+    "copy": "Copiar código",
+    "copied": "Copiado!",
+    "download": "Baixar boleto em PDF",
+    "warning": "O boleto pode levar até 3 dias úteis para compensar. Seu pedido será separado após a confirmação.",
+    "expires": "Vence em {{date}}"
+  },
+  "card": {
+    "title": "Cartão de crédito ou débito",
+    "hosted": "Você será redirecionado para o ambiente seguro do Mercado Pago para inserir os dados do cartão.",
+    "proceed": "Ir para pagamento seguro",
+    "simulate": "Simular aprovação (sandbox)"
   },
   "order": {
     "summary": "Resumo do pedido",
     "place": "Confirmar pedido",
-    "success": "Pedido realizado com sucesso!",
-    "number": "Pedido #{{number}}"
+    "success": "Pedido realizado!",
+    "number": "Pedido #{{number}}",
+    "items": "{{count}} item",
+    "items_plural": "{{count}} itens",
+    "soldBy": "Vendido por"
+  },
+  "confirmation": {
+    "title": "Pedido confirmado!",
+    "orderNumber": "Pedido #{{id}}",
+    "pixPending": "Aguardando confirmação do Pix. Isso pode levar alguns segundos.",
+    "boletoPending": "Pague o boleto até {{date}} para confirmar seu pedido.",
+    "cardApproved": "Pagamento aprovado! Seu pedido está sendo preparado.",
+    "pending": "Aguardando pagamento",
+    "confirmed": "Pagamento confirmado",
+    "failed": "Pagamento falhou",
+    "trackOrder": "Acompanhar pedido",
+    "continueShopping": "Continuar comprando",
+    "emailSent": "Enviamos a confirmação para {{email}}."
   }
 }

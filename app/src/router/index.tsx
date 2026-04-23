@@ -10,6 +10,8 @@ import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
 import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
 import AccountPage from '@/pages/account/AccountPage'
+import CheckoutPage from '@/pages/checkout/CheckoutPage'
+import OrderConfirmationPage from '@/pages/checkout/OrderConfirmationPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import UiPage from '@/pages/_dev/UiPage'
 
@@ -30,6 +32,11 @@ const router = createBrowserRouter([
         path: 'conta',
         element: <ProtectedRoute><AccountPage /></ProtectedRoute>,
       },
+      {
+        path: 'checkout',
+        element: <ProtectedRoute><CheckoutPage /></ProtectedRoute>,
+      },
+      { path: 'pedido/:id', element: <OrderConfirmationPage /> },
       { path: '404', element: <NotFoundPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],

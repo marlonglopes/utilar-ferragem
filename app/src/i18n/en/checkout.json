@@ -1,4 +1,9 @@
 {
+  "steps": {
+    "address": "Address",
+    "shipping": "Shipping",
+    "payment": "Payment"
+  },
   "cart": {
     "title": "Cart",
     "empty": "Your cart is empty",
@@ -10,15 +15,6 @@
     "remove": "Remove",
     "quantity": "Quantity"
   },
-  "payment": {
-    "title": "Payment",
-    "pix": "Pix",
-    "boleto": "Bank slip",
-    "creditCard": "Credit card",
-    "debitCard": "Debit card",
-    "installments": "{{count}}x interest-free",
-    "pixDiscount": "5% Pix discount"
-  },
   "address": {
     "title": "Delivery address",
     "cep": "ZIP code",
@@ -28,12 +24,80 @@
     "neighborhood": "Neighborhood",
     "city": "City",
     "state": "State",
-    "searchCep": "Search ZIP"
+    "searchCep": "Search ZIP",
+    "noAddresses": "No saved addresses. Fill in below.",
+    "useThis": "Use this address",
+    "addNew": "Use a different address",
+    "continue": "Continue"
+  },
+  "shipping": {
+    "title": "Delivery options",
+    "free": "Free",
+    "standard": "PAC — Correios",
+    "express": "SEDEX — Correios",
+    "days": "{{count}} business day",
+    "days_plural": "{{count}} business days",
+    "stub": "Correios integration coming soon. Fixed shipping applied.",
+    "continue": "Continue to payment"
+  },
+  "payment": {
+    "title": "Payment",
+    "pix": "Pix",
+    "boleto": "Bank slip",
+    "creditCard": "Credit card",
+    "debitCard": "Debit card",
+    "installments": "{{count}}x interest-free",
+    "pixDiscount": "5% Pix discount",
+    "confirm": "Confirm and pay"
+  },
+  "pix": {
+    "title": "Pay with Pix",
+    "scanQR": "Scan the QR code with your bank app",
+    "orCopyPaste": "Or copy the Pix code",
+    "copy": "Copy code",
+    "copied": "Copied!",
+    "expiresIn": "Expires in",
+    "expired": "QR code expired",
+    "regenerate": "Generate new code",
+    "waiting": "Waiting for payment...",
+    "confirmed": "Payment confirmed!",
+    "discount": "5% discount applied"
+  },
+  "boleto": {
+    "title": "Bank slip",
+    "code": "Barcode",
+    "copy": "Copy code",
+    "copied": "Copied!",
+    "download": "Download PDF",
+    "warning": "Bank slips may take up to 3 business days to clear. Your order will be prepared after confirmation.",
+    "expires": "Due {{date}}"
+  },
+  "card": {
+    "title": "Credit or debit card",
+    "hosted": "You will be redirected to Mercado Pago's secure environment to enter your card details.",
+    "proceed": "Go to secure payment",
+    "simulate": "Simulate approval (sandbox)"
   },
   "order": {
     "summary": "Order summary",
     "place": "Place order",
-    "success": "Order placed successfully!",
-    "number": "Order #{{number}}"
+    "success": "Order placed!",
+    "number": "Order #{{number}}",
+    "items": "{{count}} item",
+    "items_plural": "{{count}} items",
+    "soldBy": "Sold by"
+  },
+  "confirmation": {
+    "title": "Order confirmed!",
+    "orderNumber": "Order #{{id}}",
+    "pixPending": "Waiting for Pix confirmation. This may take a few seconds.",
+    "boletoPending": "Pay the bank slip by {{date}} to confirm your order.",
+    "cardApproved": "Payment approved! Your order is being prepared.",
+    "pending": "Awaiting payment",
+    "confirmed": "Payment confirmed",
+    "failed": "Payment failed",
+    "trackOrder": "Track order",
+    "continueShopping": "Continue shopping",
+    "emailSent": "We sent a confirmation to {{email}}."
   }
 }
