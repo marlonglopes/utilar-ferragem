@@ -9,16 +9,22 @@ import (
 	"time"
 )
 
-const baseURL = "https://api.mercadopago.com"
+const defaultBaseURL = "https://api.mercadopago.com"
 
 type Client struct {
 	accessToken string
+	baseURL     string
 	http        *http.Client
 }
 
 func New(accessToken string) *Client {
+	return NewWithBaseURL(accessToken, defaultBaseURL)
+}
+
+func NewWithBaseURL(accessToken, baseURL string) *Client {
 	return &Client{
 		accessToken: accessToken,
+		baseURL:     baseURL,
 		http:        &http.Client{Timeout: 15 * time.Second},
 	}
 }
@@ -32,7 +38,7 @@ func (c *Client) do(method, path string, body any) (json.RawMessage, error) {
 		}
 		r = bytes.NewReader(b)
 	}
-	req, err := http.NewRequest(method, baseURL+path, r)
+	req, err := http.NewRequest(method, c.baseURL+path, r)
 	if err != nil {
 		return nil, err
 	}
