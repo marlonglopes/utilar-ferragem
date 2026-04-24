@@ -28,9 +28,9 @@ type Payment struct {
 	Status       PaymentStatus   `json:"status" db:"status"`
 	Amount       float64         `json:"amount" db:"amount"`
 	Currency     string          `json:"currency" db:"currency"`
-	PSPPaymentID *string         `json:"psp_payment_id,omitempty" db:"psp_payment_id"`
-	PSPMetadata  json.RawMessage `json:"psp_metadata,omitempty" db:"psp_metadata"`
-	PSPPayload   json.RawMessage `json:"psp_payload,omitempty" db:"psp_payload"`
+	PSPPaymentID *string          `json:"psp_payment_id,omitempty" db:"psp_payment_id"`
+	PSPMetadata  *json.RawMessage `json:"psp_metadata,omitempty" db:"psp_metadata"`
+	PSPPayload   *json.RawMessage `json:"psp_payload,omitempty" db:"psp_payload"`
 	ConfirmedAt  *time.Time      `json:"confirmed_at,omitempty" db:"confirmed_at"`
 	ExpiresAt    *time.Time      `json:"expires_at,omitempty" db:"expires_at"`
 	CreatedAt    time.Time       `json:"created_at" db:"created_at"`

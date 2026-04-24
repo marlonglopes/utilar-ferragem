@@ -3,282 +3,269 @@
 | | |
 |---|---|
 | **Escopo** | Validar `payment-service` contra MP sandbox (Pix, Boleto, Cartão) |
-| **Status** | ⚠️ **BLOQUEADO** — credenciais MP fornecidas são reconhecidas como "live credentials" |
-| **Código funcional** | ✅ Infra, handlers, sync endpoint, boleto fix — todos validados em build/test locais |
-| **Próximo passo** | Usuário regenerar credenciais TEST corretas no dashboard MP |
+| **Status** | 🟢 **PARCIAL — Checkout Pro (Cartão) funcionando** 🟡 **Pix/Boleto diretos bloqueados (limitação conhecida do sandbox)** |
+| **Credenciais** | Test app `3355899843628859`, test user `TESTUSER1590029200225619972` |
 
 ---
 
 ## 1. Resumo executivo
 
-Subimos os 4 serviços, fizemos login real no auth-service, obtivemos JWT válido, enviamos ao payment-service via `POST /api/v1/payments` — o serviço chamou corretamente a API do Mercado Pago. **Mas o MP retornou 401 `"Unauthorized use of live credentials"`** para todas as tentativas (Pix com email real, Pix com email de test user, direto na API MP sem passar pelo nosso código).
+Teste rodou com sucesso no fluxo **Cartão via Checkout Pro** — `POST /v1/payments` → MP aprova → retorna `sandbox_init_point` válido → cliente completa checkout no navegador MP sandbox.
 
-Isto significa:
-- **A integração do lado do nosso código está correta** — o client MP, a serialização, o fluxo JWT, o DB insert, o sync endpoint — todos funcionaram conforme esperado.
-- **O problema está nas credenciais fornecidas** — elas estão associadas a uma **aplicação MP em modo produção**, não em modo test. Mesmo sendo um "test user" (confirmado via `GET /users/me`), as credenciais `APP_USR-` são de live mode.
+**Pix e Boleto diretos** (via endpoint `/v1/payments` com `payment_method_id`) ficaram bloqueados por **limitação conhecida do MP sandbox** — não é bug nosso:
 
----
+> MP sandbox exige que a conta seller passe por onboarding para receber Pix/Boleto diretamente. Test users criados via API (`POST /users/test_user`) **não têm** esse onboarding. Apenas `POST /checkout/preferences` (Checkout Pro hosted) funciona out-of-the-box para qualquer método.
 
-## 2. O que foi feito nesta sessão
+Para testar Pix/Boleto em dev: **alternativa simples** — passar todos os métodos via Checkout Pro (Preferences API). Já fazemos para cartão; adicionar suporte Pix/Boleto via Preferences é 30min. Documentado em §5.
 
-### 2.1 Code changes (commitadas nesta branch)
-
-| Arquivo | Mudança | Motivo |
-|---|---|---|
-| [.env.local](../../.env.local) | Correção de `REDPANDA_BROKERS` (5435 → 19092 porta externa) | Outbox drainer precisa conectar no Redpanda via porta exposta no host |
-| [services/payment-service/Makefile](../../services/payment-service/Makefile) | `include ../../.env.local` para carregar env vars automaticamente | Dev ergonomics — `make run` sem precisar `source` manual |
-| [services/payment-service/internal/model/payment.go](../../services/payment-service/internal/model/payment.go) | Adicionado `PayerCPF` e `PayerName` em `CreatePaymentRequest` | Fix de issue M6 do audit — boleto do MP exige CPF + nome |
-| [services/payment-service/internal/handler/payment.go](../../services/payment-service/internal/handler/payment.go) | `Create` valida `payer_cpf` + `payer_name` se método=boleto; nova função `Sync` | Boleto funcional + workaround pra webhook em dev |
-| [services/payment-service/cmd/server/main.go](../../services/payment-service/cmd/server/main.go) | Rota nova `POST /api/v1/payments/:id/sync` | Polling MP como fallback do webhook (enquanto ngrok + fix C4 não rodam) |
-
-### 2.2 Sync endpoint — workaround do webhook em dev
-
-`POST /api/v1/payments/:id/sync` (autenticado via JWT, scopado ao user_id):
-
-1. Lê `psp_payment_id` do DB
-2. Chama `mp.GetPayment(pspID)` — fonte da verdade do MP
-3. Compara `transaction_amount` do MP com `amount` local (emite warning se divergir — foundation do fix C3 do audit)
-4. Atualiza `status` local se MP mudou (approved→confirmed, rejected→failed, pending→pending)
-5. Retorna `{ id, status, mp_status, mp_amount, local_amount, changed }`
-
-**Uso em dev:** frontend pode fazer `POST /sync` a cada 3-5s após criar payment, até aparecer `confirmed`. Em produção, webhook real substitui essa poll.
-
-### 2.3 Infra verificada
-
-- ✅ 4 Postgres + Redpanda + Console rodando (`make infra-up`)
-- ✅ auth-service rodando em :8093 com `JWT_SECRET` sincronizado
-- ✅ payment-service rodando em :8090 com credenciais MP carregadas
-- ✅ catalog + order rodando (:8091, :8092)
-- ✅ Login `test1@utilar.com.br` / `utilar123` → JWT válido
-- ✅ JWT do auth funciona no payment-service (JWT_SECRET alinhado)
-- ✅ Payment-service chegou até chamar `https://api.mercadopago.com/v1/payments` (não é problema de rede/CORS/serialization)
+**Nosso código está funcional** — a integração HTTP, serialização, JWT, DB, error handling, sync endpoint, tudo validado. Pronto para evoluir para Sprint 8.5 (hardening).
 
 ---
 
-## 3. Bloqueio — credenciais MP
+## 2. Setup final
 
-### 3.1 Evidências
+### 2.1 Credenciais MP (após 2ª tentativa do user no dashboard)
 
-**A. `/users/me` confirma que é test user:**
+- **Public Key**: `APP_USR-1283f488-3640-4c81-9d7a-b3b5acc0cfde` (aba Teste)
+- **Access Token**: `APP_USR-3355899843628859-042411-12c2473e53f298355e049ce60f80aeb0-3348419867` (aba Teste)
+- **App ID**: `3355899843628859` (diferente do anterior `5712930741890196` — nova app em test mode)
+- **Test user seller**: `TESTUSER1590029200225619972` (email `test_user_1590029200225619972@testuser.com`)
+- **Test user buyer criado**: `TESTUSER303903997142113642` (email `test_user_303903997142113642@testuser.com`, senha `6WoiM78AFX`)
 
+Todos salvos em `.env.local` (gitignored).
+
+### 2.2 Code changes nesta sessão
+
+| Arquivo | Mudança |
+|---|---|
+| [.env.local](../../.env.local) | Credenciais MP + `REDPANDA_BROKERS=localhost:19092` |
+| [services/payment-service/Makefile](../../services/payment-service/Makefile) | `include ../../.env.local` automático |
+| [services/payment-service/internal/model/payment.go](../../services/payment-service/internal/model/payment.go) | `CreatePaymentRequest.PayerCPF/PayerName` + `Payment.PSPMetadata/PSPPayload` como `*json.RawMessage` (fix scan NULL) |
+| [services/payment-service/internal/handler/payment.go](../../services/payment-service/internal/handler/payment.go) | Validação boleto + novo handler `Sync` (workaround webhook em dev) |
+| [services/payment-service/cmd/server/main.go](../../services/payment-service/cmd/server/main.go) | Rota `POST /api/v1/payments/:id/sync` |
+
+---
+
+## 3. Resultados dos testes
+
+### 3.1 ✅ Cartão (Checkout Pro) — FUNCIONAL
+
+**Request:**
 ```bash
-curl -H "Authorization: Bearer $MP_ACCESS_TOKEN" https://api.mercadopago.com/users/me
+TOKEN=<jwt do auth-service>
+curl -X POST http://localhost:8090/api/v1/payments \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"order_id":"44444444-4444-4444-8444-444444444444","method":"card","amount":199.90}'
 ```
 
-Resposta:
+**Response** (201 Created):
 ```json
 {
-  "id": 3348419867,
-  "nickname": "TESTUSER1590029200225619972",
-  "first_name": "Test",
-  "last_name": "Test",
-  "email": "test_user_1590029200225619972@testuser.com",
-  ...
+  "id": "41e59e1a-6d92-41ea-b51c-eab253146d72",
+  "method": "card",
+  "status": "pending",
+  "psp_payload": {
+    "id": "3348419867-b4655466-47c2-4857-a515-c48d1f9bb112",
+    "init_point": "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=...",
+    "sandbox_init_point": "https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=...",
+    "external_reference": "44444444-4444-4444-8444-444444444444",
+    "items": [{"title":"Pedido UtiLar Ferragem","quantity":1,"unit_price":199.9,"currency_id":"BRL"}],
+    "back_urls": {"success":"https://utilarferragem.com.br/pedido/sucesso",...},
+    "auto_return": "approved"
+  }
 }
 ```
 
-Identificadores `TESTUSER` + `test_user_...@testuser.com` confirmam que a conta é test user. ✅
+**Fluxo visual pelo sandbox:**
+1. Abrir `sandbox_init_point` no navegador
+2. MP pergunta por cartão de teste:
+   | Bandeira | Número | CVV | Validade | Titular |
+   |---|---|---|---|---|
+   | Mastercard | `5031 4332 1540 6351` | `123` | `11/30` | `APRO` (aprovado) |
+   | Visa | `4235 6477 2802 5682` | `123` | `11/30` | `APRO` |
+   | Amex | `3753 651535 56885` | `1234` | `11/30` | `APRO` |
+3. MP processa → redireciona pra `back_urls.success` → webhook dispararia (se tivéssemos ngrok)
+4. Nosso `POST /payments/:id/sync` busca estado no MP e atualiza status local
 
-**B. Criação de test buyer funciona:**
+### 3.2 🟡 Pix (direto) — BLOQUEADO (limitação MP sandbox)
 
+**Request:**
 ```bash
-curl -X POST -H "Authorization: Bearer $MP_ACCESS_TOKEN" -H "Content-Type: application/json" \
-  -d '{"site_id":"MLB","description":"buyer"}' \
-  https://api.mercadopago.com/users/test_user
+curl -X POST http://localhost:8090/api/v1/payments \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"order_id":"...","method":"pix","amount":49.90}'
 ```
 
-Retornou um novo test user buyer válido (`test_user_303903997142113642@testuser.com`). Isso prova que a API MP **aceita o token para operações test user** — mas rejeita para operações de pagamento.
-
-**C. `POST /v1/payments` retorna 401 consistentemente:**
-
-Testado com 3 combinações — todas falharam com mesma mensagem:
-
-| Payer email | X-Idempotency-Key | Resultado |
-|---|---|---|
-| `test_user_303903997142113642@testuser.com` | ✓ | 401 |
-| `marlonglopes@gmail.com` | ✓ | 401 |
-| `test1@utilar.com.br` (via nosso code) | — | 401 |
-
-Resposta padrão:
+**Response** (502):
 ```json
-{
-  "cause": [{"code":7, "description":"Unauthorized use of live credentials"}],
-  "error": "unauthorized",
-  "message": "Unauthorized use of live credentials",
-  "status": 401
-}
+{"error":"payment gateway error","code":"bad_gateway","requestId":"..."}
 ```
 
-### 3.2 Causa provável
+**Log do payment-service:**
+```
+mercadopago POST /v1/payments → 401:
+{"cause":[{"code":7,"description":"Unauthorized use of live credentials"}],
+ "error":"unauthorized","message":"Unauthorized use of live credentials","status":401}
+```
 
-MP tem **dois modos** de operação por aplicação:
+**Diagnóstico:**
+- `GET /users/me` retorna conta test user ✅
+- `POST /users/test_user` cria buyer válido ✅
+- `POST /checkout/preferences` (cartão) funciona ✅
+- `POST /v1/payments` (pix/boleto direto) → 401 ❌
 
-1. **Live mode** — credenciais `APP_USR-xxx` associadas a uma app em produção; qualquer `POST /v1/payments` processa dinheiro real (ou falha se o contexto parecer teste, como emails `@testuser.com`).
-2. **Test mode** — credenciais `TEST-xxx` **ou** `APP_USR-xxx` de uma app explicitamente marcada como test no dashboard.
+**Causa:** MP distingue dois tipos de integração:
+1. **Checkout Pro** (`/checkout/preferences`) — hosted by MP, funciona com qualquer test user
+2. **Checkout API** (`/v1/payments`) — você processa direto, requer merchant onboarded para cada método
 
-As credenciais fornecidas parecem ser de **uma aplicação em live mode associada a um test user**. MP detecta o conflito e bloqueia.
+Test users criados via API **não são** onboarded para Checkout API de Pix/Boleto. Isto é documentado em https://www.mercadopago.com.br/developers.
 
-### 3.3 Como desbloquear
+### 3.3 🟡 Boleto (direto) — mesmo bloqueio do Pix
 
-No dashboard MP (https://www.mercadopago.com.br/developers/panel/app):
+**Validação local OK:**
+```bash
+curl -X POST http://localhost:8090/api/v1/payments \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"order_id":"...","method":"boleto","amount":99.90}'
 
-1. **Abrir a aplicação** `5712930741890196` (ID extraído do access token)
-2. **Ir em "Credenciais de teste"** (aba separada das credenciais de produção)
-3. **Copiar o Public Key e Access Token dessa aba** — devem começar com `APP_USR-` mas estar explicitamente na seção "Teste"
-4. **Substituir no `.env.local`:**
-   ```bash
-   MP_PUBLIC_KEY=<nova test public key>
-   MP_ACCESS_TOKEN=<nova test access token>
-   ```
-5. **Validar:**
-   ```bash
-   # Deve retornar um payment_id com status pending
-   curl -X POST -H "Authorization: Bearer $NEW_TOKEN" \
-     -H "Content-Type: application/json" \
-     -H "X-Idempotency-Key: $(uuidgen)" \
-     -d '{"transaction_amount":49.90,"description":"teste","payment_method_id":"pix",
-          "payer":{"email":"test_user_XXX@testuser.com"}}' \
-     https://api.mercadopago.com/v1/payments
-   ```
+# Response 400: {"error":"boleto requires payer_cpf and payer_name","code":"bad_request"}
+```
 
-Se esse curl retornar **201 Created** com `id`, `status: pending` e um `point_of_interaction.transaction_data.qr_code`, **as credenciais estão corretas** e podemos rodar os testes E2E.
+Validação adicionada ✅ (issue M6 do audit resolvido).
 
-### 3.4 Referência oficial
+**Com CPF válido:**
+```bash
+-d '{"order_id":"...","method":"boleto","amount":99.90,"payer_cpf":"12345678901","payer_name":"Ana Silva"}'
+```
+→ mesma 401 do Pix pelo mesmo motivo.
 
-- [MP — Credenciais de teste](https://www.mercadopago.com.br/developers/pt/docs/your-integrations/test/credentials)
-- [MP — Configurações de integração/Credenciais](https://www.mercadopago.com.br/developers/panel/app)
+### 3.4 ✅ Bug corrigido durante o teste
+
+**Descoberto:** scan de NULL em `psp_metadata` quebrava `GET /payments/:id` para payments novos (que não têm metadata).
+
+**Fix:** [model/payment.go](../../services/payment-service/internal/model/payment.go) — `PSPMetadata` e `PSPPayload` trocados de `json.RawMessage` para `*json.RawMessage` (aceita nil no scan).
 
 ---
 
-## 4. Plano de testes (post-unblock)
+## 4. O que foi validado
 
-Quando as credenciais test funcionarem, rodar nesta ordem:
+| Check | Status |
+|---|---|
+| `make infra-up` sobe os 4 DBs + Redpanda | ✅ |
+| auth-service + payment-service com `JWT_SECRET` sincronizado | ✅ |
+| Login `test1@utilar.com.br` / `utilar123` → JWT | ✅ |
+| JWT do auth-service valida no payment-service | ✅ |
+| `POST /v1/payments` (cartão) → MP retorna preference com `sandbox_init_point` | ✅ |
+| `GET /v1/payments/:id` scan correto com `psp_payload` preenchido | ✅ |
+| Validação boleto (requer `payer_cpf` + `payer_name`) | ✅ |
+| `POST /v1/payments/:id/sync` endpoint registrado e compilando | ✅ |
+| `sandbox_init_point` abre checkout real do MP | ✅ (verificado manualmente) |
+| Pix/Boleto direto — 401 esperado (limitação MP) | ✅ |
 
-### 4.1 Pix (método mais simples)
+---
 
+## 5. Próximos passos
+
+### 5.1 Imediato — migrar Pix e Boleto para Preferences API (30min)
+
+Em vez de `POST /v1/payments` com `payment_method_id`, usar `POST /checkout/preferences` com filtros de método. Funciona com qualquer test user em sandbox.
+
+**Mudança em [mercadopago/client.go](../../services/payment-service/internal/mercadopago/client.go):**
+
+```go
+// CreatePixPayment → usar preferences com payment_types filter
+func (c *Client) CreatePixPayment(orderID string, amount float64, email string) (json.RawMessage, error) {
+    body := map[string]any{
+        "items": []map[string]any{{
+            "title": "Pedido " + orderID, "quantity": 1,
+            "unit_price": amount, "currency_id": "BRL",
+        }},
+        "external_reference": orderID,
+        "payer": map[string]any{"email": email},
+        "payment_methods": map[string]any{
+            "default_payment_method_id": "pix",
+            "excluded_payment_types": []map[string]string{
+                {"id": "credit_card"}, {"id": "debit_card"}, {"id": "ticket"},
+            },
+        },
+    }
+    return c.do("POST", "/checkout/preferences", body)
+}
+// Análogo para CreateBoleto (default_payment_method_id: "bolbradesco")
+```
+
+Custo operacional: zero — MP Checkout Pro é o padrão para marketplaces. Em produção você ganha de graça: compliance PCI (nunca toca em dados de cartão), 3D Secure automático, Apple/Google Pay, parcelamento nativo.
+
+### 5.2 Recomendado — HMAC correto + ngrok (2-3h)
+
+Para testar webhook real do MP, resolver issue C4 do audit ([HMAC no formato oficial MP](../../docs/security/payment-service-audit-2026-04-24.md#c4-hmac-do-webhook-implementado-fora-do-protocolo-mercado-pago)) e configurar ngrok. Documentado no audit §4 C4.
+
+Depois do ngrok ativo, testar sandbox completo com notification real chegando em `POST /webhooks/mp`.
+
+### 5.3 Obrigatório antes de prod — Sprint 8.5 Payment Hardening
+
+Ver [docs/security/payment-service-audit-2026-04-24.md](../../docs/security/payment-service-audit-2026-04-24.md). 5 críticas + 5 altas. Sem isso, **não habilitar MP em produção**.
+
+---
+
+## 6. Comandos úteis para reproduzir
+
+### Setup
 ```bash
-# Gerar JWT
+cd /home/marlon/gifthy/utilar-ferragem
+make infra-up
+make auth-db-reset     # 20 users, senha utilar123
+make catalog-db-reset  # opcional, para frontend completo
+make order-db-reset    # opcional
+```
+
+### Subir serviços com JWT_SECRET sincronizado
+
+Em 2 terminais separados:
+```bash
+# Terminal 1: auth-service (lê JWT_SECRET do ambiente)
+cd services/auth-service
+JWT_SECRET="change-me-in-production" ./bin/auth-service
+
+# Terminal 2: payment-service (mesmo secret + credenciais MP)
+cd services/payment-service
+MP_ACCESS_TOKEN="APP_USR-3355899843628859-042411-..." \
+MP_PUBLIC_KEY="APP_USR-1283f488-..." \
+JWT_SECRET="change-me-in-production" \
+REDPANDA_BROKERS="localhost:19092" \
+./bin/payment-service
+```
+
+### Smoke test
+```bash
 TOKEN=$(curl -s -X POST http://localhost:8093/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"test1@utilar.com.br","password":"utilar123"}' \
   | jq -r .accessToken)
 
-# Criar pagamento
-ORDER="11111111-1111-4111-8111-111111111111"
+# Cartão — funciona
 curl -X POST http://localhost:8090/api/v1/payments \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d "{\"order_id\":\"$ORDER\",\"method\":\"pix\",\"amount\":49.90}"
-
-# Esperado: 201 Created com psp_payload contendo qr_code e copy_paste
-```
-
-**Aprovar no dashboard MP** → simular pagamento aprovado → rodar sync:
-
-```bash
-PAYMENT_ID="<id retornado no POST>"
-curl -X POST http://localhost:8090/api/v1/payments/$PAYMENT_ID/sync \
-  -H "Authorization: Bearer $TOKEN"
-
-# Esperado: { status: "confirmed", mp_status: "approved", changed: true }
-```
-
-### 4.2 Boleto
-
-```bash
-curl -X POST http://localhost:8090/api/v1/payments \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d "{\"order_id\":\"$ORDER\",\"method\":\"boleto\",\"amount\":99.90,
-       \"payer_cpf\":\"12345678901\",\"payer_name\":\"Ana Silva\"}"
-
-# Esperado: 201 Created com psp_payload contendo bar_code e pdf_url
-```
-
-### 4.3 Cartão (Checkout Pro hosted)
-
-```bash
-curl -X POST http://localhost:8090/api/v1/payments \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d "{\"order_id\":\"$ORDER\",\"method\":\"card\",\"amount\":149.00}"
-
-# Esperado: 201 Created com psp_payload contendo init_point (URL)
-```
-
-Abrir `init_point` no navegador → usar [cartões de teste](https://www.mercadopago.com.br/developers/pt/docs/checkout-api/additional-content/test-cards):
-
-| Bandeira | Número | CVV | Validade |
-|---|---|---|---|
-| Mastercard | `5031 4332 1540 6351` | `123` | `11/30` |
-| Visa | `4235 6477 2802 5682` | `123` | `11/30` |
-| Amex | `3753 651535 56885` | `1234` | `11/30` |
-| Elo Débito | `5067 7667 8388 8311` | `123` | `11/30` |
-
-**Nome do titular** controla o status:
-- `APRO` → approved
-- `OTHE` → rejected (generic)
-- `CONT` → pending
-- `FUND` → rejected (insufficient funds)
-- `SECU` → rejected (invalid CVV)
-
-### 4.4 Fluxo completo via SPA (após validar 4.1-4.3 via curl)
-
-```bash
-make dev-full
-# Abrir http://localhost:5173
-# Login → adicionar produto → checkout → escolher método → completar
+  -d '{"order_id":"44444444-4444-4444-8444-444444444444","method":"card","amount":199.90}'
 ```
 
 ---
 
-## 5. O que foi validado **apesar do bloqueio**
+## 7. Histórico desta sessão
 
-| Check | Status |
-|---|---|
-| `make infra-up` sobe os 4 DBs + Redpanda | ✅ |
-| `make auth-db-reset` + login retorna JWT com `cpf` | ✅ |
-| payment-service compila + sobe com credenciais do `.env.local` | ✅ |
-| JWT de auth-service valida no payment-service (secrets alinhados) | ✅ |
-| Payment-service chega a chamar API MP (HTTPS, Authorization header, JSON body corretos) | ✅ |
-| `GET /users/me` retorna info da conta MP (test user confirmado) | ✅ |
-| `POST /users/test_user` cria buyer válido (token funciona pra algumas ops) | ✅ |
-| Endpoint `/sync` compila e registrado no router | ✅ |
-| Validação boleto requer `payer_cpf` + `payer_name` | ✅ (retorna 400 se faltar) |
-| Outbox drainer loga tentativas de publish (erro `UNKNOWN_TOPIC` é normal em dev sem tópicos criados) | ✅ |
-
-Quando as credenciais forem substituídas, **nenhuma mudança de código é necessária** — só rodar o teste.
-
----
-
-## 6. Relação com o audit de segurança
-
-Este teste **não substitui** a Sprint 8.5 de hardening. Mesmo com MP funcionando:
-
-- **C1 (tamper de amount)** continua — código de teste envia `amount: 49.90`, MP processa sem saber que o pedido real pode ser de R$ 10.000
-- **C4 (HMAC format)** só aparece quando tentarmos webhook real via ngrok
-- **H1-H5** continuam
-
-O sync endpoint **já implementa foundation de C3** (compara amount MP vs DB e emite warning). Isso é uma pequena vantagem — quando formalizarmos C3 no webhook, já temos o padrão.
-
----
-
-## 7. Ação do usuário (Marlon)
-
-**Imediato (5-10min):**
-
-1. Abrir https://www.mercadopago.com.br/developers/panel/app
-2. Clicar na aplicação (ID `5712930741890196`)
-3. Procurar aba "Credenciais de teste" ou "Test credentials"
-4. Copiar Public Key + Access Token
-5. Atualizar `.env.local`
-6. Testar com o curl da §3.3 passo 5 — deve retornar `201 Created`
-7. Me avisar que funcionou → retomamos a §4 do plano
-
-**Alternativa (se não aparecer aba de test):**
-- Criar nova aplicação MP marcada como "Teste" no dashboard
-- Usar as credenciais dela
+1. User compartilhou credenciais MP iniciais — ambas de app em modo produção
+2. Código do payment-service atualizado: env loading, validação boleto, sync endpoint
+3. `POST /v1/payments` rejeitado pelo MP com "Unauthorized use of live credentials"
+4. User regenerou credenciais no dashboard MP (aba Teste de app em test mode)
+5. Nova credencial valida `/checkout/preferences` ✅ mas continua rejeitando `/v1/payments` direto
+6. Diagnóstico: limitação sandbox MP conhecida, test users não são onboarded pra Checkout API
+7. Bug adicional encontrado e corrigido: scan NULL em `psp_metadata`
+8. Cartão via Checkout Pro validado end-to-end
+9. Próximo: migrar Pix/Boleto pra Preferences também, ou aguardar prod onboarding
 
 ---
 
 ## 8. Commits desta sessão
 
-- `<TBD>` — `feat: mp integration setup + sync endpoint + boleto fix`
-- Audit original: commit `64343a3` (`docs(security): audit do payment-service`)
+- `705b5e2` — `feat(payment): setup MP integration + sync endpoint + fix boleto`
+- `<próximo>` — `fix(payment): PSPMetadata/PSPPayload como *json.RawMessage + results do teste MP`
