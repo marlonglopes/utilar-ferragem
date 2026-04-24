@@ -1,8 +1,10 @@
 APP_DIR      := app
 SVC_DIR      := services/payment-service
 CATALOG_DIR  := services/catalog-service
+ORDER_DIR    := services/order-service
 API_URL      ?= http://localhost:8090
 CATALOG_URL  ?= http://localhost:8091
+ORDER_URL    ?= http://localhost:8092
 
 # ── Postgres (payment-service) ────────────────────────────────────────────────
 PG_CONTAINER := utilar_payment_db
@@ -18,12 +20,22 @@ CAT_DB        := catalog_service
 CAT_EXEC      := docker exec -i $(CAT_CONTAINER) psql -U $(CAT_USER) -d $(CAT_DB) -v ON_ERROR_STOP=1
 CAT_MIGRATIONS := $(CATALOG_DIR)/migrations
 
+# ── Postgres (order-service) ──────────────────────────────────────────────────
+ORD_CONTAINER := utilar_order_db
+ORD_USER      := utilar
+ORD_DB        := order_service
+ORD_EXEC      := docker exec -i $(ORD_CONTAINER) psql -U $(ORD_USER) -d $(ORD_DB) -v ON_ERROR_STOP=1
+ORD_MIGRATIONS := $(ORDER_DIR)/migrations
+
 .PHONY: help dev dev-live dev-full test test-watch infra-up infra-down infra-status \
         svc-run svc-build svc-test install clean \
         db-migrate db-migrate-down db-seed db-clean db-reset db-status db-psql db-dump db-restore \
         catalog-run catalog-build catalog-test \
         catalog-db-migrate catalog-db-migrate-down catalog-db-seed catalog-db-clean catalog-db-reset \
-        catalog-db-status catalog-db-psql catalog-db-dump catalog-db-restore
+        catalog-db-status catalog-db-psql catalog-db-dump catalog-db-restore \
+        order-run order-build order-test \
+        order-db-migrate order-db-migrate-down order-db-seed order-db-clean order-db-reset \
+        order-db-status order-db-psql order-db-dump order-db-restore
 
 # ── default ──────────────────────────────────────────────────────────────────
 help:
@@ -58,6 +70,22 @@ help:
 	@echo "    make catalog-build     compila binário"
 	@echo "    make catalog-test      testes unitários Go"
 	@echo ""
+	@echo "  Backend Go (order-service)"
+	@echo "    make order-run         roda order-service em :8092"
+	@echo "    make order-build       compila binário"
+	@echo "    make order-test        testes unitários + integração"
+	@echo ""
+	@echo "  Banco de dados (Postgres order_service)"
+	@echo "    make order-db-migrate        aplica migrations"
+	@echo "    make order-db-migrate-down   reverte migrations"
+	@echo "    make order-db-seed           popula 60 pedidos de teste"
+	@echo "    make order-db-clean          TRUNCATE em todas tabelas"
+	@echo "    make order-db-reset          drop + migrate + seed"
+	@echo "    make order-db-status         lista tabelas + contagem"
+	@echo "    make order-db-psql           shell psql interativo"
+	@echo "    make order-db-dump           backup para backups/order_<date>.sql"
+	@echo "    make order-db-restore FILE=<path>"
+	@echo ""
 	@echo "  Banco de dados (Postgres catalog_service)"
 	@echo "    make catalog-db-migrate       aplica migrations"
 	@echo "    make catalog-db-migrate-down  reverte migrations"
@@ -91,9 +119,9 @@ dev:
 	cd $(APP_DIR) && npm run dev
 
 dev-live:
-	@echo "SPA em live mode → VITE_API_URL=$(API_URL), VITE_CATALOG_URL=$(CATALOG_URL)"
-	@echo "(lembre: make infra-up + make svc-run + make catalog-run devem estar rodando em outros terminais)"
-	cd $(APP_DIR) && VITE_API_URL=$(API_URL) VITE_CATALOG_URL=$(CATALOG_URL) npm run dev
+	@echo "SPA em live mode → VITE_API_URL=$(API_URL), VITE_CATALOG_URL=$(CATALOG_URL), VITE_ORDER_URL=$(ORDER_URL)"
+	@echo "(lembre: make infra-up + make svc-run + make catalog-run + make order-run devem estar rodando)"
+	cd $(APP_DIR) && VITE_API_URL=$(API_URL) VITE_CATALOG_URL=$(CATALOG_URL) VITE_ORDER_URL=$(ORDER_URL) npm run dev
 
 dev-catalog:
 	@$(MAKE) infra-up
@@ -108,13 +136,14 @@ dev-catalog:
 dev-full:
 	@$(MAKE) infra-up
 	@echo ""
-	@echo "→ subindo payment-service + catalog-service + SPA (Ctrl-C encerra todos)"
-	@trap 'echo; echo "Encerrando..."; kill $$SVC_PID $$CAT_PID 2>/dev/null; wait 2>/dev/null; exit 0' INT TERM; \
+	@echo "→ subindo payment + catalog + order + SPA (Ctrl-C encerra todos)"
+	@trap 'echo; echo "Encerrando..."; kill $$SVC_PID $$CAT_PID $$ORD_PID 2>/dev/null; wait 2>/dev/null; exit 0' INT TERM; \
 	$(MAKE) -C $(SVC_DIR) run & SVC_PID=$$!; \
 	$(MAKE) -C $(CATALOG_DIR) run & CAT_PID=$$!; \
+	$(MAKE) -C $(ORDER_DIR) run & ORD_PID=$$!; \
 	sleep 2; \
-	cd $(APP_DIR) && VITE_API_URL=$(API_URL) VITE_CATALOG_URL=$(CATALOG_URL) npm run dev; \
-	kill $$SVC_PID $$CAT_PID 2>/dev/null; wait 2>/dev/null
+	cd $(APP_DIR) && VITE_API_URL=$(API_URL) VITE_CATALOG_URL=$(CATALOG_URL) VITE_ORDER_URL=$(ORDER_URL) npm run dev; \
+	kill $$SVC_PID $$CAT_PID $$ORD_PID 2>/dev/null; wait 2>/dev/null
 
 test:
 	cd $(APP_DIR) && npm run test:run
@@ -129,8 +158,11 @@ infra-up:
 	@until docker exec utilar_payment_db pg_isready -U utilar -d payment_service 2>/dev/null; do sleep 1; done
 	@echo "Aguardando Postgres (catalog)..."
 	@until docker exec utilar_catalog_db pg_isready -U utilar -d catalog_service 2>/dev/null; do sleep 1; done
+	@echo "Aguardando Postgres (order)..."
+	@until docker exec utilar_order_db pg_isready -U utilar -d order_service 2>/dev/null; do sleep 1; done
 	@echo "Postgres payment → localhost:5435"
 	@echo "Postgres catalog → localhost:5436"
+	@echo "Postgres order   → localhost:5437"
 	@echo "Redpanda pronto  → localhost:19092"
 	@echo "Console pronto   → http://localhost:8085"
 
@@ -309,6 +341,91 @@ catalog-db-restore:
 	@test -f "$(FILE)" || (echo "arquivo não encontrado: $(FILE)"; exit 1)
 	@echo "→ restaurando de $(FILE)"
 	@$(CAT_EXEC) < $(FILE) > /dev/null
+	@echo "✓ restaurado"
+
+# ── order-service ────────────────────────────────────────────────────────────
+order-run:
+	$(MAKE) -C $(ORDER_DIR) run
+
+order-build:
+	$(MAKE) -C $(ORDER_DIR) build
+
+order-test:
+	$(MAKE) -C $(ORDER_DIR) test
+
+define _require_order_pg
+	@docker ps --filter "name=$(ORD_CONTAINER)" --filter "status=running" --format '{{.Names}}' \
+		| grep -q $(ORD_CONTAINER) \
+		|| (echo "→ Postgres (order) não está rodando. Rode: make infra-up"; exit 1)
+endef
+
+order-db-migrate:
+	$(call _require_order_pg)
+	@echo "→ aplicando migrations em $(ORD_MIGRATIONS)"
+	@$(ORD_EXEC) -c "CREATE TABLE IF NOT EXISTS schema_migrations (version BIGINT PRIMARY KEY, dirty BOOLEAN NOT NULL);" > /dev/null
+	@for f in $$(ls $(ORD_MIGRATIONS)/*.up.sql | sort); do \
+		v=$$(basename $$f | cut -d_ -f1 | sed 's/^0*//'); \
+		echo "  · $$f (version $$v)"; \
+		$(ORD_EXEC) < $$f > /dev/null || exit 1; \
+		$(ORD_EXEC) -c "INSERT INTO schema_migrations (version, dirty) VALUES ($$v, false) ON CONFLICT (version) DO UPDATE SET dirty=false;" > /dev/null; \
+	done
+	@echo "✓ migrations aplicadas"
+
+order-db-migrate-down:
+	$(call _require_order_pg)
+	@echo "→ revertendo migrations (ordem reversa)"
+	@for f in $$(ls $(ORD_MIGRATIONS)/*.down.sql | sort -r); do \
+		echo "  · $$f"; \
+		$(ORD_EXEC) < $$f > /dev/null 2>&1 || true; \
+	done
+	@$(ORD_EXEC) -c "DROP TABLE IF EXISTS schema_migrations;" > /dev/null 2>&1 || true
+	@echo "✓ schema limpo"
+
+order-db-seed:
+	$(call _require_order_pg)
+	@echo "→ populando tabelas via seed.sql"
+	@$(ORD_EXEC) < $(ORD_MIGRATIONS)/seed.sql
+	@echo "✓ seed aplicado"
+
+order-db-clean:
+	$(call _require_order_pg)
+	@echo "→ TRUNCATE em todas as tabelas"
+	@$(ORD_EXEC) -c "TRUNCATE TABLE tracking_events, shipping_addresses, order_items, orders RESTART IDENTITY CASCADE;" > /dev/null
+	@echo "✓ tabelas vazias"
+
+order-db-reset: order-db-migrate-down order-db-migrate order-db-seed
+	@echo "✓ order resetado e populado"
+
+order-db-status:
+	$(call _require_order_pg)
+	@$(ORD_EXEC) -c "\dt"
+	@$(ORD_EXEC) -c " \
+		SELECT 'orders'             AS table_name, count(*) AS rows FROM orders \
+		UNION ALL \
+		SELECT 'order_items',         count(*) FROM order_items \
+		UNION ALL \
+		SELECT 'shipping_addresses',  count(*) FROM shipping_addresses \
+		UNION ALL \
+		SELECT 'tracking_events',     count(*) FROM tracking_events \
+		ORDER BY table_name;"
+
+order-db-psql:
+	$(call _require_order_pg)
+	@docker exec -it $(ORD_CONTAINER) psql -U $(ORD_USER) -d $(ORD_DB)
+
+order-db-dump:
+	$(call _require_order_pg)
+	@mkdir -p backups
+	@FILE=backups/order_$$(date +%Y%m%d_%H%M%S).sql; \
+	docker exec $(ORD_CONTAINER) pg_dump -U $(ORD_USER) -d $(ORD_DB) --clean --if-exists > $$FILE; \
+	echo "✓ dump salvo em $$FILE"
+
+order-db-restore:
+	$(call _require_order_pg)
+	@test -n "$(FILE)" || (echo "uso: make order-db-restore FILE=backups/order_XXXX.sql"; exit 1)
+	@test -f "$(FILE)" || (echo "arquivo não encontrado: $(FILE)"; exit 1)
+	@echo "→ restaurando de $(FILE)"
+	@$(ORD_EXEC) < $(FILE) > /dev/null
 	@echo "✓ restaurado"
 
 # ── util ─────────────────────────────────────────────────────────────────────

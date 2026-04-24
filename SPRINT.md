@@ -4,7 +4,7 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 
 ## Estado atual
 
-**Fase 3 — Comércio.** Sprints 01–09 concluídos + **Phase B1** (catalog-service real + SPA plugada) entregue em 2026-04-24. Próximo: Phase B2 (order-service) ou gate de lançamento (Sprint 22).
+**Fase 3 — Comércio.** Sprints 01–09 concluídos + **Phases B1 (catalog) + B2 (order)** entregues em 2026-04-24. Próximo: Phase B3 (auth-service) ou Sprint 22 (observabilidade).
 
 ### Fases fora do roadmap original
 
@@ -12,9 +12,17 @@ Serviços backend reais criados fora da numeração de sprints (decisão arquite
 
 | Phase | Escopo | Status |
 |---|---|---|
-| **B1** | catalog-service (Go + Postgres): products, categories, sellers, images + 111 seed rows + SPA plugada | ✅ Concluído |
-| **B2** | order-service (Go + Postgres): orders, order_items referenciando products.id | ⬜ Não iniciado |
+| **B1** | catalog-service (Go + Postgres): products, categories, sellers, images + 111 seed rows + SPA plugada + endpoint `related` | ✅ Concluído |
+| **B2** | order-service (Go + Postgres): orders, order_items, shipping_addresses, tracking_events + 60 seed + SPA plugada | ✅ Concluído |
 | **B3** | auth-service (Go + Postgres): users, addresses, JWT | ⬜ Não iniciado |
+
+### Polish transversal (2026-04-24)
+
+Foundations aplicadas em catalog + payment + order:
+- **Request ID middleware** (`X-Request-Id`) gerando/propagando IDs para correlação entre serviços.
+- **Structured access log JSON** via slog em toda requisição.
+- **Error envelope consistente** `{error, code, requestId}` com códigos estáveis (`not_found`, `bad_request`, `unauthorized`, `conflict`, `db_error`, ...).
+- **CORS** aberto em dev (produção fica restrito via CloudFront + resposta do serviço).
 
 ## Índice de sprints
 
@@ -91,3 +99,5 @@ Cada sprint termina com:
 **Sprint 09 — Histórico de pedidos + rastreio** (2026-04-23): mockOrders (4 pedidos: entregue/enviado/pago/aguardando), useOrders + useOrder hooks (mock mode), OrdersTab com filtros all/active/done, OrderDetailPage (timeline 5 passos, itens, endereço, pagamento, rastreamento, cancelar pedido, comprar novamente), i18n completo (orderStatus + orders.* em pt-BR e en). 117 testes passando (15 arquivos).
 
 **Phase B1 — catalog-service + SPA plugada** (2026-04-24): scaffold Go espelhando payment-service (cmd/server, internal/{config,db,handler,model}, migrations); 4 tabelas (categories, sellers, products, product_images) + ENUM + pg_trgm + triggers updated_at; seed com 111 produtos (31 reais dos mocks + 80 sintéticos) + 222 imagens + 11 sellers; endpoints `/api/v1/{categories,sellers,products,products/:slug,products/facets}` em `:8091`, CORS aberto para dev; JSON em camelCase matching direto com `app/src/types/product.ts`; hooks `useProducts`/`useProduct`/`useFacets` com switch mock/live via `VITE_CATALOG_URL`; docker-compose estendido (postgres-catalog :5436); 12 novos Makefile targets (`catalog-*`, `dev-catalog`); 16 testes Go (4 unit + 12 integration); docs: README do serviço + seção de migrations em database.md. 131 testes frontend passam em mock mode.
+
+**Phase B2 — order-service + polish transversal** (2026-04-24): scaffold Go (cmd/server, internal/*, migrations); 4 tabelas (orders, order_items, shipping_addresses, tracking_events) + 2 ENUMs (order_status, payment_method) + triggers updated_at; seed com 60 pedidos × 20 usuários em todos os status + 120 items + 60 endereços + 170 tracking events; endpoints `/api/v1/orders` (POST/GET/GET :id/PATCH :id/cancel) em `:8092`; auth via header `X-User-Id` (temporário até Phase B3); error envelope consistente `{error, code, requestId}`; hooks `useOrders`/`useOrder` plugados via `VITE_ORDER_URL` + client helpers `orderGet/orderPost/orderPatch` em `app/src/lib/api.ts`; docker-compose estendido (postgres-order :5437); 12 novos Makefile targets (`order-*`); 8 testes Go de integração (auth, list, filters, get, create, cancel, conflict, bad_request); dev-full sobe 3 serviços + SPA em paralelo. **Polish transversal aplicado em catalog + payment + order:** Request ID middleware (gera/propaga `X-Request-Id`), structured JSON access log via slog, error envelope compartilhado, CORS padronizado. catalog ganhou endpoint `GET /products/:slug/related` usado pelo ProductDetailPage. 131 testes frontend + 16 catalog + 8 order + payment unit tests passando.

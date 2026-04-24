@@ -8,6 +8,7 @@ Serviços com DB próprio:
 
 - **[payment-service](#payment-service)** — pagamentos, webhooks, outbox (Sprint 08)
 - **[catalog-service](#catalog-service)** — produtos, categorias, vendedores, imagens (Fase B1)
+- **[order-service](#order-service)** — pedidos, items, endereços, tracking events (Fase B2)
 
 Cada serviço tem seu próprio container Postgres, seguindo o princípio de **database-per-service**: acoplamento fraco, evolução independente de schema.
 
@@ -384,4 +385,76 @@ make dev-live       # passa VITE_CATALOG_URL=http://localhost:8091 para o Vite
 - Shape: o Go emite camelCase no JSON (ex: `sellerId`, `reviewCount`) matching direto ao tipo `Product` em `app/src/types/product.ts`; sem camada de adapter.
 - Paridade de slugs: os 31 produtos reais do seed usam os mesmos slugs dos mocks (ex: `/produto/furadeira-bosch-gsb-13-re`), então nenhuma URL quebra na transição.
 
-**O que ainda é mock no SPA:** autenticação (qualquer credencial funciona), pedidos (`MOCK_ORDERS` em `app/src/lib/mockOrders.ts`), checkout Pix auto-confirma em 6s. Phase B2 (order-service) resolve pedidos; Phase B3 (auth-service) resolve login.
+**O que ainda é mock no SPA:** autenticação (qualquer credencial funciona), checkout Pix auto-confirma em 6s. Phase B3 (auth-service) resolve login.
+
+---
+
+# order-service
+
+## 1. Topologia
+
+| Item | Valor |
+|---|---|
+| Container Docker | `utilar_order_db` |
+| Imagem | `postgres:17-alpine` |
+| Host / porta | `localhost:5437` |
+| Database | `order_service` |
+| User / password | `utilar` / `utilar` |
+| Volume persistente | `order_pg_data` |
+| DSN local | `postgres://utilar:utilar@localhost:5437/order_service?sslmode=disable` |
+| Servidor HTTP | `http://localhost:8092` |
+
+## 2. Schema
+
+Quatro tabelas, criadas pela migration em [services/order-service/migrations/](../../services/order-service/migrations/):
+
+| # | Tabela | Propósito | Relação |
+|---|---|---|---|
+| 001 | `orders` | cabeçalho do pedido (número, status, totais, datas de cada transição) | — |
+| 001 | `order_items` | snapshot de produto no momento da compra | `order_id FK → orders` |
+| 001 | `shipping_addresses` | endereço 1-1 com order (histórico imutável) | `order_id FK → orders UNIQUE` |
+| 001 | `tracking_events` | linha do tempo de transições de status | `order_id FK → orders` |
+
+**ENUMs:** `order_status` (pending_payment, paid, picking, shipped, delivered, cancelled), `payment_method` (pix, boleto, card).
+
+**Cross-service refs (sem FK):** `user_id TEXT` → auth-service (Phase B3); `product_id UUID` → catalog-service; `payment_id UUID` → payment-service. Integridade verificada no nível da aplicação quando pedido é criado.
+
+## 3. Seed
+
+60 pedidos distribuídos entre 20 usuários e todos os status do ciclo:
+
+```bash
+make order-db-seed
+```
+
+| Tabela | Linhas | Distribuição |
+|---|---|---|
+| `orders` | 60 | 10×delivered, 10×shipped, 10×picking, 10×paid, 10×pending_payment, 10×cancelled |
+| `order_items` | 120 | 2 items por pedido, rotacionando entre 6 produtos × 6 sellers |
+| `shipping_addresses` | 60 | 1 por pedido, endereços incrementais em SP |
+| `tracking_events` | 170 | 1-5 eventos por pedido (mais eventos quanto mais avançado no ciclo) |
+
+## 4. Comandos do Makefile — order
+
+| Alvo | O que faz |
+|---|---|
+| `make order-run` | Roda `order-service` em `:8092` |
+| `make order-build` | Compila binário |
+| `make order-test` | 8 testes de integração (requer DB populado) |
+| `make order-db-migrate` | Aplica `*.up.sql` |
+| `make order-db-migrate-down` | Reverte schema |
+| `make order-db-seed` | Popula 60 pedidos |
+| `make order-db-clean` | TRUNCATE |
+| `make order-db-reset` | down → up → seed |
+| `make order-db-status` | `\dt` + row counts |
+| `make order-db-psql` | shell interativo |
+| `make order-db-dump` | `pg_dump → backups/order_<ts>.sql` |
+| `make order-db-restore FILE=...` | restaura dump |
+
+## 5. Integração frontend
+
+Hooks [useOrders/useOrder](../../app/src/hooks/useOrders.ts) detectam `VITE_ORDER_URL`. Quando setado, chamam o backend real com header `X-User-Id = authStore.user.id`. Error envelope é `{error, code, requestId}`.
+
+```bash
+make dev-full   # infra + payment + catalog + order + SPA live
+```

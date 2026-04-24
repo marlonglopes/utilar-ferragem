@@ -27,7 +27,7 @@ Inspiração / referência de branding: [@utilar_ferragens no Instagram](https:/
 | [docs/12-ops-runbook.md](docs/12-ops-runbook.md) | Incidentes, plantão, backups, recuperação de desastre |
 | [docs/13-launch-checklist.md](docs/13-launch-checklist.md) | Linha do tempo T-minus, jurídico, SEO, e-mail, marketing |
 | [docs/14-infra-custos.md](docs/14-infra-custos.md) | Infraestrutura mínima, custos por fase, domínio, AWS, SES, Mercado Pago, observabilidade |
-| [docs/maintenance/database.md](docs/maintenance/database.md) | Postgres local (payment-service + catalog-service): migrations, seed, reset, dumps, comandos `make db-*` e `make catalog-db-*` |
+| [docs/maintenance/database.md](docs/maintenance/database.md) | Postgres local (payment + catalog + order): migrations, seed, reset, dumps, comandos `make db-*`, `make catalog-db-*`, `make order-db-*` |
 | [docs/phases/](docs/phases/) | Detalhamento por fase (5 fases) |
 | [docs/sprints/](docs/sprints/) | Escopo por sprint, tarefas, critérios de aceite (25 sprints) |
 | [docs/adr/](docs/adr/) | Architecture Decision Records (10 ADRs) |
@@ -49,21 +49,23 @@ Para apresentar ao cliente: `open utilar-ferragem/mockups/index.html` (ou sirva 
 
 ## Status
 
-**Sprints 01–09 ✅ concluídos.** Frontend SPA completo + 2 serviços Go em operação local:
+**Sprints 01–09 ✅ concluídos.** Frontend SPA completo + 3 serviços Go em operação local:
 
-- **[services/payment-service/](services/payment-service/)** — Mercado Pago (Pix/boleto/cartão) + webhooks + outbox (Sprint 08)
-- **[services/catalog-service/](services/catalog-service/)** — produtos, categorias, vendedores, imagens (Fase B1). [README do serviço](services/catalog-service/README.md), [API + endpoints](services/catalog-service/README.md#api).
+- **[services/payment-service/](services/payment-service/)** — Mercado Pago (Pix/boleto/cartão) + webhooks + outbox (Sprint 08, porta :8090)
+- **[services/catalog-service/](services/catalog-service/)** — produtos, categorias, vendedores, imagens (Fase B1, porta :8091). [README do serviço](services/catalog-service/README.md).
+- **[services/order-service/](services/order-service/)** — pedidos, items, endereços, tracking (Fase B2, porta :8092). [README do serviço](services/order-service/README.md).
 
-Frontend já plugado no `catalog-service` real via `VITE_CATALOG_URL`. Pedidos e autenticação ainda em modo mock.
+Frontend já plugado em `catalog-service` e `order-service` reais via `VITE_CATALOG_URL` e `VITE_ORDER_URL`. Autenticação ainda em modo mock (Phase B3 pendente).
 
 ### Desenvolvimento — atalhos
 
 ```bash
 make dev              # SPA em mock mode (sem backend)
 make dev-catalog      # infra + catalog-service + SPA (catálogo live)
-make dev-full         # infra + payment + catalog + SPA (tudo live)
+make dev-full         # infra + payment + catalog + order + SPA (tudo live)
 make test             # test suite do frontend (131 testes)
 make catalog-test     # testes do catalog-service (16 testes)
+make order-test       # testes do order-service (8 testes)
 make svc-test         # testes do payment-service
 ```
 

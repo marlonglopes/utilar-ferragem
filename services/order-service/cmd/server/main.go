@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/utilar/catalog-service/internal/config"
-	"github.com/utilar/catalog-service/internal/db"
-	"github.com/utilar/catalog-service/internal/handler"
+	"github.com/utilar/order-service/internal/config"
+	"github.com/utilar/order-service/internal/db"
+	"github.com/utilar/order-service/internal/handler"
 )
 
 func main() {
@@ -33,21 +33,17 @@ func main() {
 	}
 	slog.Info("migrations applied")
 
-	productH := handler.NewProductHandler(database)
-	categoryH := handler.NewCategoryHandler(database)
-	sellerH := handler.NewSellerHandler(database)
+	orderH := handler.NewOrderHandler(database)
 
 	r := gin.New()
 	r.Use(gin.Recovery(), handler.RequestID(), handler.AccessLog(), handler.CORS())
 
-	api := r.Group("/api/v1")
+	api := r.Group("/api/v1", handler.RequireUser())
 	{
-		api.GET("/categories", categoryH.List)
-		api.GET("/sellers", sellerH.List)
-		api.GET("/products", productH.List)
-		api.GET("/products/facets", productH.Facets)
-		api.GET("/products/:slug", productH.GetBySlug)
-		api.GET("/products/:slug/related", productH.Related)
+		api.POST("/orders", orderH.Create)
+		api.GET("/orders", orderH.List)
+		api.GET("/orders/:id", orderH.Get)
+		api.PATCH("/orders/:id/cancel", orderH.Cancel)
 	}
 
 	r.GET("/health", func(c *gin.Context) {
@@ -66,7 +62,7 @@ func main() {
 	}
 
 	go func() {
-		slog.Info("catalog-service listening", "port", cfg.Port)
+		slog.Info("order-service listening", "port", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server", "error", err)
 			os.Exit(1)
@@ -82,4 +78,3 @@ func main() {
 	defer cancel()
 	srv.Shutdown(shutdownCtx)
 }
-

@@ -19,7 +19,7 @@ func (h *SellerHandler) List(c *gin.Context) {
 		FROM sellers ORDER BY name ASC
 	`)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		DBError(c, err)
 		return
 	}
 	defer rows.Close()
@@ -28,7 +28,7 @@ func (h *SellerHandler) List(c *gin.Context) {
 	for rows.Next() {
 		var s model.Seller
 		if err := rows.Scan(&s.ID, &s.Name, &s.Rating, &s.ReviewCount, &s.Verified); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "scan error"})
+			DBError(c, err)
 			return
 		}
 		out = append(out, s)

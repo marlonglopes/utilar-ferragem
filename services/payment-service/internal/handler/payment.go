@@ -24,14 +24,14 @@ func NewPaymentHandler(db *sql.DB, mp *mercadopago.Client) *PaymentHandler {
 func (h *PaymentHandler) Create(c *gin.Context) {
 	var req model.CreatePaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		BadRequest(c, err.Error())
 		return
 	}
 
 	userID := c.GetString("user_id")
 	userEmail := c.GetString("user_email")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		Unauthorized(c, "unauthorized")
 		return
 	}
 
@@ -43,8 +43,8 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		RETURNING id
 	`, req.OrderID, userID, req.Method, req.Amount).Scan(&paymentID)
 	if err != nil {
-		slog.Error("create payment: db insert", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create payment"})
+		slog.Error("create payment: db insert", "error", err, "request_id", c.GetString("request_id"))
+		InternalError(c, "could not create payment")
 		return
 	}
 
@@ -60,15 +60,14 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 	case model.MethodCard:
 		mpRaw, mpErr = h.mp.CreatePreference(req.OrderID, req.Amount, "Pedido UtiLar Ferragem")
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported method"})
+		BadRequest(c, "unsupported method")
 		return
 	}
 
 	if mpErr != nil {
-		slog.Error("create payment: mp call", "method", req.Method, "error", mpErr)
-		// Mark payment as failed
+		slog.Error("create payment: mp call", "method", req.Method, "error", mpErr, "request_id", c.GetString("request_id"))
 		h.db.Exec(`UPDATE payments SET status='failed', updated_at=now() WHERE id=$1`, paymentID)
-		c.JSON(http.StatusBadGateway, gin.H{"error": "payment gateway error"})
+		BadGateway(c, "payment gateway error")
 		return
 	}
 
@@ -107,11 +106,11 @@ func (h *PaymentHandler) Get(c *gin.Context) {
 		&p.ConfirmedAt, &p.ExpiresAt, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
-		c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
+		NotFound(c, "payment not found")
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		DBError(c, err)
 		return
 	}
 

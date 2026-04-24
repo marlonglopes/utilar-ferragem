@@ -71,7 +71,7 @@ func (h *ProductHandler) List(c *gin.Context) {
 	var total int
 	countSQL := "SELECT count(*) FROM products p JOIN sellers s ON s.id = p.seller_id WHERE " + whereSQL
 	if err := h.db.QueryRow(countSQL, args...).Scan(&total); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "count error: " + err.Error()})
+		DBError(c, err)
 		return
 	}
 
@@ -93,7 +93,7 @@ func (h *ProductHandler) List(c *gin.Context) {
 
 	rows, err := h.db.Query(querySQL, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "query error: " + err.Error()})
+		DBError(c, err)
 		return
 	}
 	defer rows.Close()
@@ -102,7 +102,7 @@ func (h *ProductHandler) List(c *gin.Context) {
 	for rows.Next() {
 		p, err := scanProduct(rows)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "scan error: " + err.Error()})
+			DBError(c, err)
 			return
 		}
 		products = append(products, p)
@@ -131,11 +131,11 @@ func (h *ProductHandler) GetBySlug(c *gin.Context) {
 	`, slug)
 	p, err := scanProduct(row)
 	if err == sql.ErrNoRows {
-		c.JSON(http.StatusNotFound, gin.H{"error": "product not found"})
+		NotFound(c, "product not found")
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "scan error: " + err.Error()})
+		DBError(c, err)
 		return
 	}
 
@@ -185,7 +185,7 @@ func (h *ProductHandler) Facets(c *gin.Context) {
 	`
 	rows, err := h.db.Query(brandSQL, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "facets error"})
+		DBError(c, err)
 		return
 	}
 	defer rows.Close()
@@ -207,6 +207,46 @@ func (h *ProductHandler) Facets(c *gin.Context) {
 		PriceMin: priceMin.Float64,
 		PriceMax: priceMax.Float64,
 	})
+}
+
+// Related GET /api/v1/products/:slug/related?limit=4
+// Produtos da mesma categoria, excluindo o slug atual.
+func (h *ProductHandler) Related(c *gin.Context) {
+	slug := c.Param("slug")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "4"))
+	if limit < 1 || limit > 24 {
+		limit = 4
+	}
+
+	rows, err := h.db.Query(`
+		SELECT
+		  p.id, p.slug, p.name, p.category_id, p.price, p.original_price, p.currency, p.icon, p.brand,
+		  s.name, s.id, s.rating, s.review_count,
+		  p.stock, p.rating, p.review_count, p.cashback_amount, p.badge::text, p.badge_label, p.installments,
+		  p.description, p.specs, p.created_at, p.updated_at
+		FROM products p
+		JOIN sellers s ON s.id = p.seller_id
+		WHERE p.category_id = (SELECT category_id FROM products WHERE slug = $1 LIMIT 1)
+		  AND p.slug != $1
+		ORDER BY p.rating DESC, p.review_count DESC
+		LIMIT $2
+	`, slug, limit)
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	defer rows.Close()
+
+	out := make([]model.Product, 0)
+	for rows.Next() {
+		p, err := scanProduct(rows)
+		if err != nil {
+			DBError(c, err)
+			return
+		}
+		out = append(out, p)
+	}
+	c.JSON(http.StatusOK, gin.H{"data": out})
 }
 
 // -- helpers -----------------------------------------------------------------

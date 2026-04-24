@@ -3,7 +3,7 @@ import { useParams, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Minus, Plus, ShoppingCart } from 'lucide-react'
 import { useProduct } from '@/hooks/useProduct'
-import { useProducts } from '@/hooks/useProducts'
+import { useRelatedProducts } from '@/hooks/useRelatedProducts'
 import { ImageGallery } from '@/components/catalog/ImageGallery'
 import { StockBadge } from '@/components/catalog/StockBadge'
 import { SellerCard } from '@/components/catalog/SellerCard'
@@ -94,12 +94,8 @@ export default function ProductDetailPage() {
 
   const category = product ? TOP_LEVEL_CATEGORIES.find((c) => c.slug === product.category) : undefined
 
-  const { data: relatedData } = useProducts({
-    category: product?.category,
-    per_page: 5,
-  })
-
-  const related = relatedData?.data.filter((p) => p.slug !== slug).slice(0, 4) ?? []
+  const { data: relatedData } = useRelatedProducts(slug, product?.category, 4)
+  const related = relatedData ?? []
 
   if (isLoading) return <DetailSkeleton />
   if (isError || product === null) return <Navigate to="/404" replace />

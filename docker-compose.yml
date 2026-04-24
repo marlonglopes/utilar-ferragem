@@ -33,6 +33,23 @@ services:
       timeout: 5s
       retries: 10
 
+  postgres-order:
+    image: postgres:17-alpine
+    container_name: utilar_order_db
+    environment:
+      POSTGRES_USER: utilar
+      POSTGRES_PASSWORD: utilar
+      POSTGRES_DB: order_service
+    ports:
+      - "5437:5432"
+    volumes:
+      - order_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U utilar -d order_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redpanda:
     image: redpandadata/redpanda:v26.1.6
     container_name: utilar_redpanda
@@ -77,4 +94,5 @@ services:
 volumes:
   payment_pg_data:
   catalog_pg_data:
+  order_pg_data:
   redpanda_data:

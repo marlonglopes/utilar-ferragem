@@ -53,7 +53,7 @@ func main() {
 
 	// Router
 	r := gin.New()
-	r.Use(gin.Recovery())
+	r.Use(gin.Recovery(), handler.RequestID(), handler.AccessLog(), handler.CORS())
 
 	paymentH := handler.NewPaymentHandler(database, mpClient)
 	webhookH := handler.NewWebhookHandler(database, cfg.MPWebhookSecret)

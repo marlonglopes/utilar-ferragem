@@ -1,8 +1,10 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 const CATALOG_URL = import.meta.env.VITE_CATALOG_URL ?? ''
+const ORDER_URL = import.meta.env.VITE_ORDER_URL ?? ''
 
 export const isApiEnabled = BASE_URL !== ''
 export const isCatalogEnabled = CATALOG_URL !== ''
+export const isOrderEnabled = ORDER_URL !== ''
 
 interface ApiError {
   error: string
@@ -50,5 +52,36 @@ export async function apiPatch<T>(path: string, body: unknown, token?: string): 
 export async function catalogGet<T>(path: string): Promise<T> {
   const res = await fetch(`${CATALOG_URL}${path}`)
   if (res.status === 404) throw new Error('not_found')
+  return handleResponse<T>(res)
+}
+
+// Order API — requer X-User-Id (substitui JWT até auth-service ficar pronto).
+function orderHeaders(userId: string, contentType = false): Record<string, string> {
+  const h: Record<string, string> = { 'X-User-Id': userId }
+  if (contentType) h['Content-Type'] = 'application/json'
+  return h
+}
+
+export async function orderGet<T>(path: string, userId: string): Promise<T> {
+  const res = await fetch(`${ORDER_URL}${path}`, { headers: orderHeaders(userId) })
+  if (res.status === 404) throw new Error('not_found')
+  return handleResponse<T>(res)
+}
+
+export async function orderPost<T>(path: string, userId: string, body: unknown): Promise<T> {
+  const res = await fetch(`${ORDER_URL}${path}`, {
+    method: 'POST',
+    headers: orderHeaders(userId, true),
+    body: JSON.stringify(body),
+  })
+  return handleResponse<T>(res)
+}
+
+export async function orderPatch<T>(path: string, userId: string, body: unknown = {}): Promise<T> {
+  const res = await fetch(`${ORDER_URL}${path}`, {
+    method: 'PATCH',
+    headers: orderHeaders(userId, true),
+    body: JSON.stringify(body),
+  })
   return handleResponse<T>(res)
 }

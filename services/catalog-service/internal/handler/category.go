@@ -20,7 +20,7 @@ func (h *CategoryHandler) List(c *gin.Context) {
 		ORDER BY sort_order ASC, name ASC
 	`)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		DBError(c, err)
 		return
 	}
 	defer rows.Close()
@@ -29,7 +29,7 @@ func (h *CategoryHandler) List(c *gin.Context) {
 	for rows.Next() {
 		var cat model.Category
 		if err := rows.Scan(&cat.ID, &cat.Name, &cat.Icon, &cat.ParentID, &cat.SortOrder); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "scan error"})
+			DBError(c, err)
 			return
 		}
 		out = append(out, cat)

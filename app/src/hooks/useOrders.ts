@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { apiGet, apiPost, isApiEnabled } from '@/lib/api'
+import { orderGet, orderPatch, isOrderEnabled } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 import { MOCK_ORDERS, type Order, type OrderStatus } from '@/lib/mockOrders'
 
@@ -11,8 +11,14 @@ interface UseOrdersReturn {
   cancelOrder: (id: string) => Promise<boolean>
 }
 
+interface OrdersListResponse {
+  data: Order[]
+  meta: { page: number; per_page: number; total: number; total_pages: number }
+}
+
 export function useOrders(): UseOrdersReturn {
-  const token = useAuthStore((s) => s.token())
+  const user = useAuthStore((s) => s.user)
+  const userId = user?.id ?? ''
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -21,19 +27,21 @@ export function useOrders(): UseOrdersReturn {
     setLoading(true)
     setError('')
     try {
-      if (!isApiEnabled) {
+      if (!isOrderEnabled) {
         await new Promise((r) => setTimeout(r, 300))
         setOrders(MOCK_ORDERS)
+      } else if (!userId) {
+        setOrders([])
       } else {
-        const data = await apiGet<Order[]>('/api/v1/orders?mine=true', token ?? undefined)
-        setOrders(data)
+        const res = await orderGet<OrdersListResponse>('/api/v1/orders?per_page=50', userId)
+        setOrders(res.data)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar pedidos')
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [userId])
 
   useEffect(() => {
     fetchOrders()
@@ -41,7 +49,7 @@ export function useOrders(): UseOrdersReturn {
 
   const cancelOrder = useCallback(async (id: string): Promise<boolean> => {
     try {
-      if (!isApiEnabled) {
+      if (!isOrderEnabled) {
         await new Promise((r) => setTimeout(r, 400))
         setOrders((prev) =>
           prev.map((o) =>
@@ -52,19 +60,21 @@ export function useOrders(): UseOrdersReturn {
         )
         return true
       }
-      await apiPost(`/api/v1/orders/${id}/cancel`, {}, token ?? undefined)
+      if (!userId) return false
+      await orderPatch(`/api/v1/orders/${id}/cancel`, userId)
       await fetchOrders()
       return true
     } catch {
       return false
     }
-  }, [token, fetchOrders])
+  }, [userId, fetchOrders])
 
   return { orders, loading, error, refresh: fetchOrders, cancelOrder }
 }
 
 export function useOrder(id: string) {
-  const token = useAuthStore((s) => s.token())
+  const user = useAuthStore((s) => s.user)
+  const userId = user?.id ?? ''
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -74,22 +84,30 @@ export function useOrder(id: string) {
       setLoading(true)
       setError('')
       try {
-        if (!isApiEnabled) {
+        if (!isOrderEnabled) {
           await new Promise((r) => setTimeout(r, 200))
           const found = MOCK_ORDERS.find((o) => o.id === id) ?? null
           setOrder(found)
-        } else {
-          const data = await apiGet<Order>(`/api/v1/orders/${id}`, token ?? undefined)
-          setOrder(data)
+          return
         }
+        if (!userId) {
+          setOrder(null)
+          return
+        }
+        const data = await orderGet<Order>(`/api/v1/orders/${id}`, userId)
+        setOrder(data)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro ao carregar pedido')
+        if (err instanceof Error && err.message === 'not_found') {
+          setOrder(null)
+        } else {
+          setError(err instanceof Error ? err.message : 'Erro ao carregar pedido')
+        }
       } finally {
         setLoading(false)
       }
     }
     fetch()
-  }, [id, token])
+  }, [id, userId])
 
   return { order, loading, error }
 }
