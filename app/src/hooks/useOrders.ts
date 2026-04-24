@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { orderGet, orderPatch, isOrderEnabled } from '@/lib/api'
+import {
+  orderGet, orderPatch,
+  orderGetWithJWT, orderPatchWithJWT,
+  isOrderEnabled, isAuthEnabled,
+} from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 import { MOCK_ORDERS, type Order, type OrderStatus } from '@/lib/mockOrders'
 
@@ -16,9 +20,33 @@ interface OrdersListResponse {
   meta: { page: number; per_page: number; total: number; total_pages: number }
 }
 
+// Roteia para JWT (auth-service ligado) ou X-User-Id (fallback dev/tests).
+async function fetchList(userId: string, token: string | null): Promise<OrdersListResponse> {
+  if (isAuthEnabled && token) {
+    return orderGetWithJWT<OrdersListResponse>('/api/v1/orders?per_page=50', token)
+  }
+  return orderGet<OrdersListResponse>('/api/v1/orders?per_page=50', userId)
+}
+
+async function fetchOne(id: string, userId: string, token: string | null): Promise<Order> {
+  if (isAuthEnabled && token) {
+    return orderGetWithJWT<Order>(`/api/v1/orders/${id}`, token)
+  }
+  return orderGet<Order>(`/api/v1/orders/${id}`, userId)
+}
+
+async function patchCancel(id: string, userId: string, token: string | null): Promise<void> {
+  if (isAuthEnabled && token) {
+    await orderPatchWithJWT(`/api/v1/orders/${id}/cancel`, token)
+    return
+  }
+  await orderPatch(`/api/v1/orders/${id}/cancel`, userId)
+}
+
 export function useOrders(): UseOrdersReturn {
   const user = useAuthStore((s) => s.user)
   const userId = user?.id ?? ''
+  const token = user?.token ?? null
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -33,7 +61,7 @@ export function useOrders(): UseOrdersReturn {
       } else if (!userId) {
         setOrders([])
       } else {
-        const res = await orderGet<OrdersListResponse>('/api/v1/orders?per_page=50', userId)
+        const res = await fetchList(userId, token)
         setOrders(res.data)
       }
     } catch (err) {
@@ -41,7 +69,7 @@ export function useOrders(): UseOrdersReturn {
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [userId, token])
 
   useEffect(() => {
     fetchOrders()
@@ -61,13 +89,13 @@ export function useOrders(): UseOrdersReturn {
         return true
       }
       if (!userId) return false
-      await orderPatch(`/api/v1/orders/${id}/cancel`, userId)
+      await patchCancel(id, userId, token)
       await fetchOrders()
       return true
     } catch {
       return false
     }
-  }, [userId, fetchOrders])
+  }, [userId, token, fetchOrders])
 
   return { orders, loading, error, refresh: fetchOrders, cancelOrder }
 }
@@ -75,6 +103,7 @@ export function useOrders(): UseOrdersReturn {
 export function useOrder(id: string) {
   const user = useAuthStore((s) => s.user)
   const userId = user?.id ?? ''
+  const token = user?.token ?? null
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -94,7 +123,7 @@ export function useOrder(id: string) {
           setOrder(null)
           return
         }
-        const data = await orderGet<Order>(`/api/v1/orders/${id}`, userId)
+        const data = await fetchOne(id, userId, token)
         setOrder(data)
       } catch (err) {
         if (err instanceof Error && err.message === 'not_found') {
@@ -107,7 +136,7 @@ export function useOrder(id: string) {
       }
     }
     fetch()
-  }, [id, userId])
+  }, [id, userId, token])
 
   return { order, loading, error }
 }

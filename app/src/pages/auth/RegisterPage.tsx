@@ -4,13 +4,14 @@ import { useTranslation } from 'react-i18next'
 import { Mail, Lock, User, Phone } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { Input } from '@/components/ui'
-import { apiPost, isApiEnabled } from '@/lib/api'
+import { authPost, isAuthEnabled } from '@/lib/api'
 import { validateCPF } from '@/lib/cpf'
 import { formatCPF, formatPhone } from '@/lib/format'
 
 interface RegisterResponse {
-  token: string
-  user: { id: string; email: string; name: string; role: 'customer' }
+  accessToken: string
+  refreshToken: string
+  user: { id: string; email: string; name: string; role: 'customer' | 'seller' | 'admin'; emailVerified?: boolean }
 }
 
 export default function RegisterPage() {
@@ -46,21 +47,20 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      if (!isApiEnabled) {
+      if (!isAuthEnabled) {
         setUser({ id: 'mock-1', email: form.email, name: form.name, role: 'customer', token: 'mock-token' })
         navigate('/', { replace: true })
         return
       }
 
-      const data = await apiPost<RegisterResponse>('/auth/register', {
+      const data = await authPost<RegisterResponse>('/api/v1/auth/register', {
         name: form.name,
         email: form.email,
         cpf: form.cpf.replace(/\D/g, ''),
         phone: form.phone.replace(/\D/g, ''),
         password: form.password,
-        lgpd_consent_at: new Date().toISOString(),
       })
-      setUser({ ...data.user, token: data.token })
+      setUser({ ...data.user, token: data.accessToken, refreshToken: data.refreshToken })
       navigate('/', { replace: true })
     } catch (err) {
       const msg = err instanceof Error ? err.message : t('error')

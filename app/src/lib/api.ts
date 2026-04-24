@@ -1,10 +1,12 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 const CATALOG_URL = import.meta.env.VITE_CATALOG_URL ?? ''
 const ORDER_URL = import.meta.env.VITE_ORDER_URL ?? ''
+const AUTH_URL = import.meta.env.VITE_AUTH_URL ?? ''
 
 export const isApiEnabled = BASE_URL !== ''
 export const isCatalogEnabled = CATALOG_URL !== ''
 export const isOrderEnabled = ORDER_URL !== ''
+export const isAuthEnabled = AUTH_URL !== ''
 
 interface ApiError {
   error: string
@@ -81,6 +83,58 @@ export async function orderPatch<T>(path: string, userId: string, body: unknown 
   const res = await fetch(`${ORDER_URL}${path}`, {
     method: 'PATCH',
     headers: orderHeaders(userId, true),
+    body: JSON.stringify(body),
+  })
+  return handleResponse<T>(res)
+}
+
+// Auth API — público (register/login/refresh) e protegido (me/addresses/logout)
+// via Authorization: Bearer <jwt>.
+function authHeaders(token?: string, contentType = false): Record<string, string> {
+  const h: Record<string, string> = {}
+  if (contentType) h['Content-Type'] = 'application/json'
+  if (token) h['Authorization'] = `Bearer ${token}`
+  return h
+}
+
+export async function authPost<T>(path: string, body: unknown, token?: string): Promise<T> {
+  const res = await fetch(`${AUTH_URL}${path}`, {
+    method: 'POST',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(body),
+  })
+  return handleResponse<T>(res)
+}
+
+export async function authGet<T>(path: string, token: string): Promise<T> {
+  const res = await fetch(`${AUTH_URL}${path}`, { headers: authHeaders(token) })
+  if (res.status === 404) throw new Error('not_found')
+  return handleResponse<T>(res)
+}
+
+// Quando auth-service está ligado, o frontend passa o JWT como Bearer para order-service.
+// Essa helper troca X-User-Id por Authorization quando aplicável.
+export async function orderGetWithJWT<T>(path: string, token: string): Promise<T> {
+  const res = await fetch(`${ORDER_URL}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 404) throw new Error('not_found')
+  return handleResponse<T>(res)
+}
+
+export async function orderPostWithJWT<T>(path: string, token: string, body: unknown): Promise<T> {
+  const res = await fetch(`${ORDER_URL}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return handleResponse<T>(res)
+}
+
+export async function orderPatchWithJWT<T>(path: string, token: string, body: unknown = {}): Promise<T> {
+  const res = await fetch(`${ORDER_URL}${path}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
   return handleResponse<T>(res)

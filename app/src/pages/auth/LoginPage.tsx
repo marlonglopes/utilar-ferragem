@@ -5,11 +5,12 @@ import { Mail, Lock } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { Input } from '@/components/ui'
-import { apiPost, isApiEnabled } from '@/lib/api'
+import { authPost, isAuthEnabled } from '@/lib/api'
 
 interface LoginResponse {
-  token: string
-  user: { id: string; email: string; name: string; role: 'customer' | 'seller' | 'admin' }
+  accessToken: string
+  refreshToken: string
+  user: { id: string; email: string; name: string; role: 'customer' | 'seller' | 'admin'; emailVerified?: boolean }
 }
 
 const GIFTHY_HUB_URL = import.meta.env.VITE_GIFTHY_HUB_URL ?? 'https://hub.utilar.com.br'
@@ -34,22 +35,22 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      if (!isApiEnabled) {
-        // Stub: accept any credentials in dev
+      if (!isAuthEnabled) {
+        // Stub: accept any credentials em dev (sem auth-service).
         setUser({ id: 'mock-1', email, name: email.split('@')[0], role: 'customer', token: 'mock-token' })
         mergeCarts([])
         navigate(nextPath, { replace: true })
         return
       }
 
-      const data = await apiPost<LoginResponse>('/auth/login', { email, password })
+      const data = await authPost<LoginResponse>('/api/v1/auth/login', { email, password })
 
       if (data.user.role === 'seller' || data.user.role === 'admin') {
         window.location.href = `${GIFTHY_HUB_URL}?from=utilar-customer`
         return
       }
 
-      setUser({ ...data.user, token: data.token })
+      setUser({ ...data.user, token: data.accessToken, refreshToken: data.refreshToken })
       mergeCarts([])
       navigate(nextPath, { replace: true })
     } catch (err) {

@@ -2,9 +2,11 @@ APP_DIR      := app
 SVC_DIR      := services/payment-service
 CATALOG_DIR  := services/catalog-service
 ORDER_DIR    := services/order-service
+AUTH_DIR     := services/auth-service
 API_URL      ?= http://localhost:8090
 CATALOG_URL  ?= http://localhost:8091
 ORDER_URL    ?= http://localhost:8092
+AUTH_URL     ?= http://localhost:8093
 
 # ── Postgres (payment-service) ────────────────────────────────────────────────
 PG_CONTAINER := utilar_payment_db
@@ -27,6 +29,13 @@ ORD_DB        := order_service
 ORD_EXEC      := docker exec -i $(ORD_CONTAINER) psql -U $(ORD_USER) -d $(ORD_DB) -v ON_ERROR_STOP=1
 ORD_MIGRATIONS := $(ORDER_DIR)/migrations
 
+# ── Postgres (auth-service) ───────────────────────────────────────────────────
+AUTH_CONTAINER := utilar_auth_db
+AUTH_PG_USER   := utilar
+AUTH_DB_NAME   := auth_service
+AUTH_EXEC      := docker exec -i $(AUTH_CONTAINER) psql -U $(AUTH_PG_USER) -d $(AUTH_DB_NAME) -v ON_ERROR_STOP=1
+AUTH_MIGRATIONS := $(AUTH_DIR)/migrations
+
 .PHONY: help dev dev-live dev-full test test-watch infra-up infra-down infra-status \
         svc-run svc-build svc-test install clean \
         db-migrate db-migrate-down db-seed db-clean db-reset db-status db-psql db-dump db-restore \
@@ -35,7 +44,10 @@ ORD_MIGRATIONS := $(ORDER_DIR)/migrations
         catalog-db-status catalog-db-psql catalog-db-dump catalog-db-restore \
         order-run order-build order-test \
         order-db-migrate order-db-migrate-down order-db-seed order-db-clean order-db-reset \
-        order-db-status order-db-psql order-db-dump order-db-restore
+        order-db-status order-db-psql order-db-dump order-db-restore \
+        auth-run auth-build auth-test \
+        auth-db-migrate auth-db-migrate-down auth-db-seed auth-db-clean auth-db-reset \
+        auth-db-status auth-db-psql auth-db-dump auth-db-restore
 
 # ── default ──────────────────────────────────────────────────────────────────
 help:
@@ -74,6 +86,22 @@ help:
 	@echo "    make order-run         roda order-service em :8092"
 	@echo "    make order-build       compila binário"
 	@echo "    make order-test        testes unitários + integração"
+	@echo ""
+	@echo "  Backend Go (auth-service)"
+	@echo "    make auth-run          roda auth-service em :8093"
+	@echo "    make auth-build        compila binário"
+	@echo "    make auth-test         testes unitários + integração"
+	@echo ""
+	@echo "  Banco de dados (Postgres auth_service)"
+	@echo "    make auth-db-migrate        aplica migrations"
+	@echo "    make auth-db-migrate-down   reverte migrations"
+	@echo "    make auth-db-seed           popula 20 users (senha: utilar123)"
+	@echo "    make auth-db-clean          TRUNCATE em todas tabelas"
+	@echo "    make auth-db-reset          drop + migrate + seed"
+	@echo "    make auth-db-status         lista tabelas + contagem"
+	@echo "    make auth-db-psql           shell psql interativo"
+	@echo "    make auth-db-dump           backup para backups/auth_<date>.sql"
+	@echo "    make auth-db-restore FILE=<path>"
 	@echo ""
 	@echo "  Banco de dados (Postgres order_service)"
 	@echo "    make order-db-migrate        aplica migrations"
@@ -119,9 +147,9 @@ dev:
 	cd $(APP_DIR) && npm run dev
 
 dev-live:
-	@echo "SPA em live mode → VITE_API_URL=$(API_URL), VITE_CATALOG_URL=$(CATALOG_URL), VITE_ORDER_URL=$(ORDER_URL)"
-	@echo "(lembre: make infra-up + make svc-run + make catalog-run + make order-run devem estar rodando)"
-	cd $(APP_DIR) && VITE_API_URL=$(API_URL) VITE_CATALOG_URL=$(CATALOG_URL) VITE_ORDER_URL=$(ORDER_URL) npm run dev
+	@echo "SPA em live mode → API=$(API_URL) CATALOG=$(CATALOG_URL) ORDER=$(ORDER_URL) AUTH=$(AUTH_URL)"
+	@echo "(lembre: make infra-up + svc-run + catalog-run + order-run + auth-run em outros terminais)"
+	cd $(APP_DIR) && VITE_API_URL=$(API_URL) VITE_CATALOG_URL=$(CATALOG_URL) VITE_ORDER_URL=$(ORDER_URL) VITE_AUTH_URL=$(AUTH_URL) npm run dev
 
 dev-catalog:
 	@$(MAKE) infra-up
@@ -136,14 +164,15 @@ dev-catalog:
 dev-full:
 	@$(MAKE) infra-up
 	@echo ""
-	@echo "→ subindo payment + catalog + order + SPA (Ctrl-C encerra todos)"
-	@trap 'echo; echo "Encerrando..."; kill $$SVC_PID $$CAT_PID $$ORD_PID 2>/dev/null; wait 2>/dev/null; exit 0' INT TERM; \
+	@echo "→ subindo payment + catalog + order + auth + SPA (Ctrl-C encerra todos)"
+	@trap 'echo; echo "Encerrando..."; kill $$SVC_PID $$CAT_PID $$ORD_PID $$AUTH_PID 2>/dev/null; wait 2>/dev/null; exit 0' INT TERM; \
 	$(MAKE) -C $(SVC_DIR) run & SVC_PID=$$!; \
 	$(MAKE) -C $(CATALOG_DIR) run & CAT_PID=$$!; \
 	$(MAKE) -C $(ORDER_DIR) run & ORD_PID=$$!; \
+	$(MAKE) -C $(AUTH_DIR) run & AUTH_PID=$$!; \
 	sleep 2; \
-	cd $(APP_DIR) && VITE_API_URL=$(API_URL) VITE_CATALOG_URL=$(CATALOG_URL) VITE_ORDER_URL=$(ORDER_URL) npm run dev; \
-	kill $$SVC_PID $$CAT_PID $$ORD_PID 2>/dev/null; wait 2>/dev/null
+	cd $(APP_DIR) && VITE_API_URL=$(API_URL) VITE_CATALOG_URL=$(CATALOG_URL) VITE_ORDER_URL=$(ORDER_URL) VITE_AUTH_URL=$(AUTH_URL) npm run dev; \
+	kill $$SVC_PID $$CAT_PID $$ORD_PID $$AUTH_PID 2>/dev/null; wait 2>/dev/null
 
 test:
 	cd $(APP_DIR) && npm run test:run
@@ -160,9 +189,12 @@ infra-up:
 	@until docker exec utilar_catalog_db pg_isready -U utilar -d catalog_service 2>/dev/null; do sleep 1; done
 	@echo "Aguardando Postgres (order)..."
 	@until docker exec utilar_order_db pg_isready -U utilar -d order_service 2>/dev/null; do sleep 1; done
+	@echo "Aguardando Postgres (auth)..."
+	@until docker exec utilar_auth_db pg_isready -U utilar -d auth_service 2>/dev/null; do sleep 1; done
 	@echo "Postgres payment → localhost:5435"
 	@echo "Postgres catalog → localhost:5436"
 	@echo "Postgres order   → localhost:5437"
+	@echo "Postgres auth    → localhost:5438"
 	@echo "Redpanda pronto  → localhost:19092"
 	@echo "Console pronto   → http://localhost:8085"
 
@@ -426,6 +458,87 @@ order-db-restore:
 	@test -f "$(FILE)" || (echo "arquivo não encontrado: $(FILE)"; exit 1)
 	@echo "→ restaurando de $(FILE)"
 	@$(ORD_EXEC) < $(FILE) > /dev/null
+	@echo "✓ restaurado"
+
+# ── auth-service ─────────────────────────────────────────────────────────────
+auth-run:
+	$(MAKE) -C $(AUTH_DIR) run
+
+auth-build:
+	$(MAKE) -C $(AUTH_DIR) build
+
+auth-test:
+	$(MAKE) -C $(AUTH_DIR) test
+
+define _require_auth_pg
+	@docker ps --filter "name=$(AUTH_CONTAINER)" --filter "status=running" --format '{{.Names}}' \
+		| grep -q $(AUTH_CONTAINER) \
+		|| (echo "→ Postgres (auth) não está rodando. Rode: make infra-up"; exit 1)
+endef
+
+auth-db-migrate:
+	$(call _require_auth_pg)
+	@echo "→ aplicando migrations em $(AUTH_MIGRATIONS)"
+	@$(AUTH_EXEC) -c "CREATE TABLE IF NOT EXISTS schema_migrations (version BIGINT PRIMARY KEY, dirty BOOLEAN NOT NULL);" > /dev/null
+	@for f in $$(ls $(AUTH_MIGRATIONS)/*.up.sql | sort); do \
+		v=$$(basename $$f | cut -d_ -f1 | sed 's/^0*//'); \
+		echo "  · $$f (version $$v)"; \
+		$(AUTH_EXEC) < $$f > /dev/null || exit 1; \
+		$(AUTH_EXEC) -c "INSERT INTO schema_migrations (version, dirty) VALUES ($$v, false) ON CONFLICT (version) DO UPDATE SET dirty=false;" > /dev/null; \
+	done
+	@echo "✓ migrations aplicadas"
+
+auth-db-migrate-down:
+	$(call _require_auth_pg)
+	@echo "→ revertendo migrations"
+	@for f in $$(ls $(AUTH_MIGRATIONS)/*.down.sql | sort -r); do \
+		echo "  · $$f"; \
+		$(AUTH_EXEC) < $$f > /dev/null 2>&1 || true; \
+	done
+	@$(AUTH_EXEC) -c "DROP TABLE IF EXISTS schema_migrations;" > /dev/null 2>&1 || true
+	@echo "✓ schema limpo"
+
+auth-db-seed:
+	$(call _require_auth_pg)
+	@echo "→ populando tabelas via seed.sql"
+	@$(AUTH_EXEC) < $(AUTH_MIGRATIONS)/seed.sql
+	@echo "✓ seed aplicado (senha de todos os users: utilar123)"
+
+auth-db-clean:
+	$(call _require_auth_pg)
+	@$(AUTH_EXEC) -c "TRUNCATE TABLE refresh_tokens, password_reset_tokens, email_verification_tokens, addresses, users RESTART IDENTITY CASCADE;" > /dev/null
+	@echo "✓ tabelas vazias"
+
+auth-db-reset: auth-db-migrate-down auth-db-migrate auth-db-seed
+	@echo "✓ auth resetado e populado"
+
+auth-db-status:
+	$(call _require_auth_pg)
+	@$(AUTH_EXEC) -c "\dt"
+	@$(AUTH_EXEC) -c " \
+		SELECT 'users'                     AS table_name, count(*) AS rows FROM users \
+		UNION ALL SELECT 'addresses',       count(*) FROM addresses \
+		UNION ALL SELECT 'refresh_tokens',  count(*) FROM refresh_tokens \
+		UNION ALL SELECT 'email_verification_tokens', count(*) FROM email_verification_tokens \
+		UNION ALL SELECT 'password_reset_tokens',     count(*) FROM password_reset_tokens \
+		ORDER BY table_name;"
+
+auth-db-psql:
+	$(call _require_auth_pg)
+	@docker exec -it $(AUTH_CONTAINER) psql -U $(AUTH_PG_USER) -d $(AUTH_DB_NAME)
+
+auth-db-dump:
+	$(call _require_auth_pg)
+	@mkdir -p backups
+	@FILE=backups/auth_$$(date +%Y%m%d_%H%M%S).sql; \
+	docker exec $(AUTH_CONTAINER) pg_dump -U $(AUTH_PG_USER) -d $(AUTH_DB_NAME) --clean --if-exists > $$FILE; \
+	echo "✓ dump salvo em $$FILE"
+
+auth-db-restore:
+	$(call _require_auth_pg)
+	@test -n "$(FILE)" || (echo "uso: make auth-db-restore FILE=backups/auth_XXXX.sql"; exit 1)
+	@test -f "$(FILE)" || (echo "arquivo não encontrado: $(FILE)"; exit 1)
+	@$(AUTH_EXEC) < $(FILE) > /dev/null
 	@echo "✓ restaurado"
 
 # ── util ─────────────────────────────────────────────────────────────────────

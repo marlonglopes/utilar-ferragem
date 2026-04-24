@@ -6,7 +6,9 @@ export interface User {
   email: string
   name: string
   role: 'customer' | 'seller' | 'admin'
-  token: string
+  token: string           // JWT access token (expires em 15min quando vindo do auth-service)
+  refreshToken?: string   // opaco, revogável (30 dias)
+  emailVerified?: boolean
 }
 
 interface AuthState {

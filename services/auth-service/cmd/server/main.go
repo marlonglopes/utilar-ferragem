@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/utilar/order-service/internal/config"
-	"github.com/utilar/order-service/internal/db"
-	"github.com/utilar/order-service/internal/handler"
+	"github.com/utilar/auth-service/internal/config"
+	"github.com/utilar/auth-service/internal/db"
+	"github.com/utilar/auth-service/internal/handler"
 )
 
 func main() {
@@ -33,17 +33,29 @@ func main() {
 	}
 	slog.Info("migrations applied")
 
-	orderH := handler.NewOrderHandler(database)
+	authH := handler.NewAuthHandler(database, cfg)
+	addrH := handler.NewAddressHandler(database)
 
 	r := gin.New()
 	r.Use(gin.Recovery(), handler.RequestID(), handler.AccessLog(), handler.CORS())
 
-	api := r.Group("/api/v1", handler.RequireUser(cfg.JWTSecret))
+	pub := r.Group("/api/v1")
 	{
-		api.POST("/orders", orderH.Create)
-		api.GET("/orders", orderH.List)
-		api.GET("/orders/:id", orderH.Get)
-		api.PATCH("/orders/:id/cancel", orderH.Cancel)
+		pub.POST("/auth/register", authH.Register)
+		pub.POST("/auth/login", authH.Login)
+		pub.POST("/auth/refresh", authH.Refresh)
+		pub.POST("/auth/forgot-password", authH.ForgotPassword)
+		pub.POST("/auth/reset-password", authH.ResetPassword)
+		pub.POST("/auth/verify-email", authH.VerifyEmail)
+	}
+
+	priv := r.Group("/api/v1", handler.JWTAuth(cfg.JWTSecret))
+	{
+		priv.GET("/me", authH.Me)
+		priv.POST("/auth/logout", authH.Logout)
+		priv.GET("/addresses", addrH.List)
+		priv.POST("/addresses", addrH.Create)
+		priv.DELETE("/addresses/:id", addrH.Delete)
 	}
 
 	r.GET("/health", func(c *gin.Context) {
@@ -62,7 +74,7 @@ func main() {
 	}
 
 	go func() {
-		slog.Info("order-service listening", "port", cfg.Port)
+		slog.Info("auth-service listening", "port", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server", "error", err)
 			os.Exit(1)

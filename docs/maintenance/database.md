@@ -9,6 +9,7 @@ Serviços com DB próprio:
 - **[payment-service](#payment-service)** — pagamentos, webhooks, outbox (Sprint 08)
 - **[catalog-service](#catalog-service)** — produtos, categorias, vendedores, imagens (Fase B1)
 - **[order-service](#order-service)** — pedidos, items, endereços, tracking events (Fase B2)
+- **[auth-service](#auth-service)** — users, addresses, tokens (Fase B3)
 
 Cada serviço tem seu próprio container Postgres, seguindo o princípio de **database-per-service**: acoplamento fraco, evolução independente de schema.
 
@@ -453,8 +454,66 @@ make order-db-seed
 
 ## 5. Integração frontend
 
-Hooks [useOrders/useOrder](../../app/src/hooks/useOrders.ts) detectam `VITE_ORDER_URL`. Quando setado, chamam o backend real com header `X-User-Id = authStore.user.id`. Error envelope é `{error, code, requestId}`.
+Hooks [useOrders/useOrder](../../app/src/hooks/useOrders.ts) detectam `VITE_ORDER_URL`. Quando setado, chamam o backend real. Se `VITE_AUTH_URL` também estiver ativo, usam `Authorization: Bearer <JWT>`; caso contrário, fallback `X-User-Id = authStore.user.id`. Error envelope é `{error, code, requestId}`.
 
 ```bash
-make dev-full   # infra + payment + catalog + order + SPA live
+make dev-full   # infra + payment + catalog + order + auth + SPA live
 ```
+
+---
+
+# auth-service
+
+## 1. Topologia
+
+| Item | Valor |
+|---|---|
+| Container Docker | `utilar_auth_db` |
+| Imagem | `postgres:17-alpine` |
+| Host / porta | `localhost:5438` |
+| Database | `auth_service` |
+| User / password | `utilar` / `utilar` |
+| Volume persistente | `auth_pg_data` |
+| DSN local | `postgres://utilar:utilar@localhost:5438/auth_service?sslmode=disable` |
+| Servidor HTTP | `http://localhost:8093` |
+
+## 2. Schema
+
+Cinco tabelas na migration 001:
+
+| Tabela | Propósito |
+|---|---|
+| `users` | identidade (id, email UNIQUE, password_hash argon2id, name, cpf, phone, role, email_verified) |
+| `addresses` | endereços salvos, com constraint parcial "1 default por user" |
+| `email_verification_tokens` | 1-use, TTL 24h |
+| `password_reset_tokens` | 1-use, TTL 1h |
+| `refresh_tokens` | sessões revogáveis, TTL 30 dias |
+
+ENUM `user_role`: `customer`, `seller`, `admin`.
+
+**Segurança:**
+- Passwords: argon2id (OWASP 2023 params)
+- Access tokens: JWT HS256, 15 min TTL, sem estado
+- Refresh tokens: UUID v4 opaco, revogável via logout ou reset
+- `JWT_SECRET` compartilhado com payment-service e order-service (consomem o mesmo JWT)
+
+## 3. Seed
+
+20 users (senha: `utilar123`) + 29 endereços. Ver [auth-service README](../../services/auth-service/README.md#seed) para detalhes.
+
+## 4. Comandos Makefile — auth
+
+| Alvo | O que faz |
+|---|---|
+| `make auth-run` | Roda servidor em `:8093` |
+| `make auth-test` | 22 testes (5 password + 4 JWT + 13 handlers) |
+| `make auth-db-migrate` / `-down` / `-seed` / `-reset` / `-clean` / `-status` / `-psql` / `-dump` / `-restore` | Padrão igual aos outros serviços |
+
+## 5. Integração cross-service
+
+Auth emite JWT → order-service e payment-service validam com o mesmo `JWT_SECRET`. Order-service tem fallback para `X-User-Id` (backward-compat com dev/tests que não usam auth).
+
+Frontend:
+- [authStore](../../app/src/store/authStore.ts) agora persiste `user.token` (JWT) + `user.refreshToken`
+- [LoginPage](../../app/src/pages/auth/LoginPage.tsx) e [RegisterPage](../../app/src/pages/auth/RegisterPage.tsx) detectam `isAuthEnabled` (= `VITE_AUTH_URL` setado)
+- Requests a `order-service` usam `Bearer <JWT>` quando auth-service está ativo

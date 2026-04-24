@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 const RequestIDHeader = "X-Request-Id"
@@ -51,20 +54,63 @@ func CORS() gin.HandlerFunc {
 	}
 }
 
-// RequireUser é um middleware temporário: lê o user_id do header X-User-Id.
-// Substituir por JWTMiddleware quando o auth-service (Phase B3) estiver no ar.
-// Em dev/mock, o frontend passa o user_id do authStore direto no header.
-func RequireUser() gin.HandlerFunc {
+// RequireUser valida o usuário por uma de duas fontes, nesta ordem:
+//  1. Authorization: Bearer <JWT>  (emitido pelo auth-service; mesmo JWT_SECRET)
+//  2. X-User-Id: <opaque>           (fallback para dev sem auth real / tests)
+//
+// JWT_SECRET precisa ser o mesmo do auth-service. Em produção, só JWT é válido
+// (X-User-Id será desabilitado via flag de build/env quando auth-service estiver em prod).
+func RequireUser(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID := c.GetHeader("X-User-Id")
-		if userID == "" {
-			Unauthorized(c, "missing X-User-Id header")
-			c.Abort()
+		// 1) Tenta JWT primeiro
+		if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+			tokenStr := strings.TrimPrefix(auth, "Bearer ")
+			sub, err := parseJWTSubject(tokenStr, jwtSecret)
+			if err != nil {
+				Unauthorized(c, "invalid token: "+err.Error())
+				c.Abort()
+				return
+			}
+			c.Set("user_id", sub)
+			c.Set("auth_source", "jwt")
+			c.Next()
 			return
 		}
-		c.Set("user_id", userID)
-		c.Next()
+		// 2) Fallback: X-User-Id (dev only)
+		if userID := c.GetHeader("X-User-Id"); userID != "" {
+			c.Set("user_id", userID)
+			c.Set("auth_source", "x-user-id")
+			c.Next()
+			return
+		}
+		Unauthorized(c, "missing Authorization header or X-User-Id")
+		c.Abort()
 	}
+}
+
+// parseJWTSubject extrai a claim `sub` do JWT HS256 (compatível com auth-service.Claims).
+func parseJWTSubject(tokenStr, secret string) (string, error) {
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(secret), nil
+	})
+	if err != nil || !token.Valid {
+		if err == nil {
+			err = errors.New("invalid token")
+		}
+		return "", err
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("invalid claims")
+	}
+	sub, ok := claims["sub"].(string)
+	if !ok || sub == "" {
+		return "", errors.New("missing sub claim")
+	}
+	return sub, nil
 }
 
 func newRequestID() string {

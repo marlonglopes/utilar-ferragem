@@ -50,6 +50,23 @@ services:
       timeout: 5s
       retries: 10
 
+  postgres-auth:
+    image: postgres:17-alpine
+    container_name: utilar_auth_db
+    environment:
+      POSTGRES_USER: utilar
+      POSTGRES_PASSWORD: utilar
+      POSTGRES_DB: auth_service
+    ports:
+      - "5438:5432"
+    volumes:
+      - auth_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U utilar -d auth_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redpanda:
     image: redpandadata/redpanda:v26.1.6
     container_name: utilar_redpanda
@@ -95,4 +112,5 @@ volumes:
   payment_pg_data:
   catalog_pg_data:
   order_pg_data:
+  auth_pg_data:
   redpanda_data:
