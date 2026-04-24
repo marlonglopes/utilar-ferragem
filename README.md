@@ -51,10 +51,10 @@ Para apresentar ao cliente: `open utilar-ferragem/mockups/index.html` (ou sirva 
 
 **Sprints 01–09 ✅ concluídos.** Frontend SPA completo + **4 serviços Go** em operação local, **zero mocks no backend**:
 
-- **[services/payment-service/](services/payment-service/)** — Mercado Pago (Pix/boleto/cartão) + webhooks + outbox (Sprint 08, porta :8090)
-- **[services/catalog-service/](services/catalog-service/)** — produtos, categorias, vendedores, imagens (Fase B1, porta :8091)
-- **[services/order-service/](services/order-service/)** — pedidos, items, endereços, tracking (Fase B2, porta :8092)
-- **[services/auth-service/](services/auth-service/)** — users, addresses, argon2id, JWT HS256 (Fase B3, porta :8093)
+- **[payment-service](services/payment-service/README.md)** — Mercado Pago (Pix/boleto/cartão) + webhooks + outbox (Sprint 08, porta :8090)
+- **[catalog-service](services/catalog-service/README.md)** — produtos, categorias, vendedores, imagens (Fase B1, porta :8091)
+- **[order-service](services/order-service/README.md)** — pedidos, items, endereços, tracking (Fase B2, porta :8092)
+- **[auth-service](services/auth-service/README.md)** — users, addresses, argon2id, JWT HS256 (Fase B3, porta :8093)
 
 Frontend plugado em todos os serviços via `VITE_AUTH_URL`, `VITE_CATALOG_URL`, `VITE_ORDER_URL`, `VITE_API_URL`. **Operação fim-a-fim real:** login → catálogo → carrinho → pedido → pagamento.
 
