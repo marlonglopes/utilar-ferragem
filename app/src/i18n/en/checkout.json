@@ -28,6 +28,8 @@
     "noAddresses": "No saved addresses. Fill in below.",
     "useThis": "Use this address",
     "addNew": "Use a different address",
+    "label": "Address label (e.g., Home, Work)",
+    "saveForLater": "Save this address for future purchases",
     "continue": "Continue"
   },
   "shipping": {

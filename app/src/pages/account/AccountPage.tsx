@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { User, MapPin, CreditCard, LogOut, Plus, Pencil, Trash2, Check, Package } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { useAddressStore, type Address, type AddressInput } from '@/store/addressStore'
 import { useNavigate } from 'react-router-dom'
 import { Input } from '@/components/ui'
 import { formatCEP } from '@/lib/format'
@@ -10,20 +11,7 @@ import OrdersTab from './OrdersTab'
 
 type Tab = 'profile' | 'addresses' | 'payment' | 'orders'
 
-interface Address {
-  id: string
-  label: string
-  cep: string
-  street: string
-  number: string
-  complement: string
-  neighborhood: string
-  city: string
-  state: string
-  isDefault: boolean
-}
-
-const EMPTY_ADDR: Omit<Address, 'id' | 'isDefault'> = {
+const EMPTY_ADDR: AddressInput = {
   label: '',
   cep: '',
   street: '',
@@ -95,7 +83,7 @@ function AddressForm({
   onCancel,
 }: {
   initial?: Partial<Address>
-  onSave: (addr: Omit<Address, 'id' | 'isDefault'>) => void
+  onSave: (addr: AddressInput) => void
   onCancel: () => void
 }) {
   const { t } = useTranslation()
@@ -175,33 +163,22 @@ function AddressForm({
 
 function AddressesTab() {
   const { t } = useTranslation()
-  const [addresses, setAddresses] = useState<Address[]>([])
+  const addresses = useAddressStore((s) => s.addresses)
+  const addAddress = useAddressStore((s) => s.addAddress)
+  const updateAddress = useAddressStore((s) => s.updateAddress)
+  const removeAddress = useAddressStore((s) => s.removeAddress)
+  const setDefault = useAddressStore((s) => s.setDefault)
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  function saveNew(data: Omit<Address, 'id' | 'isDefault'>) {
-    setAddresses((p) => [
-      ...p,
-      { ...data, id: crypto.randomUUID(), isDefault: p.length === 0 },
-    ])
+  function saveNew(data: AddressInput) {
+    addAddress(data)
     setAdding(false)
   }
 
-  function saveEdit(id: string, data: Omit<Address, 'id' | 'isDefault'>) {
-    setAddresses((p) => p.map((a) => (a.id === id ? { ...a, ...data } : a)))
+  function saveEdit(id: string, data: AddressInput) {
+    updateAddress(id, data)
     setEditingId(null)
-  }
-
-  function remove(id: string) {
-    setAddresses((p) => {
-      const next = p.filter((a) => a.id !== id)
-      if (next.length > 0 && !next.some((a) => a.isDefault)) next[0].isDefault = true
-      return next
-    })
-  }
-
-  function setDefault(id: string) {
-    setAddresses((p) => p.map((a) => ({ ...a, isDefault: a.id === id })))
   }
 
   return (
@@ -238,7 +215,7 @@ function AddressesTab() {
                 <button onClick={() => setEditingId(addr.id)} className="text-gray-400 hover:text-brand-blue transition-colors">
                   <Pencil className="h-4 w-4" />
                 </button>
-                <button onClick={() => remove(addr.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                <button onClick={() => removeAddress(addr.id)} className="text-gray-400 hover:text-red-500 transition-colors">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>

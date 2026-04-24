@@ -1,8 +1,10 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Check, ChevronRight, Loader2 } from 'lucide-react'
+import { Check, ChevronRight, Loader2, Plus } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
+import { useAuthStore } from '@/store/authStore'
+import { useAddressStore, type Address as StoredAddress } from '@/store/addressStore'
 import { usePayment, type PaymentMethod } from '@/hooks/usePayment'
 import { formatCurrency, formatCEP } from '@/lib/format'
 import { cn } from '@/lib/cn'
@@ -23,6 +25,18 @@ interface Address {
   neighborhood: string
   city: string
   state: string
+}
+
+function toShippingAddress(a: StoredAddress): Address {
+  return {
+    cep: a.cep,
+    street: a.street,
+    number: a.number,
+    complement: a.complement,
+    neighborhood: a.neighborhood,
+    city: a.city,
+    state: a.state,
+  }
 }
 
 interface ShippingOption {
@@ -83,9 +97,24 @@ function AddressStep({
   onNext: (addr: Address) => void
 }) {
   const { t } = useTranslation('checkout')
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn())
+  const savedAddresses = useAddressStore((s) => s.addresses)
+  const addAddress = useAddressStore((s) => s.addAddress)
+
+  const defaultAddress = useMemo(
+    () => savedAddresses.find((a) => a.isDefault) ?? savedAddresses[0] ?? null,
+    [savedAddresses]
+  )
+
+  const hasSaved = isLoggedIn && savedAddresses.length > 0
+  const [selectedId, setSelectedId] = useState<string | null>(defaultAddress?.id ?? null)
+  const [addingNew, setAddingNew] = useState(!hasSaved)
+  const [saveForLater, setSaveForLater] = useState(isLoggedIn)
+
   const [form, setForm] = useState<Address>({
     cep: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '',
   })
+  const [label, setLabel] = useState('')
   const [cepLoading, setCepLoading] = useState(false)
 
   function set(field: keyof Address, value: string) {
@@ -112,9 +141,97 @@ function AddressStep({
     setCepLoading(false)
   }
 
+  function pickSavedAddress(addr: StoredAddress) {
+    onNext(toShippingAddress(addr))
+  }
+
   function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (!addingNew && selectedId) {
+      const picked = savedAddresses.find((a) => a.id === selectedId)
+      if (picked) {
+        onNext(toShippingAddress(picked))
+        return
+      }
+    }
+    if (saveForLater && isLoggedIn) {
+      addAddress({ ...form, label: label || form.street }, savedAddresses.length === 0)
+    }
     onNext(form)
+  }
+
+  if (hasSaved && !addingNew) {
+    return (
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <h2 className="text-lg font-bold text-gray-900">{t('address.title')}</h2>
+
+        <div className="flex flex-col gap-2">
+          {savedAddresses.map((addr) => (
+            <label
+              key={addr.id}
+              className={cn(
+                'flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors',
+                selectedId === addr.id
+                  ? 'border-brand-orange bg-orange-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              )}
+            >
+              <input
+                type="radio"
+                name="savedAddress"
+                value={addr.id}
+                checked={selectedId === addr.id}
+                onChange={() => setSelectedId(addr.id)}
+                className="accent-brand-orange mt-0.5"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900">
+                  {addr.label || addr.street}
+                  {addr.isDefault && (
+                    <span className="ml-2 text-[10px] font-bold uppercase tracking-wide bg-brand-orange text-white px-1.5 py-0.5 rounded-full">
+                      {t('account.defaultAddress', { ns: 'common' })}
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  {addr.street}{addr.number ? `, ${addr.number}` : ''}{addr.complement ? ` - ${addr.complement}` : ''}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {addr.neighborhood}, {addr.city} – {addr.state} · {addr.cep}
+                </p>
+              </div>
+              {selectedId === addr.id && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); pickSavedAddress(addr) }}
+                  className="text-xs font-semibold text-brand-orange hover:text-brand-orange-dark whitespace-nowrap"
+                >
+                  {t('address.useThis')}
+                </button>
+              )}
+            </label>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setAddingNew(true)}
+          className="flex items-center gap-2 h-10 px-4 rounded-xl border border-dashed border-gray-300 text-sm text-gray-500 hover:border-brand-orange hover:text-brand-orange transition-colors self-start"
+        >
+          <Plus className="h-4 w-4" />
+          {t('address.addNew')}
+        </button>
+
+        <button
+          type="submit"
+          disabled={!selectedId}
+          className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors mt-2 disabled:opacity-60"
+        >
+          {t('address.continue')}
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </form>
+    )
   }
 
   return (
@@ -180,13 +297,44 @@ function AddressStep({
         required
       />
 
-      <button
-        type="submit"
-        className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors mt-2"
-      >
-        {t('address.continue')}
-        <ChevronRight className="h-4 w-4" />
-      </button>
+      {isLoggedIn && (
+        <>
+          <Input
+            label={t('address.label', { defaultValue: 'Nome do endereço (ex: Casa, Trabalho)' })}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Casa"
+          />
+          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={saveForLater}
+              onChange={(e) => setSaveForLater(e.target.checked)}
+              className="accent-brand-orange"
+            />
+            {t('address.saveForLater', { defaultValue: 'Salvar este endereço para próximas compras' })}
+          </label>
+        </>
+      )}
+
+      <div className="flex gap-2 mt-2">
+        {hasSaved && (
+          <button
+            type="button"
+            onClick={() => setAddingNew(false)}
+            className="h-11 px-4 rounded-xl border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            {t('cancel', { ns: 'common' })}
+          </button>
+        )}
+        <button
+          type="submit"
+          className="flex-1 h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors"
+        >
+          {t('address.continue')}
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
     </form>
   )
 }

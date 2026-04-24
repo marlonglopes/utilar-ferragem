@@ -6,6 +6,7 @@ import i18n from '@/i18n'
 import CheckoutPage from '@/pages/checkout/CheckoutPage'
 import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
+import { useAddressStore } from '@/store/addressStore'
 
 beforeAll(async () => {
   await i18n.changeLanguage('pt-BR')
@@ -13,6 +14,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   useCartStore.setState({ items: [] })
+  useAddressStore.setState({ addresses: [] })
   useAuthStore.setState({
     user: { id: 'u1', email: 'test@test.com', name: 'Test', role: 'customer', token: 'tok' },
   })
@@ -79,6 +81,47 @@ describe('CheckoutPage — passo endereço', () => {
     await waitFor(() => {
       expect(screen.getByText(/opções de entrega/i)).toBeInTheDocument()
     })
+  })
+})
+
+describe('CheckoutPage — endereço salvo (usuário logado)', () => {
+  function seedDefaultAddress() {
+    useAddressStore.getState().addAddress({
+      label: 'Casa',
+      cep: '01310-100',
+      street: 'Av Paulista',
+      number: '100',
+      complement: '',
+      neighborhood: 'Bela Vista',
+      city: 'São Paulo',
+      state: 'SP',
+    })
+  }
+
+  it('exibe lista de endereços salvos em vez do formulário', () => {
+    addItem()
+    seedDefaultAddress()
+    renderCheckout()
+    expect(screen.getByText(/av paulista/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/CEP/i)).not.toBeInTheDocument()
+  })
+
+  it('endereço padrão vem pré-selecionado e avança para entrega', async () => {
+    addItem()
+    seedDefaultAddress()
+    renderCheckout()
+    fireEvent.click(screen.getByRole('button', { name: /continuar/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/opções de entrega/i)).toBeInTheDocument()
+    })
+  })
+
+  it('permite abrir o formulário de novo endereço via "usar outro endereço"', () => {
+    addItem()
+    seedDefaultAddress()
+    renderCheckout()
+    fireEvent.click(screen.getByRole('button', { name: /usar outro endereço/i }))
+    expect(screen.getByLabelText(/CEP/i)).toBeInTheDocument()
   })
 })
 
