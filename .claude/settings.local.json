@@ -15,7 +15,31 @@
       "WebFetch(domain:localhost)",
       "Bash(go version *)",
       "Bash(docker --version)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(curl -fsSL https://go.dev/dl/go1.22.5.linux-amd64.tar.gz -o /tmp/go.tar.gz)",
+      "Bash(sudo tar *)",
+      "Bash(echo 'export PATH=$PATH:/usr/local/go/bin')",
+      "Bash(/usr/local/go/bin/go version *)",
+      "Bash(git -C /home/marlon/gifthy/utilar-ferragem status)",
+      "Bash(git -C /home/marlon/gifthy/utilar-ferragem add SPRINT.md app/src/i18n/en/checkout.json app/src/i18n/pt-BR/checkout.json app/src/router/index.tsx app/src/hooks/usePayment.ts app/src/pages/checkout/ app/src/test/CheckoutPage.test.tsx app/src/test/OrderConfirmationPage.test.tsx app/src/test/usePayment.test.ts)",
+      "Bash(git -C /home/marlon/gifthy/utilar-ferragem commit -m ' *)",
+      "Bash(git -C /home/marlon/gifthy/utilar-ferragem add app/src/test/CheckoutPage.test.tsx app/src/test/usePayment.test.ts)",
+      "Bash(git -C /home/marlon/gifthy/utilar-ferragem push)",
+      "Bash(~/go/bin/go version *)",
+      "WebSearch",
+      "Bash(nvm --version)",
+      "Bash(nvm ls *)",
+      "Bash(~/go/bin/go env *)",
+      "Bash(~/go/bin/go get *)",
+      "Bash(~/go/bin/go mod *)",
+      "Bash(~/go/bin/go build *)",
+      "Bash(curl -s \"https://hub.docker.com/v2/repositories/library/postgres/tags?page_size=50&name=alpine\")",
+      "Bash(curl -s \"https://hub.docker.com/v2/repositories/redpandadata/redpanda/tags?page_size=50\")",
+      "Bash(curl -s \"https://hub.docker.com/v2/repositories/redpandadata/console/tags?page_size=50\")",
+      "Bash(~/go/bin/go test *)",
+      "Bash(git -C /home/marlon/gifthy/utilar-ferragem add .nvmrc app/package.json docker-compose.yml docs/03-architecture.md docs/10-testing-strategy.md docs/sprints/sprint-08-checkout.md services/payment-service/go.mod services/payment-service/go.sum)",
+      "Bash(git -C /home/marlon/gifthy/utilar-ferragem add docs/maintenance/major-version-upgrades.md)",
+      "Bash(make help *)"
     ]
   }
 }
