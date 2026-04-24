@@ -17,7 +17,7 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	dbURL := env("PAYMENT_DB_URL", "postgres://utilar:utilar@localhost:5435/payment_service")
+	dbURL := env("PAYMENT_DB_URL", "postgres://utilar:utilar@localhost:5435/payment_service?sslmode=disable")
 	brokers := strings.Split(env("REDPANDA_BROKERS", "localhost:19092"), ",")
 
 	mpToken := os.Getenv("MP_ACCESS_TOKEN")
