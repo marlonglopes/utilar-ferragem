@@ -16,6 +16,23 @@ services:
       timeout: 5s
       retries: 10
 
+  postgres-catalog:
+    image: postgres:17-alpine
+    container_name: utilar_catalog_db
+    environment:
+      POSTGRES_USER: utilar
+      POSTGRES_PASSWORD: utilar
+      POSTGRES_DB: catalog_service
+    ports:
+      - "5436:5432"
+    volumes:
+      - catalog_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U utilar -d catalog_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redpanda:
     image: redpandadata/redpanda:v26.1.6
     container_name: utilar_redpanda
@@ -59,4 +76,5 @@ services:
 
 volumes:
   payment_pg_data:
+  catalog_pg_data:
   redpanda_data:

@@ -26,3 +26,12 @@ Thumbs.db
 *.log
 npm-debug.log*
 .creds
+
+# Go service binaries
+services/*/bin/
+
+# Test coverage
+app/coverage/
+
+# DB dumps (dev only)
+backups/

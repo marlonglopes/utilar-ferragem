@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { SlidersHorizontal } from 'lucide-react'
 import { useProducts } from '@/hooks/useProducts'
+import { useFacets } from '@/hooks/useFacets'
 import { useSearchFilters } from '@/hooks/useSearchFilters'
-import { getMockFacets } from '@/lib/mockProducts'
 import { ProductCard, ProductCardSkeleton } from '@/components/catalog/ProductCard'
 import { FacetSidebar } from '@/components/catalog/FacetSidebar'
 import { ActiveFilterChips } from '@/components/catalog/ActiveFilterChips'
@@ -66,7 +66,10 @@ export default function SearchPage() {
   const productsParams = toProductsParams()
   const { data, isLoading } = useProducts(productsParams)
 
-  const facets = getMockFacets({ q: filters.q, category: filters.category })
+  const { data: facets } = useFacets({ q: filters.q, category: filters.category })
+  const brands = facets?.brands ?? []
+  const priceMin = facets?.priceMin ?? 0
+  const priceMax = facets?.priceMax ?? 9999
 
   const sortOptions = SORT_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))
 
@@ -154,9 +157,9 @@ export default function SearchPage() {
         <div className="hidden lg:block w-56 flex-shrink-0">
           <FacetSidebar
             filters={filters}
-            brands={facets.brands}
-            priceMin={facets.priceMin}
-            priceMax={facets.priceMax}
+            brands={brands}
+            priceMin={priceMin}
+            priceMax={priceMax}
             onChange={set}
           />
         </div>
@@ -170,9 +173,9 @@ export default function SearchPage() {
         >
           <FacetSidebar
             filters={filters}
-            brands={facets.brands}
-            priceMin={facets.priceMin}
-            priceMax={facets.priceMax}
+            brands={brands}
+            priceMin={priceMin}
+            priceMax={priceMax}
             onChange={(u) => { set(u); setDrawerOpen(false) }}
           />
         </Drawer>

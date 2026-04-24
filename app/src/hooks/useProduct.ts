@@ -1,15 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
+import { catalogGet, isCatalogEnabled } from '@/lib/api'
 import { getMockProduct } from '@/lib/mockProducts'
 import type { Product } from '@/types/product'
 
-const isApiEnabled = Boolean(import.meta.env.VITE_API_URL)
-
 async function fetchProduct(slug: string): Promise<Product | null> {
-  if (!isApiEnabled) return getMockProduct(slug)
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/products/${slug}`)
-  if (res.status === 404) return null
-  if (!res.ok) throw new Error('Failed to fetch product')
-  return res.json() as Promise<Product>
+  if (!isCatalogEnabled) return getMockProduct(slug)
+  try {
+    return await catalogGet<Product>(`/api/v1/products/${slug}`)
+  } catch (err) {
+    if (err instanceof Error && err.message === 'not_found') return null
+    throw err
+  }
 }
 
 export function useProduct(slug: string) {

@@ -1,6 +1,8 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
+const CATALOG_URL = import.meta.env.VITE_CATALOG_URL ?? ''
 
 export const isApiEnabled = BASE_URL !== ''
+export const isCatalogEnabled = CATALOG_URL !== ''
 
 interface ApiError {
   error: string
@@ -41,5 +43,12 @@ export async function apiPatch<T>(path: string, body: unknown, token?: string): 
     headers,
     body: JSON.stringify(body),
   })
+  return handleResponse<T>(res)
+}
+
+// Catalog API — leitura pública, sem auth. Base URL independente (VITE_CATALOG_URL).
+export async function catalogGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${CATALOG_URL}${path}`)
+  if (res.status === 404) throw new Error('not_found')
   return handleResponse<T>(res)
 }

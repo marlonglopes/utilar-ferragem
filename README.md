@@ -27,6 +27,7 @@ Inspiração / referência de branding: [@utilar_ferragens no Instagram](https:/
 | [docs/12-ops-runbook.md](docs/12-ops-runbook.md) | Incidentes, plantão, backups, recuperação de desastre |
 | [docs/13-launch-checklist.md](docs/13-launch-checklist.md) | Linha do tempo T-minus, jurídico, SEO, e-mail, marketing |
 | [docs/14-infra-custos.md](docs/14-infra-custos.md) | Infraestrutura mínima, custos por fase, domínio, AWS, SES, Mercado Pago, observabilidade |
+| [docs/maintenance/database.md](docs/maintenance/database.md) | Postgres local (payment-service + catalog-service): migrations, seed, reset, dumps, comandos `make db-*` e `make catalog-db-*` |
 | [docs/phases/](docs/phases/) | Detalhamento por fase (5 fases) |
 | [docs/sprints/](docs/sprints/) | Escopo por sprint, tarefas, critérios de aceite (25 sprints) |
 | [docs/adr/](docs/adr/) | Architecture Decision Records (10 ADRs) |
@@ -48,17 +49,35 @@ Para apresentar ao cliente: `open utilar-ferragem/mockups/index.html` (ou sirva 
 
 ## Status
 
-**Fase 0 — Planejamento.** Nenhum código escrito. Plano de implementação completo redigido: **25 sprints** em **5 fases**, **10 ADRs**, **7 documentos de engenharia transversais** (dados, segurança, observabilidade, testes, infra, operações, lançamento) e um **deck visual de 7 telas**. Aguardando revisão + go/no-go.
+**Sprints 01–09 ✅ concluídos.** Frontend SPA completo + 2 serviços Go em operação local:
+
+- **[services/payment-service/](services/payment-service/)** — Mercado Pago (Pix/boleto/cartão) + webhooks + outbox (Sprint 08)
+- **[services/catalog-service/](services/catalog-service/)** — produtos, categorias, vendedores, imagens (Fase B1). [README do serviço](services/catalog-service/README.md), [API + endpoints](services/catalog-service/README.md#api).
+
+Frontend já plugado no `catalog-service` real via `VITE_CATALOG_URL`. Pedidos e autenticação ainda em modo mock.
+
+### Desenvolvimento — atalhos
+
+```bash
+make dev              # SPA em mock mode (sem backend)
+make dev-catalog      # infra + catalog-service + SPA (catálogo live)
+make dev-full         # infra + payment + catalog + SPA (tudo live)
+make test             # test suite do frontend (131 testes)
+make catalog-test     # testes do catalog-service (16 testes)
+make svc-test         # testes do payment-service
+```
+
+Gestão de banco (migrations, seed, reset, dumps): ver [docs/maintenance/database.md](docs/maintenance/database.md).
 
 ### Plano em resumo
 
-- **Fase 1 — Fundação** (Sprints 01–02): scaffold, design system, i18n
-- **Fase 2 — Catálogo** (Sprints 03–05): home, PDP com specs JSONB, busca + filtros
-- **Fase 3 — Comércio + lançamento** (Sprints 06–09, 22–25): carrinho, autenticação, checkout (Pix/boleto/cartão), pedidos, observabilidade, CI/CD, LGPD, lançamento
+- **Fase 1 — Fundação** (Sprints 01–02 ✅): scaffold, design system, i18n
+- **Fase 2 — Catálogo** (Sprints 03–05 ✅): home, PDP com specs JSONB, busca + filtros
+- **Fase 3 — Comércio + lançamento** (Sprints 06–09 ✅, 22–25): carrinho, autenticação, checkout (Pix/boleto/cartão), pedidos, observabilidade, CI/CD, LGPD, lançamento
 - **Fase 4 — Vertical de vendedores** (Sprints 10, 11, 14, 15, 20): onboarding, importação em massa, frete, disputas, console administrativo
 - **Fase 5 — Crescimento** (Sprints 12, 13, 16, 17, 18, 19, 21): avaliações, contas pro, suporte, upgrade de busca, PWA, recomendações, performance
 
-Tabela completa de sprints + dependências: [docs/05-roadmap.md](docs/05-roadmap.md).
+Tabela completa de sprints + dependências: [docs/05-roadmap.md](docs/05-roadmap.md). Rastreador ao vivo: [SPRINT.md](SPRINT.md).
 
 ## Plataforma pai
 

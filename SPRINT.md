@@ -4,7 +4,17 @@ Documento vivo que acompanha os sprints ativos e concluídos. Segue o padrão us
 
 ## Estado atual
 
-**Fase 3 — Comércio.** Sprints 01–09 concluídos. Sprint 10 (onboarding de vendedor) é o próximo.
+**Fase 3 — Comércio.** Sprints 01–09 concluídos + **Phase B1** (catalog-service real + SPA plugada) entregue em 2026-04-24. Próximo: Phase B2 (order-service) ou gate de lançamento (Sprint 22).
+
+### Fases fora do roadmap original
+
+Serviços backend reais criados fora da numeração de sprints (decisão arquitetural de 2026-04-24 — migração progressiva mock → live):
+
+| Phase | Escopo | Status |
+|---|---|---|
+| **B1** | catalog-service (Go + Postgres): products, categories, sellers, images + 111 seed rows + SPA plugada | ✅ Concluído |
+| **B2** | order-service (Go + Postgres): orders, order_items referenciando products.id | ⬜ Não iniciado |
+| **B3** | auth-service (Go + Postgres): users, addresses, JWT | ⬜ Não iniciado |
 
 ## Índice de sprints
 
@@ -79,3 +89,5 @@ Cada sprint termina com:
 **Sprint 08b — CheckoutPage SPA** (2026-04-20): usePayment hook (mock mode + polling real), PixPayment (QR + copia-e-cola + countdown + auto-confirm mock), BoletoPayment (barcode + aviso + vencimento), CardPayment (hosted drop-in + simulate sandbox), CheckoutPage (wizard 3 passos: endereço/frete/pagamento + sidebar resumo), OrderConfirmationPage (Pix/boleto/cartão), rotas `/checkout` (ProtectedRoute) e `/pedido/:id`. 89 testes passando (12 arquivos).
 
 **Sprint 09 — Histórico de pedidos + rastreio** (2026-04-23): mockOrders (4 pedidos: entregue/enviado/pago/aguardando), useOrders + useOrder hooks (mock mode), OrdersTab com filtros all/active/done, OrderDetailPage (timeline 5 passos, itens, endereço, pagamento, rastreamento, cancelar pedido, comprar novamente), i18n completo (orderStatus + orders.* em pt-BR e en). 117 testes passando (15 arquivos).
+
+**Phase B1 — catalog-service + SPA plugada** (2026-04-24): scaffold Go espelhando payment-service (cmd/server, internal/{config,db,handler,model}, migrations); 4 tabelas (categories, sellers, products, product_images) + ENUM + pg_trgm + triggers updated_at; seed com 111 produtos (31 reais dos mocks + 80 sintéticos) + 222 imagens + 11 sellers; endpoints `/api/v1/{categories,sellers,products,products/:slug,products/facets}` em `:8091`, CORS aberto para dev; JSON em camelCase matching direto com `app/src/types/product.ts`; hooks `useProducts`/`useProduct`/`useFacets` com switch mock/live via `VITE_CATALOG_URL`; docker-compose estendido (postgres-catalog :5436); 12 novos Makefile targets (`catalog-*`, `dev-catalog`); 16 testes Go (4 unit + 12 integration); docs: README do serviço + seção de migrations em database.md. 131 testes frontend passam em mock mode.
