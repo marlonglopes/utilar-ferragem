@@ -66,8 +66,23 @@ Base URL em dev: `http://localhost:8090`.
 | `GET`  | `/health` | liveness probe |
 | `POST` | `/api/v1/payments` | cria pagamento pending + chama Mercado Pago + retorna psp_payload (QR code / barcode / init_point) |
 | `GET`  | `/api/v1/payments/:id` | consulta status (scoped ao `user_id` do JWT) |
+| `POST` | `/api/v1/payments/:id/sync` | chama `mp.GetPayment` e atualiza status local — **workaround de webhook em dev** (sem ngrok). Em produção o webhook real substitui. Inclui comparação de `amount` MP vs DB (foundation da issue C3 do audit). |
 
 Middleware: `JWTMiddleware(JWT_SECRET)` decodifica `Authorization: Bearer <JWT>` emitido pelo [auth-service](../auth-service/README.md). Extrai `user_id` e `email` para injetar no contexto.
+
+### Payload do `POST /api/v1/payments`
+
+```json
+{
+  "order_id": "uuid-do-pedido",
+  "method": "pix" | "boleto" | "card",
+  "amount": 199.90,
+  "payer_cpf": "12345678901",   // opcional — OBRIGATÓRIO para method=boleto
+  "payer_name": "Nome completo" // opcional — OBRIGATÓRIO para method=boleto
+}
+```
+
+> **Nota (audit issues C1/C2):** `amount`, `order_id` e `payer_*` ainda vêm do cliente neste momento. Sprint 8.5 troca isso por propagação JWT → auth-service (CPF/nome) + order-service (amount/ownership). Ver [audit](../../docs/security/payment-service-audit-2026-04-24.md).
 
 ---
 
@@ -83,7 +98,19 @@ Middleware: `JWTMiddleware(JWT_SECRET)` decodifica `Authorization: Bearer <JWT>`
 | `MP_WEBHOOK_SECRET` | — | segredo para verificar HMAC dos webhooks |
 | `REDPANDA_BROKERS` | `localhost:19092` | brokers do Redpanda para publicar outbox |
 
-Em dev, o Makefile do serviço lê `MP_ACCESS_TOKEN` e `MP_PUBLIC_KEY` de `.env.local` na raiz do repo. Em produção, virá de AWS Secrets Manager.
+Em dev, o Makefile do serviço faz `include ../../.env.local` automaticamente — só criar o arquivo e rodar `make run`. Em produção, virá de AWS Secrets Manager.
+
+**Atenção ao sincronizar secrets em dev:** `JWT_SECRET` precisa ser idêntico em auth-service, order-service e payment-service — senão o JWT emitido pelo auth não valida nos outros. Exemplo funcional:
+
+```bash
+# Terminal 1: auth
+cd services/auth-service && JWT_SECRET="change-me-in-production" ./bin/auth-service
+
+# Terminal 2: payment
+cd services/payment-service && \
+  MP_ACCESS_TOKEN=... MP_PUBLIC_KEY=... JWT_SECRET="change-me-in-production" \
+  REDPANDA_BROKERS="localhost:19092" ./bin/payment-service
+```
 
 ---
 
@@ -113,6 +140,66 @@ make db-psql           # shell interativo
 make db-dump           # backups/payment_service_<ts>.sql
 make db-restore FILE=<path>
 ```
+
+---
+
+## Testando integração MP em dev
+
+**Status atual (2026-04-24):** Integração parcialmente validada em sandbox. Ver [docs/security/mp-integration-test-2026-04-24.md](../../docs/security/mp-integration-test-2026-04-24.md) para detalhes completos.
+
+| Método | Status sandbox | Como testar |
+|---|---|---|
+| **Cartão** | ✅ Funciona | Retorna `sandbox_init_point` do Checkout Pro |
+| **Pix direto** | 🟡 Bloqueado | MP requer onboarding da conta seller (não disponível em test users); workaround: migrar pra Preferences API |
+| **Boleto direto** | 🟡 Bloqueado | Mesma causa |
+
+### Smoke test rápido — Cartão
+
+```bash
+# 1. Login e pegar JWT
+TOKEN=$(curl -s -X POST http://localhost:8093/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"test1@utilar.com.br","password":"utilar123"}' \
+  | jq -r .accessToken)
+
+# 2. Criar payment cartão
+RESP=$(curl -s -X POST http://localhost:8090/api/v1/payments \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"order_id":"55555555-5555-4555-8555-555555555555","method":"card","amount":99.90}')
+
+echo "$RESP" | jq '.id, .status, .psp_payload.sandbox_init_point'
+```
+
+### Completar o checkout no navegador
+
+1. Abrir `sandbox_init_point` em **janela anônima** (evita conflito com sessão MP pessoal)
+2. Se pedir login, usar um **test user buyer** (criar via `POST https://api.mercadopago.com/users/test_user`)
+3. Ou continuar como convidado e preencher cartão de teste:
+
+| Bandeira | Número | CVV | Validade | Titular |
+|---|---|---|---|---|
+| Mastercard | `5031 4332 1540 6351` | `123` | `11/30` | `APRO` |
+| Visa | `4235 6477 2802 5682` | `123` | `11/30` | `APRO` |
+| Amex | `3753 651535 56885` | `1234` | `11/30` | `APRO` |
+
+Titular `APRO` = aprovado. Outras flags: `OTHE` (rejeitado genérico), `CONT` (pendente), `FUND` (saldo insuficiente), `SECU` (CVV inválido).
+
+### Erro comum: "Uma das partes é de teste"
+
+Aparece se você está logado no navegador com sua conta MP pessoal/produção + abrindo checkout de seller teste. Solução: **janela anônima** sem login, ou logar com test user buyer criado via API.
+
+### Sincronização de status (workaround webhook)
+
+Após o pagamento ser processado no MP sandbox, chame sync para trazer o status:
+
+```bash
+PAYMENT_ID="<id retornado no POST>"
+curl -X POST http://localhost:8090/api/v1/payments/$PAYMENT_ID/sync \
+  -H "Authorization: Bearer $TOKEN"
+# → { status: "confirmed", mp_status: "approved", mp_amount: 99.90, local_amount: 99.90, changed: true }
+```
+
+Em produção, webhook `POST /webhooks/mp` faz isso automaticamente quando MP notifica.
 
 ---
 
