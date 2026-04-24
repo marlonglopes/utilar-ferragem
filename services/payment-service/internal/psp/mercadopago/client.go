@@ -17,7 +17,7 @@ type Client struct {
 	http        *http.Client
 }
 
-func New(accessToken string) *Client {
+func NewClient(accessToken string) *Client {
 	return NewWithBaseURL(accessToken, defaultBaseURL)
 }
 

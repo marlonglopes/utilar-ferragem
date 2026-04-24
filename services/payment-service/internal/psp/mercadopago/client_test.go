@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/utilar/payment-service/internal/mercadopago"
+	"github.com/utilar/payment-service/internal/psp/mercadopago"
 )
 
 // newTestClient injects a test server URL by temporarily replacing the base URL.
@@ -97,7 +97,7 @@ func TestClientReturnsErrorOn4xx(t *testing.T) {
 
 // Verify Client struct has the expected exported methods (compile-time shape check).
 func TestClientInterface(t *testing.T) {
-	c := mercadopago.New("token")
+	c := mercadopago.NewClient("token")
 	typ := reflect.TypeOf(c)
 	methods := []string{"CreatePixPayment", "CreateBoleto", "GetPayment", "CreatePreference"}
 	for _, m := range methods {

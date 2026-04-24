@@ -13,8 +13,10 @@ import (
 	"github.com/utilar/payment-service/internal/config"
 	"github.com/utilar/payment-service/internal/db"
 	"github.com/utilar/payment-service/internal/handler"
-	"github.com/utilar/payment-service/internal/mercadopago"
 	"github.com/utilar/payment-service/internal/outbox"
+	"github.com/utilar/payment-service/internal/psp"
+	mpgateway "github.com/utilar/payment-service/internal/psp/mercadopago"
+	stripegateway "github.com/utilar/payment-service/internal/psp/stripe"
 )
 
 func main() {
@@ -39,7 +41,18 @@ func main() {
 	}
 	slog.Info("migrations applied")
 
-	mpClient := mercadopago.New(cfg.MPAccessToken)
+	// Select PSP gateway baseado em PSP_PROVIDER
+	var gateway psp.Gateway
+	switch cfg.PSPProvider {
+	case "stripe":
+		gateway = stripegateway.New(cfg.StripeSecretKey, cfg.StripeWebhookSecret)
+	case "mercadopago":
+		gateway = mpgateway.New(cfg.MPAccessToken, cfg.MPWebhookSecret)
+	default:
+		slog.Error("unknown PSP_PROVIDER", "provider", cfg.PSPProvider)
+		os.Exit(1)
+	}
+	slog.Info("psp gateway selected", "provider", gateway.Name())
 
 	drainer, err := outbox.NewDrainer(database, cfg.RedpandaBrokers)
 	if err != nil {
@@ -55,7 +68,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery(), handler.RequestID(), handler.AccessLog(), handler.CORS())
 
-	paymentH := handler.NewPaymentHandler(database, mpClient)
+	paymentH := handler.NewPaymentHandler(database, gateway)
 	webhookH := handler.NewWebhookHandler(database, cfg.MPWebhookSecret)
 
 	r.POST("/webhooks/mp", webhookH.HandleMercadoPago)

@@ -1,24 +1,27 @@
 package handler
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
+	"math"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/utilar/payment-service/internal/mercadopago"
 	"github.com/utilar/payment-service/internal/model"
+	"github.com/utilar/payment-service/internal/psp"
 )
 
 type PaymentHandler struct {
-	db  *sql.DB
-	mp  *mercadopago.Client
+	db      *sql.DB
+	gateway psp.Gateway
 }
 
-func NewPaymentHandler(db *sql.DB, mp *mercadopago.Client) *PaymentHandler {
-	return &PaymentHandler{db: db, mp: mp}
+func NewPaymentHandler(db *sql.DB, gateway psp.Gateway) *PaymentHandler {
+	return &PaymentHandler{db: db, gateway: gateway}
 }
 
 // Create handles POST /api/v1/payments
@@ -36,7 +39,7 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Insert payment row (pending)
+	// Insert payment row (pending) — ainda sem psp_payment_id
 	var paymentID string
 	err := h.db.QueryRow(`
 		INSERT INTO payments (order_id, user_id, method, amount)
@@ -49,49 +52,53 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Call Mercado Pago
-	var mpRaw json.RawMessage
-	var mpErr error
-
-	switch req.Method {
-	case model.MethodPix:
-		mpRaw, mpErr = h.mp.CreatePixPayment(req.OrderID, req.Amount, userEmail)
-	case model.MethodBoleto:
-		if req.PayerCPF == "" || req.PayerName == "" {
-			BadRequest(c, "boleto requires payer_cpf and payer_name")
-			return
-		}
-		mpRaw, mpErr = h.mp.CreateBoleto(req.OrderID, req.Amount, userEmail, req.PayerCPF, req.PayerName)
-	case model.MethodCard:
-		mpRaw, mpErr = h.mp.CreatePreference(req.OrderID, req.Amount, "Pedido UtiLar Ferragem")
-	default:
-		BadRequest(c, "unsupported method")
-		return
+	// Call PSP via Gateway abstraction
+	pspReq := psp.CreateRequest{
+		OrderID:        req.OrderID,
+		UserID:         userID,
+		Amount:         req.Amount,
+		Currency:       "BRL",
+		Method:         psp.PaymentMethod(req.Method),
+		PayerEmail:     userEmail,
+		PayerName:      req.PayerName,
+		PayerCPF:       req.PayerCPF,
+		IdempotencyKey: c.GetString("request_id"), // foundation de H1 — melhoraremos na Sprint 8.5
 	}
+	result, pspErr := h.gateway.CreatePayment(c.Request.Context(), pspReq)
 
-	if mpErr != nil {
-		slog.Error("create payment: mp call", "method", req.Method, "error", mpErr, "request_id", c.GetString("request_id"))
+	if pspErr != nil {
+		slog.Error("create payment: psp call",
+			"provider", h.gateway.Name(),
+			"method", req.Method,
+			"error", pspErr,
+			"request_id", c.GetString("request_id"))
 		h.db.Exec(`UPDATE payments SET status='failed', updated_at=now() WHERE id=$1`, paymentID)
-		BadGateway(c, "payment gateway error")
+
+		// Mapeia erro normalizado do PSP para HTTP
+		switch {
+		case errors.Is(pspErr, psp.ErrInvalidRequest):
+			BadRequest(c, pspErr.Error())
+		case errors.Is(pspErr, psp.ErrUpstream):
+			BadGateway(c, "payment gateway error")
+		default:
+			BadGateway(c, "payment gateway error")
+		}
 		return
 	}
 
-	// Extract MP payment ID from response
-	var mpResp struct {
-		ID string `json:"id"`
-	}
-	json.Unmarshal(mpRaw, &mpResp)
-
-	// Update payment row with PSP data
+	// Persiste o retorno do PSP
 	h.db.Exec(`
 		UPDATE payments SET psp_payment_id=$1, psp_payload=$2, updated_at=now() WHERE id=$3
-	`, mpResp.ID, mpRaw, paymentID)
+	`, result.PSPID, result.RawPayload, paymentID)
 
 	c.JSON(http.StatusCreated, gin.H{
-		"id":         paymentID,
-		"method":     req.Method,
-		"status":     "pending",
-		"psp_payload": mpRaw,
+		"id":           paymentID,
+		"method":       req.Method,
+		"status":       string(result.Status),
+		"provider":     h.gateway.Name(),
+		"psp_id":       result.PSPID,
+		"clientSecret": result.ClientSecret, // Stripe: frontend usa pra stripe.confirmPayment
+		"psp_payload":  result.ClientData,    // MP: QR/barcode/init_point; Stripe: PaymentIntent
 	})
 }
 
@@ -123,13 +130,12 @@ func (h *PaymentHandler) Get(c *gin.Context) {
 }
 
 // Sync handles POST /api/v1/payments/:id/sync
-// Chama MP.GetPayment e atualiza status local. Workaround do webhook em dev
-// (sem ngrok/URL pública). Em produção, o webhook faz esse trabalho.
-// Endpoint scopado ao user_id (não pode sincronizar payment alheio).
+// Chama PSP.GetPayment e atualiza status local. Workaround do webhook em dev.
+// Em produção, o webhook faz esse trabalho automaticamente.
+// Endpoint scopado ao user_id.
 //
-// NOTA DE SEGURANÇA (audit C3): Em dev, usamos este endpoint também como
-// verificação cruzada — se MP diz approved mas local diz pending, atualiza.
-// A validação de amount contra MP entra na Sprint 8.5 no webhook handler real.
+// NOTA DE SEGURANÇA (audit C3): também audita amount do PSP vs DB (foundation
+// do fix que vai no webhook handler na Sprint 8.5).
 func (h *PaymentHandler) Sync(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
@@ -153,42 +159,43 @@ func (h *PaymentHandler) Sync(c *gin.Context) {
 		return
 	}
 
-	// Fetch MP
-	mpRaw, err := h.mp.GetPayment(pspID.String)
+	// Fetch from PSP (qualquer provider)
+	pspResult, err := h.gateway.GetPayment(c.Request.Context(), pspID.String)
 	if err != nil {
-		slog.Error("sync: mp get", "error", err, "psp_id", pspID.String, "request_id", c.GetString("request_id"))
-		BadGateway(c, "mp gateway error")
+		slog.Error("sync: psp get",
+			"provider", h.gateway.Name(),
+			"error", err,
+			"psp_id", pspID.String,
+			"request_id", c.GetString("request_id"))
+		BadGateway(c, "psp gateway error")
 		return
 	}
 
-	var mpResp struct {
-		Status            string  `json:"status"`
-		TransactionAmount float64 `json:"transaction_amount"`
-		ID                int64   `json:"id"`
-	}
-	if err := json.Unmarshal(mpRaw, &mpResp); err != nil {
-		InternalError(c, "could not parse mp response")
-		return
-	}
-
-	// Amount validation (foundation de C3 — já usamos aqui porque sync
-	// é manual e audita MP contra DB; webhook real vai fazer o mesmo).
-	if localAmount > 0 && (mpResp.TransactionAmount-localAmount) > 0.01 || (localAmount-mpResp.TransactionAmount) > 0.01 {
+	// Amount validation (foundation de C3)
+	if localAmount > 0 && math.Abs(pspResult.Amount-localAmount) > 0.01 {
 		slog.Warn("sync: amount mismatch",
-			"local", localAmount, "mp", mpResp.TransactionAmount,
-			"psp_id", pspID.String, "request_id", c.GetString("request_id"))
+			"local", localAmount,
+			"psp", pspResult.Amount,
+			"provider", h.gateway.Name(),
+			"psp_id", pspID.String,
+			"request_id", c.GetString("request_id"))
 	}
 
+	// Mapeia status normalizado do PSP pro status local
 	newStatus := currentStatus
 	var confirmedAt *time.Time
-	switch mpResp.Status {
-	case "approved":
+	switch pspResult.Status {
+	case psp.StatusApproved:
 		newStatus = "confirmed"
 		now := time.Now()
 		confirmedAt = &now
-	case "rejected", "cancelled":
+	case psp.StatusRejected:
 		newStatus = "failed"
-	case "pending", "in_process":
+	case psp.StatusCancelled:
+		newStatus = "cancelled"
+	case psp.StatusExpired:
+		newStatus = "expired"
+	case psp.StatusPending, psp.StatusAuthorized:
 		newStatus = "pending"
 	}
 
@@ -203,11 +210,16 @@ func (h *PaymentHandler) Sync(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":          id,
-		"status":      newStatus,
-		"mp_status":   mpResp.Status,
-		"mp_amount":   mpResp.TransactionAmount,
+		"id":           id,
+		"status":       newStatus,
+		"psp_status":   string(pspResult.Status),
+		"psp_amount":   pspResult.Amount,
 		"local_amount": localAmount,
-		"changed":     newStatus != currentStatus,
+		"provider":     h.gateway.Name(),
+		"changed":      newStatus != currentStatus,
 	})
 }
+
+// Compile-time guard — silence unused import if ctx not needed in future.
+var _ = json.RawMessage(nil)
+var _ = context.Background
