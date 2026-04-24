@@ -15,6 +15,7 @@ Serviços backend reais criados fora da numeração de sprints (decisão arquite
 | **B1** | catalog-service (Go + Postgres): products, categories, sellers, images + 111 seed rows + SPA plugada + endpoint `related` | ✅ Concluído |
 | **B2** | order-service (Go + Postgres): orders, order_items, shipping_addresses, tracking_events + 60 seed + SPA plugada | ✅ Concluído |
 | **B3** | auth-service (Go + Postgres): users, addresses, argon2id, JWT HS256, refresh tokens + 20 seed users + SPA plugada + order-service aceitando JWT | ✅ Concluído |
+| **8.5** | **Payment Hardening** — 5 críticas + 5 altas do [audit 2026-04-24](docs/security/payment-service-audit-2026-04-24.md) — **BLOQUEIA PROD** | 🚧 A iniciar após testes sandbox MP |
 
 ### Polish transversal (2026-04-24)
 

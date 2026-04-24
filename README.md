@@ -28,6 +28,7 @@ Inspiração / referência de branding: [@utilar_ferragens no Instagram](https:/
 | [docs/13-launch-checklist.md](docs/13-launch-checklist.md) | Linha do tempo T-minus, jurídico, SEO, e-mail, marketing |
 | [docs/14-infra-custos.md](docs/14-infra-custos.md) | Infraestrutura mínima, custos por fase, domínio, AWS, SES, Mercado Pago, observabilidade |
 | [docs/maintenance/database.md](docs/maintenance/database.md) | Postgres local (payment + catalog + order + auth): migrations, seed, reset, dumps, comandos `make db-*`, `make catalog-db-*`, `make order-db-*`, `make auth-db-*` |
+| [docs/security/payment-service-audit-2026-04-24.md](docs/security/payment-service-audit-2026-04-24.md) | ⛔ **Audit de segurança do payment-service** — 5 vulnerabilidades críticas, plano de remediação Sprint 8.5 (BLOQUEIA prod) |
 | [docs/phases/](docs/phases/) | Detalhamento por fase (5 fases) |
 | [docs/sprints/](docs/sprints/) | Escopo por sprint, tarefas, critérios de aceite (25 sprints) |
 | [docs/adr/](docs/adr/) | Architecture Decision Records (10 ADRs) |

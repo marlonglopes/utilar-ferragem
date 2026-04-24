@@ -7,7 +7,7 @@ Serviço de pagamentos do marketplace Utilar Ferragem — integra Mercado Pago (
 | **Stack** | Go 1.26 + Gin 1.12 + Postgres 17 + Mercado Pago SDK + Redpanda (franz-go) |
 | **Porta** | `:8090` |
 | **DB** | `utilar_payment_db` (Postgres em `localhost:5435`) |
-| **Status** | Sprint 08 ✅ em operação + polish transversal (request-id + error envelope + JWT compartilhado) |
+| **Status** | Sprint 08 ✅ em operação em dev/sandbox. ⛔ **BLOQUEADO para produção** — ver [audit 2026-04-24](../../docs/security/payment-service-audit-2026-04-24.md) (Sprint 8.5 pendente) |
 
 Documentação transversal:
 - [README raiz](../../README.md)
