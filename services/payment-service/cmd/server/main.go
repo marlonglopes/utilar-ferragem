@@ -64,6 +64,7 @@ func main() {
 	{
 		api.POST("/payments", paymentH.Create)
 		api.GET("/payments/:id", paymentH.Get)
+		api.POST("/payments/:id/sync", paymentH.Sync)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

@@ -41,6 +41,13 @@ type CreatePaymentRequest struct {
 	OrderID string        `json:"order_id" binding:"required,uuid"`
 	Method  PaymentMethod `json:"method" binding:"required,oneof=pix boleto card"`
 	Amount  float64       `json:"amount" binding:"required,gt=0"`
+
+	// Boleto requires payer identification (MP rejects without CPF).
+	// Pix and card accept these but don't require. Validação no handler.
+	// NOTE: audit C1/C2 — essa info continua vindo do cliente em dev;
+	// Sprint 8.5 troca por propagação JWT → auth-service para evitar tamper.
+	PayerCPF  string `json:"payer_cpf,omitempty"`
+	PayerName string `json:"payer_name,omitempty"`
 }
 
 // PSPPayload is the response sent back to the SPA per payment method

@@ -1,10 +1,16 @@
 export PATH := $(PATH):$(HOME)/go/bin
 
+# Carrega .env.local da raiz do repo (gitignored) se existir.
+# Formato esperado: KEY=value (um por linha, # pra comentário).
+ENV_FILE := ../../.env.local
+ifneq (,$(wildcard $(ENV_FILE)))
+    include $(ENV_FILE)
+    export
+endif
+
 .PHONY: run build test test-integration infra-up infra-down tidy
 
 run:
-	MP_ACCESS_TOKEN=$$(grep MP_ACCESS_TOKEN ../../.env.local | cut -d= -f2) \
-	MP_PUBLIC_KEY=$$(grep MP_PUBLIC_KEY ../../.env.local | cut -d= -f2) \
 	go run ./cmd/server
 
 build:
