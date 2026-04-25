@@ -4,8 +4,11 @@
 |---|---|
 | **Escopo** | Validar payment-service com abstração `psp.Gateway` + Stripe como primeiro provider |
 | **Status** | 🟢 **Cartão + Boleto funcionais fim-a-fim** 🟡 **Pix precisa de 1 clique no dashboard Stripe** |
-| **Credenciais** | `sk_test_51TPoFv...` (test mode Stripe) |
+| **Credenciais (atual)** | `sk_test_51TQFpi...` — conta `acct_1TQFpiLQCtijFcSY` (country=BR, currency=brl) |
+| **Credenciais (descartadas)** | `sk_test_51TPoFv...` — conta `acct_1TPoFvBjqYCOj3YA` (non-BR, sem suporte a Pix mesmo após ativação) |
 | **Arquitetura** | Payment-service agora é PSP-agnóstico via `internal/psp/Gateway` |
+
+> **Histórico das credenciais:** Em 2026-04-24 testamos com uma conta Stripe non-BR — boleto/cartão funcionaram (são universais), Pix bloqueado por country. Em 2026-04-25 o user criou nova conta com country=Brazil. Mesma situação para Pix (precisa ativar no dashboard) — diferença é que agora o link de ativação é específico da conta `acct_1TQFpi`.
 
 ---
 
@@ -213,10 +216,15 @@ Para Pix/Boleto, renderizar o `next_action` in-page (QR code SVG, PDF embed, cop
 
 ### 5.2 Ativar Pix no dashboard Stripe (**para o Marlon fazer**)
 
-1. https://dashboard.stripe.com/account/payments/settings
-2. Procurar "Pix" na lista (está dentro da categoria "Wallet" ou "Additional")
+URL específica da conta BR atual:
+👉 https://dashboard.stripe.com/acct_1TQFpiLQCtijFcSY/settings/payment_methods
+
+1. Abrir a URL acima
+2. Procurar "Pix" na lista (está dentro de "Wallet" ou "Local payment methods - Brazil")
 3. Clicar "Turn on" / "Ativar"
 4. Rodar o teste da §4.3 novamente — deve retornar 201 com QR code
+
+> **Observação importante:** mesmo com conta BR (country=BR confirmado via `GET /v1/account`), Stripe mantém Pix como "preview feature" que precisa ser ativado por merchant. A mensagem de erro do Stripe vem com o link direto pra ativar — DX pontiaguda.
 
 ### 5.3 Webhook via Stripe CLI (~5min)
 
