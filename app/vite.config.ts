@@ -13,6 +13,16 @@ export default defineConfig({
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
-    env: { VITE_API_URL: '' },
+    // Force mock mode em testes — testes legacy (useOrders, OrdersTab, OrderDetailPage,
+    // LoginPage, RegisterPage) assumem `is*Enabled === false`. Sem esse override,
+    // valores presentes no .env.local vazariam pra dentro do test e quebrariam o
+    // branch mock dos hooks.
+    env: {
+      VITE_API_URL: '',
+      VITE_CATALOG_URL: '',
+      VITE_ORDER_URL: '',
+      VITE_AUTH_URL: '',
+      VITE_STRIPE_PUBLISHABLE_KEY: '',
+    },
   },
 })

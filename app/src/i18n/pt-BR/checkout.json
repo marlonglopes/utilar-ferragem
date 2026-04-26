@@ -78,7 +78,16 @@
     "title": "Cartão de crédito ou débito",
     "hosted": "Você será redirecionado para o ambiente seguro do Mercado Pago para inserir os dados do cartão.",
     "proceed": "Ir para pagamento seguro",
-    "simulate": "Simular aprovação (sandbox)"
+    "simulate": "Simular aprovação (sandbox)",
+    "secure": "Pagamento seguro processado pela Stripe. Os dados do cartão nunca passam pelos nossos servidores.",
+    "pay": "Pagar {{amount}}",
+    "processing": "Processando...",
+    "authenticating": "Autenticando com seu banco...",
+    "loadError": "Não foi possível carregar o formulário de pagamento. Tente novamente."
+  },
+  "boletoStripe": {
+    "downloadHosted": "Visualizar boleto",
+    "downloadPdf": "Baixar PDF do boleto"
   },
   "order": {
     "summary": "Resumo do pedido",

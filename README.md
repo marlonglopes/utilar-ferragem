@@ -52,12 +52,12 @@ Para apresentar ao cliente: `open utilar-ferragem/mockups/index.html` (ou sirva 
 
 **Sprints 01–09 ✅ concluídos.** Frontend SPA completo + **4 serviços Go** em operação local, **zero mocks no backend**:
 
-- **[payment-service](services/payment-service/README.md)** — Mercado Pago (Pix/boleto/cartão) + webhooks + outbox (Sprint 08, porta :8090)
+- **[payment-service](services/payment-service/README.md)** — abstração `psp.Gateway` plugável (Stripe ✅ / Mercado Pago ✅) + webhooks + outbox (Sprint 08, porta :8090)
 - **[catalog-service](services/catalog-service/README.md)** — produtos, categorias, vendedores, imagens (Fase B1, porta :8091)
 - **[order-service](services/order-service/README.md)** — pedidos, items, endereços, tracking (Fase B2, porta :8092)
 - **[auth-service](services/auth-service/README.md)** — users, addresses, argon2id, JWT HS256 (Fase B3, porta :8093)
 
-Frontend plugado em todos os serviços via `VITE_AUTH_URL`, `VITE_CATALOG_URL`, `VITE_ORDER_URL`, `VITE_API_URL`. **Operação fim-a-fim real:** login → catálogo → carrinho → pedido → pagamento.
+Frontend plugado em todos os serviços via `VITE_AUTH_URL`, `VITE_CATALOG_URL`, `VITE_ORDER_URL`, `VITE_API_URL` + `VITE_STRIPE_PUBLISHABLE_KEY` (Stripe Elements no checkout). **Operação fim-a-fim real:** login → catálogo → carrinho → pedido → pagamento (cartão confirmado in-app via `<PaymentElement>`, sem redirect).
 
 ### Desenvolvimento — atalhos
 
@@ -65,11 +65,11 @@ Frontend plugado em todos os serviços via `VITE_AUTH_URL`, `VITE_CATALOG_URL`, 
 make dev              # SPA em mock mode (sem backend)
 make dev-catalog      # infra + catalog-service + SPA (catálogo live)
 make dev-full         # infra + payment + catalog + order + auth + SPA (tudo live)
-make test             # test suite do frontend (131 testes)
+make test             # test suite do frontend (152 testes — inclui Stripe Elements)
 make auth-test        # testes do auth-service (22 testes)
 make catalog-test     # testes do catalog-service (16 testes)
 make order-test       # testes do order-service (8 testes)
-make svc-test         # testes do payment-service
+make svc-test         # testes do payment-service (PSP gateway + Stripe + MP)
 ```
 
 Login em dev: `test1@utilar.com.br` / `utilar123` (ver [auth seed](services/auth-service/README.md#seed) para a lista completa de 20 users).

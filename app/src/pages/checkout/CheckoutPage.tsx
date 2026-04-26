@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Check, ChevronRight, Loader2, Plus } from 'lucide-react'
@@ -416,21 +416,39 @@ function PaymentStep({
   onPaymentCreated: (paymentId: string, method: PaymentMethod) => void
 }) {
   const { t } = useTranslation('checkout')
-  const { result, error, createPayment, simulateConfirm } = usePayment()
+  const { result, error, createPayment, simulateConfirm, markConfirmed, markFailed } = usePayment()
   const [method, setMethod] = useState<PaymentMethod>('pix')
+  const [payerCPF, setPayerCPF] = useState('')
+  const [payerName, setPayerName] = useState('')
 
   const pixTotal = +(total * 0.95).toFixed(2)
   const displayTotal = method === 'pix' ? pixTotal : total
 
+  // Boleto requer CPF + nome (Stripe rejeita sem isso). Validação simples client-side.
+  const boletoReady = method !== 'boleto' || (
+    payerCPF.replace(/\D/g, '').length === 11 && payerName.trim().length >= 3
+  )
+
   async function handleConfirm() {
-    const res = await createPayment(orderId, method, displayTotal)
-    if (res) {
+    const extras = method === 'boleto'
+      ? { payer_cpf: payerCPF.replace(/\D/g, ''), payer_name: payerName.trim() }
+      : undefined
+    const res = await createPayment(orderId, method, displayTotal, extras)
+    if (!res) return
+    // Pix/Boleto: navega imediatamente pra página de status (poll continua lá ou aqui).
+    // Card: NÃO navega — aguarda Stripe Elements confirmar via onConfirmed.
+    if (method === 'pix' || method === 'boleto') {
       onPaymentCreated(res.paymentId, method)
     }
   }
 
   async function handleRegenerate() {
     await createPayment(orderId, method, displayTotal)
+  }
+
+  function handleStripeConfirmed() {
+    markConfirmed()
+    if (result) onPaymentCreated(result.paymentId, method)
   }
 
   if (result && result.status !== 'creating') {
@@ -447,7 +465,10 @@ function PaymentStep({
         {method === 'card' && (
           <CardPayment
             result={result}
+            amount={displayTotal}
             onSimulateConfirm={!isApiEnabled ? simulateConfirm : undefined}
+            onConfirmed={handleStripeConfirmed}
+            onFailed={(msg) => markFailed(msg)}
           />
         )}
       </div>
@@ -493,10 +514,30 @@ function PaymentStep({
         </p>
       )}
 
+      {method === 'boleto' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label="CPF do pagador"
+            value={payerCPF}
+            onChange={(e) => setPayerCPF(e.target.value)}
+            placeholder="000.000.000-00"
+            maxLength={14}
+            required
+          />
+          <Input
+            label="Nome completo"
+            value={payerName}
+            onChange={(e) => setPayerName(e.target.value)}
+            placeholder="Como no documento"
+            required
+          />
+        </div>
+      )}
+
       <button
         onClick={handleConfirm}
-        disabled={result?.status === 'creating'}
-        className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-wait"
+        disabled={result?.status === 'creating' || !boletoReady}
+        className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {result?.status === 'creating' ? (
           <>
@@ -581,7 +622,10 @@ export default function CheckoutPage() {
   const shippingCost = shipping?.price ?? 0
   const total = subtotal + shippingCost
 
-  const orderId = `order-${Date.now()}`
+  // UUID v4 estável durante a sessão de checkout — backend exige formato UUID.
+  // Quando order-service estiver no fluxo, troca por orderId real do POST /orders.
+  const orderIdRef = useRef<string>(crypto.randomUUID())
+  const orderId = orderIdRef.current
 
   const handleAddressDone = useCallback((addr: Address) => {
     setAddress(addr)

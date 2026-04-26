@@ -82,6 +82,29 @@ Middleware: `JWTMiddleware(JWT_SECRET)` decodifica `Authorization: Bearer <JWT>`
 }
 ```
 
+### Resposta `201 Created`
+
+```json
+{
+  "id": "uuid-pagamento-local",
+  "method": "card",
+  "status": "pending",
+  "provider": "stripe",                      // stripe | mercadopago
+  "psp_id": "pi_3TQa8WLQCtijFcSY12pJyBht",
+  "clientSecret": "pi_..._secret_...",       // Stripe Elements (frontend confirma sem PCI scope)
+  "psp_payload": {                           // dados normalizados pro frontend
+    "type": "card" | "pix" | "boleto",
+    "client_secret": "...",
+    "next_action": { "pix_display_qr_code": {...} | "boleto_display_details": {...} }
+  }
+}
+```
+
+- **Card (Stripe):** frontend usa `clientSecret` em `<PaymentElement>` + `stripe.confirmPayment()`.
+- **Pix (Stripe):** `next_action.pix_display_qr_code.data` (copy-paste) + `image_url_png`.
+- **Boleto (Stripe):** `next_action.boleto_display_details.hosted_voucher_url` (HTML imprimível) + `pdf` + `number` (linha digitável).
+- **Card (MP):** `psp_payload.init_point` (URL do Checkout Pro — redirect).
+
 > **Nota (audit issues C1/C2):** `amount`, `order_id` e `payer_*` ainda vêm do cliente neste momento. Sprint 8.5 troca isso por propagação JWT → auth-service (CPF/nome) + order-service (amount/ownership). Ver [audit](../../docs/security/payment-service-audit-2026-04-24.md).
 
 ---
@@ -277,6 +300,34 @@ Mercado Pago   payment-service             payments_outbox   Redpanda   order-se
 
 ## Próximos passos
 
+- **Webhook genérico `/webhooks/:provider`** — handler usando `Gateway.VerifyWebhook` + `ParseWebhookEvent`. Roda `stripe listen --forward-to localhost:8090/webhooks/stripe` em dev pra promover `pending → confirmed` automaticamente.
+- **Sprint 8.5 — Hardening** — endereçar 5 CRITICAL + 5 HIGH do [audit](../../docs/security/payment-service-audit-2026-04-24.md): tamper de amount, ownership, validação de amount no webhook, fail-closed quando webhook secret ausente.
 - **Sprint 15** — disputas/estornos: endpoints `POST /payments/:id/refund`, webhook `chargeback.*`.
 - **Sprint 22** — métricas Prometheus em `/metrics`, Sentry SDK, alertas payment_success_rate < 95%.
 - **order-service integration** — quando `payment.confirmed` chega no Redpanda, order-service consome e atualiza `orders.status` + `paid_at`. (hoje o drainer publica mas ninguém consome ainda.)
+
+---
+
+## Stripe Elements no frontend (SPA)
+
+A SPA confirma cartão **sem redirect** usando Stripe Elements (`<PaymentElement>`).
+- Backend cria `PaymentIntent` e retorna `clientSecret`.
+- Frontend monta `<Elements stripe={stripePromise} options={{ clientSecret }}>` e chama `stripe.confirmPayment({ redirect: 'if_required' })`.
+- PCI scope: SAQ-A — campos sensíveis vivem dentro do iframe Stripe.
+
+Configuração rápida na SPA (`app/.env.local`):
+
+```bash
+VITE_API_URL=http://localhost:8090
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...   # mesma conta do STRIPE_SECRET_KEY do backend
+```
+
+Cartões de teste (qualquer data futura, qualquer CVC):
+- `4242 4242 4242 4242` — sucesso
+- `4000 0000 0000 0002` — recusado
+- `4000 0025 0000 3155` — exige 3DS
+
+Componentes:
+- [`app/src/lib/stripe.ts`](../../app/src/lib/stripe.ts) — singleton `loadStripe()`.
+- [`app/src/pages/checkout/CardPayment.tsx`](../../app/src/pages/checkout/CardPayment.tsx) — Elements + `confirmPayment`.
+- [`app/src/hooks/usePayment.ts`](../../app/src/hooks/usePayment.ts) — parser branchando por `provider` (stripe|mercadopago|mock).

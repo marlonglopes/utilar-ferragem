@@ -78,7 +78,16 @@
     "title": "Credit or debit card",
     "hosted": "You will be redirected to Mercado Pago's secure environment to enter your card details.",
     "proceed": "Go to secure payment",
-    "simulate": "Simulate approval (sandbox)"
+    "simulate": "Simulate approval (sandbox)",
+    "secure": "Secure payment processed by Stripe. Card details never touch our servers.",
+    "pay": "Pay {{amount}}",
+    "processing": "Processing...",
+    "authenticating": "Authenticating with your bank...",
+    "loadError": "Could not load the payment form. Please try again."
+  },
+  "boletoStripe": {
+    "downloadHosted": "View bank slip",
+    "downloadPdf": "Download PDF"
   },
   "order": {
     "summary": "Order summary",

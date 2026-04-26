@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy, Check, Download, AlertTriangle } from 'lucide-react'
+import { Copy, Check, Download, AlertTriangle, ExternalLink } from 'lucide-react'
 import type { PaymentResult } from '@/hooks/usePayment'
 
 interface Props {
@@ -65,6 +65,19 @@ export default function BoletoPayment({ result }: Props) {
         </p>
       )}
 
+      {/* Hosted voucher (Stripe-only): página completa do boleto pra impressão */}
+      {result.hostedVoucherUrl && (
+        <a
+          href={result.hostedVoucherUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm transition-colors"
+        >
+          <ExternalLink className="h-4 w-4" />
+          {t('boletoStripe.downloadHosted')}
+        </a>
+      )}
+
       {/* PDF download */}
       {result.pdfUrl && result.pdfUrl !== '#' && (
         <a
@@ -74,7 +87,7 @@ export default function BoletoPayment({ result }: Props) {
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors self-start"
         >
           <Download className="h-4 w-4" />
-          {t('boleto.download')}
+          {result.hostedVoucherUrl ? t('boletoStripe.downloadPdf') : t('boleto.download')}
         </a>
       )}
     </div>

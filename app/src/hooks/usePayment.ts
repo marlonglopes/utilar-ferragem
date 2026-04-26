@@ -4,11 +4,16 @@ import { useAuthStore } from '@/store/authStore'
 
 export type PaymentMethod = 'pix' | 'boleto' | 'card'
 export type PaymentStatus = 'idle' | 'creating' | 'pending' | 'confirmed' | 'failed' | 'expired'
+export type PaymentProvider = 'stripe' | 'mercadopago' | 'mock'
 
 export interface PaymentResult {
   paymentId: string
+  pspId?: string
+  provider: PaymentProvider
   method: PaymentMethod
   status: PaymentStatus
+  // Stripe (card+pix+boleto): client_secret pra stripe.confirmPayment / Elements
+  clientSecret?: string
   // Pix
   qrCodeBase64?: string
   copyPaste?: string
@@ -16,8 +21,9 @@ export interface PaymentResult {
   // Boleto
   barCode?: string
   pdfUrl?: string
+  hostedVoucherUrl?: string
   boletoExpiresAt?: Date
-  // Card
+  // Card (MP-only redirect)
   initPoint?: string
 }
 
@@ -26,9 +32,10 @@ const MOCK_PIX_CODE = '00020126360014BR.GOV.BCB.PIX0114+551199999000052040000530
 const MOCK_BOLETO = '34191.09008 09133.610947 91020.150008 1 00010000012345'
 
 function mockPixResult(orderId: string): PaymentResult {
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 min
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
   return {
     paymentId: `mock-pay-${orderId}`,
+    provider: 'mock',
     method: 'pix',
     status: 'pending',
     qrCodeBase64: MOCK_PIX_QR,
@@ -38,9 +45,10 @@ function mockPixResult(orderId: string): PaymentResult {
 }
 
 function mockBoletoResult(orderId: string): PaymentResult {
-  const boletoExpiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3 days
+  const boletoExpiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
   return {
     paymentId: `mock-pay-${orderId}`,
+    provider: 'mock',
     method: 'boleto',
     status: 'pending',
     barCode: MOCK_BOLETO,
@@ -52,18 +60,69 @@ function mockBoletoResult(orderId: string): PaymentResult {
 function mockCardResult(orderId: string): PaymentResult {
   return {
     paymentId: `mock-pay-${orderId}`,
+    provider: 'mock',
     method: 'card',
     status: 'pending',
     initPoint: '#',
   }
 }
 
-function parseApiResult(raw: Record<string, unknown>, method: PaymentMethod): PaymentResult {
+interface ApiPaymentResponse {
+  id: string
+  psp_id?: string
+  provider?: PaymentProvider
+  method: PaymentMethod
+  status: string
+  clientSecret?: string
+  // Stripe: ClientData JSON com next_action; MP: payload bruto.
+  psp_payload?: Record<string, unknown> | null
+}
+
+function parseStripeResult(raw: ApiPaymentResponse, method: PaymentMethod): PaymentResult {
+  const clientData = (raw.psp_payload ?? {}) as Record<string, unknown>
+  const nextAction = (clientData.next_action ?? {}) as Record<string, unknown>
+
+  const result: PaymentResult = {
+    paymentId: raw.id,
+    pspId: raw.psp_id,
+    provider: 'stripe',
+    method,
+    status: 'pending',
+    clientSecret: raw.clientSecret ?? (clientData.client_secret as string | undefined),
+  }
+
+  if (method === 'pix') {
+    const pixDisplay = (nextAction.pix_display_qr_code ?? {}) as Record<string, unknown>
+    result.qrCodeBase64 = pixDisplay.image_url_png as string | undefined // Stripe entrega URL
+    result.copyPaste = pixDisplay.data as string | undefined
+    const expiresAt = pixDisplay.expires_at as number | undefined
+    result.expiresAt = expiresAt
+      ? new Date(expiresAt * 1000)
+      : new Date(Date.now() + 15 * 60 * 1000)
+  }
+  if (method === 'boleto') {
+    const boletoDisplay = (nextAction.boleto_display_details ?? {}) as Record<string, unknown>
+    result.barCode = boletoDisplay.number as string | undefined
+    result.pdfUrl = boletoDisplay.pdf as string | undefined
+    result.hostedVoucherUrl = boletoDisplay.hosted_voucher_url as string | undefined
+    const expiresAt = boletoDisplay.expires_at as number | undefined
+    result.boletoExpiresAt = expiresAt
+      ? new Date(expiresAt * 1000)
+      : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+  }
+  // card: confirmPayment do Elements usa só clientSecret
+
+  return result
+}
+
+function parseMercadoPagoResult(raw: ApiPaymentResponse, method: PaymentMethod): PaymentResult {
   const psp = (raw.psp_payload ?? {}) as Record<string, unknown>
   const txData = ((psp.point_of_interaction as Record<string, unknown> | undefined)?.transaction_data ?? {}) as Record<string, unknown>
 
   const result: PaymentResult = {
-    paymentId: raw.id as string,
+    paymentId: raw.id,
+    pspId: raw.psp_id,
+    provider: 'mercadopago',
     method,
     status: 'pending',
   }
@@ -85,6 +144,12 @@ function parseApiResult(raw: Record<string, unknown>, method: PaymentMethod): Pa
   }
 
   return result
+}
+
+function parseApiResult(raw: ApiPaymentResponse, method: PaymentMethod): PaymentResult {
+  const provider = raw.provider ?? 'stripe' // backend default é stripe
+  if (provider === 'mercadopago') return parseMercadoPagoResult(raw, method)
+  return parseStripeResult(raw, method)
 }
 
 export function usePayment() {
@@ -109,7 +174,6 @@ export function usePayment() {
     pollCountRef.current = 0
 
     if (!isApiEnabled) {
-      // Mock: auto-confirm after 6s in dev
       pollingRef.current = setInterval(() => {
         pollCountRef.current++
         if (pollCountRef.current >= 2) {
@@ -137,7 +201,7 @@ export function usePayment() {
           setResult((prev) => prev ? { ...prev, status: 'failed' } : prev)
         }
       } catch {
-        // transient error — keep polling
+        // transient — keep polling
       }
     }, 3000)
   }, [token, stopPolling])
@@ -146,13 +210,16 @@ export function usePayment() {
     orderId: string,
     method: PaymentMethod,
     amount: number,
+    extras?: { payer_cpf?: string; payer_name?: string },
   ) => {
     setError('')
-    setResult((prev) => prev ? { ...prev, status: 'creating' } : { paymentId: '', method, status: 'creating' })
+    setResult((prev) => prev
+      ? { ...prev, status: 'creating' }
+      : { paymentId: '', provider: 'mock', method, status: 'creating' })
 
     try {
       if (!isApiEnabled) {
-        await new Promise((r) => setTimeout(r, 600)) // simulate latency
+        await new Promise((r) => setTimeout(r, 600))
         let mock: PaymentResult
         if (method === 'pix') mock = mockPixResult(orderId)
         else if (method === 'boleto') mock = mockBoletoResult(orderId)
@@ -162,14 +229,15 @@ export function usePayment() {
         return mock
       }
 
-      const data = await apiPost<Record<string, unknown>>(
+      const data = await apiPost<ApiPaymentResponse>(
         '/api/v1/payments',
-        { order_id: orderId, method, amount },
+        { order_id: orderId, method, amount, ...(extras ?? {}) },
         token ?? undefined,
       )
       const parsed = parseApiResult(data, method)
       setResult(parsed)
-      if (method === 'pix') startPolling(parsed.paymentId)
+      // Pix/Boleto: poll. Card-Stripe: confirma via Elements (frontend marca confirmed manualmente).
+      if (method === 'pix' || method === 'boleto') startPolling(parsed.paymentId)
       return parsed
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao criar pagamento'
@@ -183,5 +251,31 @@ export function usePayment() {
     setResult((prev) => prev ? { ...prev, status: 'confirmed' } : prev)
   }, [stopPolling])
 
-  return { result, error, createPayment, simulateConfirm, stopPolling }
+  // Marca como pendente — usado depois de stripe.confirmPayment retornar succeeded.
+  // O webhook vai promover pra confirmed real, mas o frontend pode mostrar feedback otimista.
+  const markPending = useCallback(() => {
+    setResult((prev) => prev ? { ...prev, status: 'pending' } : prev)
+  }, [])
+
+  const markConfirmed = useCallback(() => {
+    stopPolling()
+    setResult((prev) => prev ? { ...prev, status: 'confirmed' } : prev)
+  }, [stopPolling])
+
+  const markFailed = useCallback((msg?: string) => {
+    stopPolling()
+    if (msg) setError(msg)
+    setResult((prev) => prev ? { ...prev, status: 'failed' } : prev)
+  }, [stopPolling])
+
+  return {
+    result,
+    error,
+    createPayment,
+    simulateConfirm,
+    markPending,
+    markConfirmed,
+    markFailed,
+    stopPolling,
+  }
 }
