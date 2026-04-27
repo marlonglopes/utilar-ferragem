@@ -2,7 +2,7 @@
 
 **Última atualização**: 2026-04-27
 
-Documento vivo do trabalho de segurança restante. CRITICALs estão todos fechados; este doc rastreia HIGHs e MEDIUMs por ordem de impacto + esforço.
+Documento vivo do trabalho de segurança restante. CRITICALs estão todos fechados; este doc rastreia HIGHs e MEDIUMs por ordem de impacto + esforço, e organiza os HIGHs em **4 bundles de trabalho** prontos pra execução em sequência.
 
 ---
 
@@ -11,7 +11,7 @@ Documento vivo do trabalho de segurança restante. CRITICALs estão todos fechad
 | Categoria | Aberto | Fechado |
 |---|---:|---:|
 | CRITICAL | **0** ✅ | 14 (audit completo + Sprint 8.5 Fase 1) |
-| HIGH | 12 | 7 |
+| HIGH | 11 | 8 |
 | MEDIUM | 18 | 4 |
 | LOW | 14 | 0 |
 
@@ -21,99 +21,129 @@ Ver detalhes em:
 
 ---
 
-## HIGH ainda em aberto (12)
+## Plano de execução — Sprint 8.5 Fase 2 (~19h, 2.5 dias)
 
-Ordenados por impacto. Esforço total: **~22h**.
+Os 11 HIGHs em aberto agrupados em 4 bundles pelo eixo dependência/coesão. Cada bundle pode ser um PR independente, na ordem proposta abaixo (de menor pra maior risco de regressão).
 
-### 1. Rate limiting (~6h, precisa Redis)
+### Bundle 1 — Quick wins isolados (~3h, sem dependências)
 
-Atinge: payment, auth, catalog.
+Pequenos fixes pontuais, baixo risco, alto sinal-pra-ruído. Fazer primeiro pra reduzir surface de ataque enquanto bundles maiores são planejados.
 
-- **payment H4** — `/payments`: 10/min/user (anti order-bomb)
-- **auth A6-H2** — `/verify-email`, `/reset-password`, `/login`, `/forgot-password`: 5/min/IP
-- **catalog CT1-H1** — `/products` (especialmente search com `q`): 100/min/IP
+| ID | Serviço | Issue | Esforço | Fix |
+|---|---|---|---:|---|
+| **O2-H4** | order | Order number sequencial enumerável | 1h | `crypto/rand` 8 chars base32 em vez de `UnixNano()%100000` (mantém prefix de ano) |
+| **CT1-H4** | catalog | Slug GET timing attack | 1h | Pad fixo de ~50ms via `time.Sleep(50ms - elapsed)` na resposta |
+| **A9-H5** | auth | Forgot-password timing-safe | 30min | Jitter artificial fixo quando email não encontrado |
+| **H2** | payment | JWT claims tipadas | 1h | Extrair `auth.Claims` struct pra pacote shared ou redefinir local; trocar `jwt.MapClaims` cru por struct tipada |
+| **H5** | payment | MaxBytesReader em `POST /payments` | 30min | `c.Request.Body = http.MaxBytesReader(...)` antes do bind (já feito no webhook) |
 
-Implementação: middleware `RateLimit(reqs, window)` baseado em token bucket no Redis (`go-redis/redis/v9`). Chave: `rl:{endpoint}:{user_id_or_ip}`.
+**Validação**: testes unitários novos pra cada (timing-safe verifiable; entropy de order number; etc).
 
-### 2. Idempotency-Key em `POST /payments` (~3h)
+### Bundle 2 — Rate limiting + Idempotency-Key via Redis (~9h)
 
-Audit **payment H1**. Cliente que retransmite (network blip) cria pagamento duplicado e cobra 2x.
+Maior PR. Adiciona dependência **Redis** ao projeto. Resolve 4 HIGHs num só pacote (todos compartilham infra).
 
-Fix: middleware lê header `Idempotency-Key`, faz hash, busca em Redis. Se hit → retorna response cached. Se miss → processa + salva response com TTL 24h.
+**Setup (~2h)**:
+- Adicionar `redis` ao `docker-compose.yml`
+- `go get github.com/redis/go-redis/v9`
+- Helper `internal/ratelimit/limiter.go` (token bucket no Redis, key=`rl:{endpoint}:{key}`)
+- Helper `internal/idempotency/store.go` (hash → response com TTL 24h)
+- Config: `REDIS_URL` env var em `auth/order/catalog/payment`
 
-### 3. Token hashing pra refresh/reset/verify (~3h, precisa migration)
+**Aplicação dos middlewares (~7h)**:
 
-Audit **auth A7-H3, M3, M4**. Tokens em plaintext no DB → se DB vaza, atacante reseta qualquer conta / impersona qualquer sessão.
+| ID | Serviço | Endpoint | Limite | Esforço |
+|---|---|---|---|---:|
+| **A6-H2** | auth | `/auth/login` | 5/min/IP | 30min |
+| | auth | `/auth/forgot-password` | 5/min/IP | 30min |
+| | auth | `/auth/reset-password` | 5/min/IP | 30min |
+| | auth | `/auth/verify-email` | 10/min/IP | 30min |
+| **CT1-H1** | catalog | `/products` (search) | 100/min/IP | 1h |
+| **H4** | payment | `/payments` | 10/min/user | 1h |
+| **H1** | payment | `/payments` | `Idempotency-Key` middleware (separado do rate limit) | 3h |
 
-Fix:
-1. Migration: adicionar coluna `token_hash` em `refresh_tokens`, `password_reset_tokens`, `email_verification_tokens`. Backfill com SHA-256 dos tokens existentes. Drop coluna `token` em migration separada (rollback-safe).
-2. Handlers: hash do token antes de SELECT/UPDATE. Constant-time compare.
+**Validação**:
+- Tests integration: 11ª req em janela retorna 429
+- Tests integration: segundo POST `/payments` com mesma `Idempotency-Key` retorna response cached do primeiro
+- Smoke test fim-a-fim com Redis rodando
 
-### 4. Cross-service price validation (~3h, order→catalog)
+### Bundle 3 — Cross-service price validation (~3h)
 
-Audit **order O2-H5**. Hoje cliente envia `unitPrice` no body do `POST /orders` — backend confia. Atacante pode forjar pedido com `unitPrice: 0.01`.
+Resolve **O2-H5**. Aproveita o fato de que agora o order-service precisa chamar catalog (segundo caller cross-service depois do payment→order) — bom momento pra **extrair** `internal/orderclient/` do payment pra `pkg/serviceclient/` shared.
 
-Fix: order-service passa a chamar catalog-service via `GET /products/:id` (com cache) e usa `product.price` autoritativo. Padrão idêntico ao orderclient do payment.
+**Etapas**:
+1. (~1h) Extrair `payment-service/internal/orderclient/` → `pkg/serviceclient/order/` (shared) e `payment-service/internal/orderclient/` vira thin wrapper
+2. (~1h) Criar `pkg/serviceclient/catalog/` espelhando o pattern (`Get(ctx, productID, jwt)`) — sem JWT propagation aqui (catalog é público)
+3. (~1h) `OrderHandler.Create` consulta catalog antes de aceitar `unitPrice` do body; usa `product.price` autoritativo. Logs warning se diverge. Mesma pattern do payment vs order
 
-### 5. Order number não-sequencial (~1h)
+**Validação**: testes integration que tentam tampering com `unitPrice` e verificam que o pedido fica com preço autoritativo do catalog.
 
-Audit **order O2-H4**. `2026-12345` é enumerável, vaza volume de pedidos.
+### Bundle 4 — Token hashing migration (~3h)
 
-Fix: trocar por `2026-` + 8 chars random base32 (`crypto/rand`). Mantém prefix de ano pra debugging.
+Resolve **A7-H3** (e MEDIUMs A12, A13 por consequência). Maior risco operacional dos 4 bundles porque envolve migration + backfill + zero-downtime deploy.
 
-### 6. Forgot-password timing-safe (~1h)
+**Etapas**:
 
-Audit **auth A9-H5**. Endpoint diferente em latência se email existe vs não → enumeration.
+1. (~30min) Migration `add_token_hash`:
+   ```sql
+   ALTER TABLE refresh_tokens ADD COLUMN token_hash TEXT;
+   ALTER TABLE password_reset_tokens ADD COLUMN token_hash TEXT;
+   ALTER TABLE email_verification_tokens ADD COLUMN token_hash TEXT;
+   CREATE UNIQUE INDEX idx_refresh_token_hash ON refresh_tokens(token_hash) WHERE token_hash IS NOT NULL;
+   -- idem outras
+   ```
 
-Fix: adicionar jitter artificial fixo (~50ms) com `time.Sleep` quando email não encontrado.
+2. (~30min) Backfill SQL:
+   ```sql
+   UPDATE refresh_tokens SET token_hash = encode(digest(token, 'sha256'), 'base64') WHERE token_hash IS NULL;
+   ```
+   (Requer extension `pgcrypto`. Se não tiver, fazer backfill em Go.)
 
-### 7. CORS whitelist em produção (~30min, **fechado em 2026-04-27**)
+3. (~1h30min) Handlers:
+   - `Refresh`/`Logout`: hash o token recebido e compara com `token_hash` (substitui SELECT atual por `WHERE token_hash = $1`)
+   - `VerifyEmail`/`ResetPassword`: idem
+   - Constant-time compare via `subtle.ConstantTimeCompare`
 
-✅ **Concluído**: 4 services agora aceitam `ALLOWED_ORIGINS=https://a.com,https://b.com`. Vazio = wildcard (dev).
+4. (~30min) Migration de drop da coluna `token` (em PR separado, após confirmar que nada lê `token` direto):
+   ```sql
+   ALTER TABLE refresh_tokens DROP COLUMN token;
+   ```
 
-### 8. Security headers transversais (~30min, **fechado em 2026-04-27**)
-
-✅ **Concluído**: `SecurityHeaders()` middleware em 4 services. Adiciona CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy.
-
-### 9. Tokens logados condicional ao DEV_MODE (auth, ~15min, **fechado em 2026-04-27**)
-
-✅ **Concluído**: `slog.Info("...token...")` em `Register`/`ForgotPassword` agora gated por `cfg.DevMode`.
-
-### 10. JWT alg lock pra HS256 exato (~15min)
-
-Audit **auth A16-M7**. Atualmente aceita qualquer HMAC. Se library default mudar, pode aceitar HS512 com chave HS256 → confusão de algorítmos.
-
-Fix: validar `t.Method.Alg() == "HS256"` em vez de só `*jwt.SigningMethodHMAC`.
-
-### 11. JWT claims tipadas no payment (~1h)
-
-Audit **payment H2**. Hoje payment usa `jwt.MapClaims` cru — possível bug se claims mudarem no auth.
-
-Fix: extrair `auth.Claims` struct do auth-service pra um pacote shared (ou redefinir no payment).
-
-### 12. MaxBytesReader em endpoints (~30min)
-
-Audit **payment H5**. Adicionar `io.LimitReader` em todos os `c.Request.Body` reads.
-
-Fix: middleware genérico `BodyLimit(64*1024)` que envolve `c.Request.Body` antes do bind. Já está aplicado no webhook do payment.
+**Validação**:
+- Testes unitários do hashing (constant-time)
+- Testes integration: registrar → login → /refresh com token hashado funciona
+- Backup do DB antes do deploy de prod (rollback path conhecido)
 
 ---
 
-## MEDIUM em aberto (~18)
+## Ordem de execução recomendada
 
-Resumo (impacto menor, fila orgânica):
+1. **Bundle 1** (~3h) — Quick wins. Sem risco de regressão, fecha 5 HIGHs imediato.
+2. **Bundle 2** (~9h) — Redis. Maior PR mas autocontido. Exige `docker-compose up redis` em dev.
+3. **Bundle 3** (~3h) — Cross-service price. Refactor do orderclient + cliente novo pro catalog.
+4. **Bundle 4** (~3h) — Token hashing. Última coisa porque é a mais arriscada (DB migration).
+
+**Total**: ~19h. Distribuição sugerida: 2.5 dias dedicados, ou 4–5 sessões de ~4h.
+
+Após Bundle 4, **payment-service e auth-service estão em estado de produção saudável**: 0 CRITICAL, 0 HIGH abertos. Restam apenas MEDIUM/LOW (hardening orgânico, sem urgência).
+
+---
+
+## MEDIUM em aberto (~18, ~10h total)
+
+Tratados após HIGHs. Ordem orgânica baseada em ROI:
 
 - **auth A10-M1** — validação de CPF (algoritmo de check digit) — 30min
-- **auth A12-M3** — email verification tokens em plaintext — engloba HIGH #3
-- **auth A14-M5** — cleanup automático de tokens expirados via job/cron — 1h
-- **auth A15-M6** — complexidade mínima de senha (10 chars min, blacklist top-passwords) — 1h
+- **auth A14-M5** — cleanup automático de tokens expirados via cron/job — 1h
+- **auth A15-M6** — complexidade mínima de senha (10 chars + blacklist top-passwords) — 1h
+- **auth A16-M7** — JWT alg lock pra HS256 exato (evita confusão de algorítmos) — 15min
 - **catalog CT1-M1** — limite no número de filtros simultâneos — 30min
-- **catalog CT1-M4** — RequestID via UUID v4 (precisa ULID lib ou `github.com/google/uuid`) — 1h
-- **catalog CT1-M5, L1** — CHECK constraints no schema (`stock >= 0`, `price >= 0`) — 30min (migration)
-- **order O3-M3** — rate limit em create order — engloba HIGH #1
+- **catalog CT1-M4** — RequestID via UUID v4 (UUID lib ou ULID) — 1h
+- **catalog CT1-M5, L1** — CHECK constraints no schema (`stock >= 0`, `price >= 0`) — 30min
+- **order O3-M3** — rate limit em create order — engloba HIGH Bundle 2
 - **order O3-M4** — pessimistic locking em cancel pra evitar TOCTOU — 1h
 - **payment M2** — redactor PII em `psp_payload` — 2h
-- **payment M5** — redactor PII em logs de acesso — 1h
+- **payment M5** — redactor PII em logs — 1h
 - **payment M6** — buscar CPF do auth-service pro boleto — 30min (depois do auth client)
 - **(transversal) M11** — request_id via ULID em todos os 4 services — 1h
 
@@ -121,29 +151,38 @@ Resumo (impacto menor, fila orgânica):
 
 ## LOW em aberto (14)
 
-Backlog orgânico, sem urgência:
-
-- audit logging tables, slug enumeration, govulncheck no CI, circuit breaker, SAST (gosec), dependabot, container scanning, etc.
+Backlog orgânico, sem urgência: audit logging tables, slug enumeration, govulncheck no CI, circuit breaker, SAST (gosec), dependabot, container scanning, etc.
 
 ---
 
-## Como abrir issues no GitHub
+## Como abrir issues no GitHub (sugestão)
 
-Sugiro 4 issues principais (HIGHs agrupados por tema):
-
-1. **Rate limiting + Idempotency-Key** (Sprint 8.5 Fase 2 — esforço ~9h, precisa Redis)
-2. **Token hashing migration** (audit A7-H3 — esforço ~3h, precisa migration deploy)
-3. **Cross-service price validation** (audit O2-H5 — esforço ~3h)
-4. **Forgot-password timing + JWT alg lock + claims tipadas** (HIGH miscellaneous — ~3h)
-
-E 1 issue agrupando MEDIUMs como "Hardening operacional Sprint 22".
-
-Comando sugerido:
+4 issues principais (1 por bundle):
 
 ```bash
-gh issue create --title "Security: rate limiting + idempotency-key" \
-  --body "$(cat docs/security/security-roadmap.md | head -50)" \
-  --label security,sprint-8.5
+gh issue create --title "[Sprint 8.5 Fase 2] Bundle 1: HIGH quick wins (5 fixes, ~3h)" \
+  --label security,sprint-8.5,high \
+  --body "Ver docs/security/security-roadmap.md#bundle-1"
+
+gh issue create --title "[Sprint 8.5 Fase 2] Bundle 2: Redis — Rate limit + Idempotency-Key (~9h)" \
+  --label security,sprint-8.5,high,infra \
+  --body "Ver docs/security/security-roadmap.md#bundle-2"
+
+gh issue create --title "[Sprint 8.5 Fase 2] Bundle 3: Cross-service price validation (~3h)" \
+  --label security,sprint-8.5,high \
+  --body "Ver docs/security/security-roadmap.md#bundle-3"
+
+gh issue create --title "[Sprint 8.5 Fase 2] Bundle 4: Token hashing migration (~3h)" \
+  --label security,sprint-8.5,high,migration \
+  --body "Ver docs/security/security-roadmap.md#bundle-4"
+```
+
+Plus 1 issue agrupando MEDIUMs:
+
+```bash
+gh issue create --title "[Sprint 22] Hardening operacional — 18 MEDIUMs do audit" \
+  --label security,sprint-22,medium \
+  --body "Ver docs/security/security-roadmap.md#medium-em-aberto-18-10h-total"
 ```
 
 ---
@@ -152,4 +191,7 @@ gh issue create --title "Security: rate limiting + idempotency-key" \
 
 Já cumprido (CRITICAL block clear) — **payment-service tecnicamente desbloqueado** em 2026-04-27.
 
-Para tráfego significativo (> 10 reqs/min de pagamento real), recomenda-se também HIGH #1 (rate limit) + HIGH #2 (idempotency) antes do go-live.
+Recomendação prática:
+- **Dev/staging**: pode rodar como está (CRITICALs fechados, transversais hardened).
+- **Prod com tráfego < 10 reqs/min de pagamento real**: rodar Bundle 1 antes (3h).
+- **Prod com tráfego significativo ou MP em produção real**: completar Bundles 1–4 (19h) antes do go-live.
