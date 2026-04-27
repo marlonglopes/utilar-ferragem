@@ -224,13 +224,30 @@ func (h *OrderHandler) Get(c *gin.Context) {
 }
 
 // Cancel PATCH /api/v1/orders/:id/cancel
+//
+// SEGURANÇA (audit O3-M4): pessimistic locking via SELECT FOR UPDATE.
+// Sem o lock, dois cancels concorrentes (ou cancel + webhook avançando status)
+// poderiam ler o mesmo status, ambos passar pela validação, e gerar tracking
+// events duplicados ou racing entre cancel e paid. Com FOR UPDATE, o segundo
+// fica em wait até o primeiro commitar e relê o status atualizado.
 func (h *OrderHandler) Cancel(c *gin.Context) {
 	userID := c.GetString("user_id")
 	id := c.Param("id")
 
-	// Carrega + valida estado
+	// Toda a leitura + validação + UPDATE acontece dentro da MESMA transação,
+	// com FOR UPDATE travando a row do pedido. Quem chegar segundo bloqueia.
+	tx, err := h.db.Begin()
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	defer tx.Rollback()
+
 	var status string
-	err := h.db.QueryRow("SELECT status FROM orders WHERE id=$1 AND user_id=$2", id, userID).Scan(&status)
+	err = tx.QueryRow(
+		`SELECT status FROM orders WHERE id=$1 AND user_id=$2 FOR UPDATE`,
+		id, userID,
+	).Scan(&status)
 	if err == sql.ErrNoRows {
 		NotFound(c, "order not found")
 		return
@@ -240,18 +257,13 @@ func (h *OrderHandler) Cancel(c *gin.Context) {
 		return
 	}
 
-	// Só pode cancelar se ainda não saiu para entrega
+	// Só pode cancelar se ainda não saiu para entrega.
+	// Com FOR UPDATE, o status lido é o "real" — concorrente não consegue
+	// cancelar duas vezes nem cancelar pedido que virou shipped no meio do caminho.
 	if status == "shipped" || status == "delivered" || status == "cancelled" {
 		Conflict(c, fmt.Sprintf("cannot cancel order in status %q", status))
 		return
 	}
-
-	tx, err := h.db.Begin()
-	if err != nil {
-		DBError(c, err)
-		return
-	}
-	defer tx.Rollback()
 
 	if _, err := tx.Exec(`
 		UPDATE orders SET status='cancelled', cancelled_at=now() WHERE id=$1 AND user_id=$2

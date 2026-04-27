@@ -323,6 +323,28 @@ func (h *ProductHandler) Related(c *gin.Context) {
 
 // -- helpers -----------------------------------------------------------------
 
+// CT1-M1: caps por filtro pra prevenir DoS via query string absurda
+// (ILIKE em string de 100KB queima CPU mesmo com escape).
+const (
+	maxFilterQ        = 100 // termo de busca (typed)
+	maxFilterCategory = 64  // slug
+	maxFilterBrand    = 64  // nome de marca
+	maxFilterSort     = 32  // string de sort (já tem whitelist)
+)
+
+// truncateRunes corta a string mantendo os primeiros N runes (não bytes).
+// Evita explodir caracteres UTF-8 multibyte no meio.
+func truncateRunes(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n])
+}
+
 type productsQuery struct {
 	Category string
 	Q        string
@@ -345,12 +367,14 @@ func parseProductsQuery(c *gin.Context) productsQuery {
 		perPage = 24
 	}
 
+	// CT1-M1: trunca cada filtro pra um cap sensato. Cap > limite humano (q=100
+	// chars já é uma frase longa) mas << que payload abusivo.
 	q := productsQuery{
-		Category: c.Query("category"),
-		Q:        strings.TrimSpace(c.Query("q")),
-		Brand:    c.Query("brand"),
+		Category: truncateRunes(c.Query("category"), maxFilterCategory),
+		Q:        truncateRunes(strings.TrimSpace(c.Query("q")), maxFilterQ),
+		Brand:    truncateRunes(c.Query("brand"), maxFilterBrand),
 		InStock:  c.Query("in_stock") == "true",
-		Sort:     c.Query("sort"),
+		Sort:     truncateRunes(c.Query("sort"), maxFilterSort),
 		Page:     page,
 		PerPage:  perPage,
 	}

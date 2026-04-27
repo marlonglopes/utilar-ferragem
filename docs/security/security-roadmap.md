@@ -1,8 +1,8 @@
-# Security Roadmap — pós Sprint 8.5 Fase 2
+# Security Roadmap — pós Sprint 8.5 + MEDIUMs
 
-**Última atualização**: 2026-04-27 (Bundles 1+2+3+4 fechados)
+**Última atualização**: 2026-04-27 (todos MEDIUMs explícitos fechados)
 
-Documento vivo do trabalho de segurança. CRITICALs e HIGHs zerados; agora rastreia apenas MEDIUMs (hardening orgânico) e LOWs (backlog).
+Documento vivo do trabalho de segurança. CRITICALs, HIGHs e MEDIUMs prioritários zerados; restam apenas LOWs (backlog orgânico).
 
 ---
 
@@ -12,7 +12,7 @@ Documento vivo do trabalho de segurança. CRITICALs e HIGHs zerados; agora rastr
 |---|---:|---:|
 | CRITICAL | **0** ✅ | 14 (audit completo + Sprint 8.5 Fase 1) |
 | HIGH     | **0** ✅ | 19 (8 audit + 11 Sprint 8.5 Fase 2) |
-| MEDIUM   | 18       | 4 |
+| MEDIUM   | **0** ✅ | 18 (4 + 14 desta sessão) |
 | LOW      | 14       | 0 |
 
 Ver detalhes em:
@@ -112,23 +112,46 @@ Resolveu **A7-H3**. Migração single-shot (pre-launch, sem dados reais) — sub
 
 ---
 
-## MEDIUM em aberto (~18, ~10h total)
+## MEDIUMs ✅ FECHADOS (2026-04-27)
 
-Tratados após HIGHs. Ordem orgânica baseada em ROI:
+Executados em 3 fases após bundles de HIGHs:
 
-- **auth A10-M1** — validação de CPF (algoritmo de check digit) — 30min
-- **auth A14-M5** — cleanup automático de tokens expirados via cron/job — 1h
-- **auth A15-M6** — complexidade mínima de senha (10 chars + blacklist top-passwords) — 1h
-- **auth A16-M7** — JWT alg lock pra HS256 exato (evita confusão de algorítmos) — 15min
-- **catalog CT1-M1** — limite no número de filtros simultâneos — 30min
-- **catalog CT1-M4** — RequestID via UUID v4 (UUID lib ou ULID) — 1h
-- **catalog CT1-M5, L1** — CHECK constraints no schema (`stock >= 0`, `price >= 0`) — 30min
-- **order O3-M3** — rate limit em create order — engloba HIGH Bundle 2
-- **order O3-M4** — pessimistic locking em cancel pra evitar TOCTOU — 1h
-- **payment M2** — redactor PII em `psp_payload` — 2h
-- **payment M5** — redactor PII em logs — 1h
-- **payment M6** — buscar CPF do auth-service pro boleto — 30min (depois do auth client)
-- **(transversal) M11** — request_id via ULID em todos os 4 services — 1h
+### Fase 1 — Quick wins (~2.5h)
+
+| ID | Serviço | Fix |
+|---|---|---|
+| **A16-M7** | auth+order+payment | JWT alg lock estrito em HS256 (`t.Method.Alg() != HS256`) — anti algorithm confusion |
+| **O3-M1** | order | Items array já tinha `max=100,dive` (regressão test adicionado) |
+| **O3-M3** | order | Rate limit `POST /orders` 20/min/user via Redis |
+| **CT1-M5/L1** | catalog | Migration 002 com CHECK constraints (`price>=0`, `stock>=0`, etc.) |
+| **M6** | payment | Novo `authclient` busca CPF/Name de `/api/v1/me` pro boleto (não confia no body) |
+
+### Fase 2 — Hardening operacional (~4h)
+
+| ID | Serviço | Fix |
+|---|---|---|
+| **A10-M1** | auth | Validação CPF (mod-11 check digit) em Register; rejeita inválidos e CPFs com dígitos iguais |
+| **A15-M6** | auth | Complexidade de senha: 10+ chars, 3 de 4 categorias, blacklist top-passwords (incl. pt-BR) |
+| **A14-M5** | auth | `StartTokenCleanup()` goroutine apaga refresh/reset/verify tokens expirados a cada 1h |
+| **CT1-M1** | catalog | Truncate de filtros (`q`/`brand`/`category`) com `truncateRunes` (UTF-8 safe) — anti-DoS via query |
+| **O3-M4** | order | `SELECT ... FOR UPDATE` em Cancel — pessimistic lock previne TOCTOU |
+
+### Fase 3 — Compliance/PII + cleanup (~3h)
+
+| ID | Serviço | Fix |
+|---|---|---|
+| **M1** | payment | Removido código morto `verifyHMAC` + `resolveStatus` (legacy MP); `webhook_unit_test.go` deletado |
+| **M2** | payment | `redactPSPPayload()` mascara PAN/CVC/CPF/identification em `psp_payload` antes do INSERT (mantém last4 + IDs) |
+| **M5** | payment | `redactLogValue()` aplicado em `Respond()` — mascara emails, CPFs e PANs em mensagens de erro |
+| **M11+CT1-M4** | transversal | Novo `pkg/requestid` com ULID (k-sortable, 26 chars) substitui `newRequestID()` em 4 serviços |
+
+**Testes adicionados nesta sessão**:
+- `cpf_test.go`, `password_test.go`, `cleanup_test.go` (auth)
+- `redact_test.go`, `redactlog_test.go`, `authclient/client_test.go` (payment)
+- `order_itemscap_test.go` (order — regressão)
+- `pkg/requestid/requestid_test.go` (4 casos: formato, distinct, k-sortable, concorrência)
+- Migration `002_check_constraints.up.sql` (catalog)
+- Migration `002` validada no DB local (rejeita `price=-10`)
 
 ---
 

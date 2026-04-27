@@ -18,6 +18,9 @@ type Config struct {
 	// criar pagamento (audit C1, C2). O JWT do cliente é propagado.
 	OrderServiceURL string
 
+	// AuthServiceURL é usado pra buscar CPF/name pro boleto (audit M6).
+	AuthServiceURL string
+
 	// PSP selector — qual provider usar.
 	// Valores: "stripe" (recomendado em dev + test mode robusto)
 	//          "mercadopago" (prod BR quando merchant onboarded)
@@ -65,6 +68,7 @@ func Load() (*Config, error) {
 		DevMode:         devMode,
 		AllowedOrigins:  parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		OrderServiceURL: env("ORDER_SERVICE_URL", "http://localhost:8092"),
+		AuthServiceURL:  env("AUTH_SERVICE_URL", "http://localhost:8093"),
 		PSPProvider:     provider,
 
 		StripeSecretKey:      os.Getenv("STRIPE_SECRET_KEY"),

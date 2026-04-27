@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/utilar/pkg/requestid"
 )
 
 // RequestIDHeader é o header padrão de correlação entre serviços.
@@ -17,7 +18,7 @@ func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.GetHeader(RequestIDHeader)
 		if id == "" {
-			id = newRequestID()
+			id = requestid.New()
 		}
 		c.Set("request_id", id)
 		c.Header(RequestIDHeader, id)
@@ -86,17 +87,3 @@ func SecurityHeaders() gin.HandlerFunc {
 	}
 }
 
-// -- helpers -----------------------------------------------------------------
-
-// newRequestID cria um ID curto baseado em timestamp nano (suficiente para dev/log correlation).
-// Em produção, considerar UUID v4 ou ULID — vem na Sprint 22.
-func newRequestID() string {
-	const hex = "0123456789abcdef"
-	n := time.Now().UnixNano()
-	buf := make([]byte, 16)
-	for i := 15; i >= 0; i-- {
-		buf[i] = hex[n&0xf]
-		n >>= 4
-	}
-	return string(buf)
-}

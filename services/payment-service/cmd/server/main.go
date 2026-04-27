@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/utilar/payment-service/internal/authclient"
 	"github.com/utilar/payment-service/internal/config"
 	"github.com/utilar/payment-service/internal/db"
 	"github.com/utilar/payment-service/internal/handler"
@@ -81,8 +82,10 @@ func main() {
 
 	// Cliente HTTP pra order-service (audit C1, C2 — server-side amount/ownership).
 	orderC := orderclient.New(cfg.OrderServiceURL)
+	// M6: cliente pro auth-service pra buscar CPF do boleto.
+	authC := authclient.New(cfg.AuthServiceURL)
 
-	paymentH := handler.NewPaymentHandler(database, gateway, orderC, cfg.DevMode)
+	paymentH := handler.NewPaymentHandler(database, gateway, orderC, authC, cfg.DevMode)
 	webhookH := handler.NewWebhookHandler(database, gateway)
 
 	// Webhook endpoint provider-agnostic. O `:provider` precisa bater com

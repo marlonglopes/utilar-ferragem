@@ -44,6 +44,11 @@ func main() {
 	authH := handler.NewAuthHandler(database, cfg)
 	addrH := handler.NewAddressHandler(database)
 
+	// A14-M5: cleanup periódico de tokens expirados (refresh, reset, verify).
+	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
+	defer cleanupCancel()
+	handler.StartTokenCleanup(cleanupCtx, database)
+
 	// A6-H2: rate limiter via Redis. Em dev sem REDIS_URL, mid noop (limiters nil-safe).
 	var loginRL, forgotRL, resetRL, verifyRL gin.HandlerFunc
 	if cfg.RedisURL != "" {

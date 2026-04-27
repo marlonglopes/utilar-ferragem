@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/utilar/pkg/requestid"
 )
 
 const RequestIDHeader = "X-Request-Id"
@@ -16,7 +17,7 @@ func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.GetHeader(RequestIDHeader)
 		if id == "" {
-			id = newRequestID()
+			id = requestid.New()
 		}
 		c.Set("request_id", id)
 		c.Header(RequestIDHeader, id)
@@ -25,6 +26,11 @@ func RequestID() gin.HandlerFunc {
 }
 
 // AccessLog emite uma linha JSON por requisição.
+//
+// SEGURANÇA (M5): logamos `c.FullPath()` (route pattern, ex `/payments/:id`)
+// em vez de `c.Request.URL.Path` (path real com IDs). Isso evita PII em
+// agregadores de log. Query string NÃO é logada por padrão; se for adicionar
+// no futuro, passe por redactLogValue() primeiro.
 func AccessLog() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -83,13 +89,3 @@ func SecurityHeaders() gin.HandlerFunc {
 	}
 }
 
-func newRequestID() string {
-	const hex = "0123456789abcdef"
-	n := time.Now().UnixNano()
-	buf := make([]byte, 16)
-	for i := 15; i >= 0; i-- {
-		buf[i] = hex[n&0xf]
-		n >>= 4
-	}
-	return string(buf)
-}

@@ -18,10 +18,7 @@
 package handler
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -134,13 +131,15 @@ func (h *WebhookHandler) processEvent(
 	defer tx.Rollback()
 
 	// Idempotency — duas tentativas do mesmo (provider, payment, event) são no-op.
+	// M2: armazenamos o webhook payload com PII redacted.
+	redactedRaw := redactPSPPayload(rawPayload)
 	var webhookID string
 	err = tx.QueryRow(`
 		INSERT INTO webhook_events (psp_id, psp_payment_id, event_type, raw_payload)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (psp_id, psp_payment_id, event_type) DO NOTHING
 		RETURNING id
-	`, provider, event.PSPID, event.EventType, rawPayload).Scan(&webhookID)
+	`, provider, event.PSPID, event.EventType, []byte(redactedRaw)).Scan(&webhookID)
 	if err == sql.ErrNoRows {
 		// Já processado — ACK silencioso
 		return tx.Commit()
@@ -273,32 +272,3 @@ func mapPSPStatus(s psp.PaymentStatus) string {
 	}
 }
 
-// -- Legacy helpers — preservados pros testes unitários antigos. ----------------
-
-// verifyHMAC implementa HMAC-SHA256 simples sobre o body — formato genérico que
-// não é mais usado em produção (cada Gateway implementa seu próprio formato via
-// VerifyWebhook). Fica aqui só pra compatibilidade do webhook_unit_test.go.
-//
-// Deprecated: use psp.Gateway.VerifyWebhook em vez disso.
-func verifyHMAC(payload []byte, signature, secret string) bool {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(payload)
-	expected := hex.EncodeToString(mac.Sum(nil))
-	return hmac.Equal([]byte(expected), []byte(signature))
-}
-
-// resolveStatus mapeia ações antigas do MP pra status. Mantido pra compat
-// dos testes unitários existentes — produção usa mapPSPStatus + Gateway.
-//
-// Deprecated: use mapPSPStatus.
-func resolveStatus(action string) (string, *time.Time) {
-	switch action {
-	case "payment.updated":
-		now := time.Now()
-		return "confirmed", &now
-	case "payment.created":
-		return "pending", nil
-	default:
-		return "failed", nil
-	}
-}

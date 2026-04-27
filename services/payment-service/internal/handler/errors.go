@@ -20,7 +20,9 @@ func Respond(c *gin.Context, status int, code, msg string) {
 		"request_id", reqID,
 		"status", status,
 		"code", code,
-		"error", msg,
+		// M5: redactLogValue mascara email/CPF/PAN que possam vazar em msgs
+		// de erro (ex: erro de bind validation com payload que inclui email).
+		"error", redactLogValue(msg),
 		"path", c.FullPath(),
 	)
 	c.JSON(status, ErrorEnvelope{Error: msg, Code: code, RequestID: reqID})

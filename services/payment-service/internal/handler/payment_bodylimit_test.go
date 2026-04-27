@@ -30,7 +30,7 @@ func setupBodyCapRouter(t *testing.T) *gin.Engine {
 		c.Set("user_email", "test@utilar.dev")
 		c.Next()
 	})
-	pH := handler.NewPaymentHandler(nil, nil, nil, true)
+	pH := handler.NewPaymentHandler(nil, nil, nil, nil, true)
 	r.POST("/api/v1/payments", pH.Create)
 	return r
 }

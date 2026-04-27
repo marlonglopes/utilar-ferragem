@@ -10,10 +10,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/utilar/order-service/internal/catalogclient"
 	"github.com/utilar/order-service/internal/config"
 	"github.com/utilar/order-service/internal/db"
 	"github.com/utilar/order-service/internal/handler"
+	"github.com/utilar/pkg/ratelimit"
 )
 
 func main() {
@@ -51,9 +54,33 @@ func main() {
 		handler.CORS(cfg.AllowedOrigins),
 	)
 
+	// O3-M3: rate limit em POST /orders. 20/min/user — folga acima do uso humano,
+	// mas bloqueia bot que tenta inflar tabelas.
+	var createRL gin.HandlerFunc
+	if cfg.RedisURL != "" {
+		opts, err := redis.ParseURL(cfg.RedisURL)
+		if err != nil {
+			slog.Error("redis url", "error", err)
+			os.Exit(1)
+		}
+		createRL = ratelimit.Middleware(
+			ratelimit.New(redis.NewClient(opts)),
+			"order:create",
+			ratelimit.Limit{Max: 20, Window: time.Minute},
+			ratelimit.UserKey,
+		)
+		slog.Info("rate limit enabled", "redis", opts.Addr)
+	} else {
+		slog.Warn("REDIS_URL not set — order rate limit DISABLED (O3-M3 unprotected)")
+	}
+
 	api := r.Group("/api/v1", handler.RequireUser(cfg.JWTSecret, cfg.DevMode))
 	{
-		api.POST("/orders", orderH.Create)
+		if createRL != nil {
+			api.POST("/orders", createRL, orderH.Create)
+		} else {
+			api.POST("/orders", orderH.Create)
+		}
 		api.GET("/orders", orderH.List)
 		api.GET("/orders/:id", orderH.Get)
 		api.PATCH("/orders/:id/cancel", orderH.Cancel)

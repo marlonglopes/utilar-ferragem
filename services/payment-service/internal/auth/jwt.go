@@ -20,11 +20,10 @@ type Claims struct {
 }
 
 // ParseAccessToken valida assinatura HS256 + expiração e devolve as claims tipadas.
-// Aborta com erro se algoritmo for diferente ou token inválido.
-// H2: substitui uso de jwt.MapClaims (untyped) por struct concreta.
+// A16-M7: lock estrito em HS256 (não só "qualquer HMAC") — anti algorithm confusion.
 func ParseAccessToken(tokenStr, secret string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+		if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 			return nil, errors.New("unexpected signing method")
 		}
 		return []byte(secret), nil

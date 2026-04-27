@@ -35,6 +35,26 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 
+	// A15-M6: complexidade mínima de senha (10 chars + 3 categorias).
+	if err := validatePasswordStrength(req.Password); err != nil {
+		BadRequest(c, "password too weak: min 10 chars, mix of upper/lower/digit/symbol")
+		return
+	}
+
+	// A10-M1: valida CPF (check digit) antes de gravar. Aceita vazio
+	// (campo opcional). Normaliza pra só dígitos quando válido.
+	var cpfNorm *string
+	if req.CPF != nil {
+		norm, ok := validateCPF(*req.CPF)
+		if !ok {
+			BadRequest(c, "invalid CPF")
+			return
+		}
+		if norm != "" {
+			cpfNorm = &norm
+		}
+	}
+
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
 		InternalError(c, "hash error")
@@ -45,7 +65,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	err = h.db.QueryRow(`
 		INSERT INTO users (email, password_hash, name, cpf, phone)
 		VALUES ($1, $2, $3, $4, $5) RETURNING id
-	`, email, hash, req.Name, req.CPF, req.Phone).Scan(&userID)
+	`, email, hash, req.Name, cpfNorm, req.Phone).Scan(&userID)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") {
 			Conflict(c, "email already registered")
@@ -335,6 +355,12 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		BadRequest(c, err.Error())
 		return
 	}
+	// A15-M6: aplica complexidade no novo password também (não só no register).
+	if err := validatePasswordStrength(req.NewPassword); err != nil {
+		BadRequest(c, "password too weak: min 10 chars, mix of upper/lower/digit/symbol")
+		return
+	}
+
 	tokenHash := hashToken(req.Token)
 	var userID string
 	var expiresAt time.Time

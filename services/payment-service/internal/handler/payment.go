@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/utilar/payment-service/internal/authclient"
 	"github.com/utilar/payment-service/internal/model"
 	"github.com/utilar/payment-service/internal/orderclient"
 	"github.com/utilar/payment-service/internal/psp"
@@ -38,18 +39,28 @@ type OrderLookup interface {
 	Get(ctx context.Context, orderID, jwt string) (*orderclient.Order, error)
 }
 
+// UserLookup busca dados completos do usuário no auth-service via JWT.
+// Usado pra buscar CPF/Name no boleto quando o cliente não envia (M6).
+type UserLookup interface {
+	Me(ctx context.Context, jwt string) (*authclient.User, error)
+}
+
 type PaymentHandler struct {
 	db          *sql.DB
 	gateway     psp.Gateway
 	orderClient OrderLookup
-	devMode     bool // permite skip da validação cross-service em tests/dev
+	authClient  UserLookup
+	devMode     bool
 }
 
-func NewPaymentHandler(db *sql.DB, gateway psp.Gateway, orderClient OrderLookup, devMode bool) *PaymentHandler {
+// NewPaymentHandler. authClient pode ser nil em dev — boleto vai pro PSP
+// com CPF/name do body (warning logado).
+func NewPaymentHandler(db *sql.DB, gateway psp.Gateway, orderClient OrderLookup, authClient UserLookup, devMode bool) *PaymentHandler {
 	return &PaymentHandler{
 		db:          db,
 		gateway:     gateway,
 		orderClient: orderClient,
+		authClient:  authClient,
 		devMode:     devMode,
 	}
 }
@@ -150,6 +161,27 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 			"request_id", c.GetString("request_id"))
 	}
 
+	// M6: pra boleto, CPF + Name são obrigatórios em prod (MP rejeita vazio).
+	// Buscamos do auth-service via JWT em vez de confiar no body.
+	payerName := req.PayerName
+	payerCPF := req.PayerCPF
+	if req.Method == "boleto" && h.authClient != nil {
+		jwt := extractBearerToken(c)
+		u, err := h.authClient.Me(c.Request.Context(), jwt)
+		if err != nil {
+			slog.Warn("create payment: auth lookup failed for boleto",
+				"error", err, "request_id", c.GetString("request_id"))
+			// Fail-soft: segue com o do body (PSP rejeita se vazio em prod).
+		} else {
+			if u.Name != "" {
+				payerName = u.Name
+			}
+			if u.CPF != nil && *u.CPF != "" {
+				payerCPF = *u.CPF
+			}
+		}
+	}
+
 	// Insert payment row (pending) — usa amount autoritativo
 	var paymentID string
 	err := h.db.QueryRow(`
@@ -171,8 +203,8 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		Currency:       "BRL",
 		Method:         psp.PaymentMethod(req.Method),
 		PayerEmail:     userEmail,
-		PayerName:      req.PayerName,
-		PayerCPF:       req.PayerCPF,
+		PayerName:      payerName,
+		PayerCPF:       payerCPF,
 		IdempotencyKey: c.GetString("request_id"),
 	}
 	result, pspErr := h.gateway.CreatePayment(c.Request.Context(), pspReq)
@@ -197,10 +229,12 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Persiste o retorno do PSP
+	// M2: persiste o RawPayload com redação de PII. last4 e dados de UI ficam,
+	// PAN/CVC/CPF/etc viram "***REDACTED***".
+	redactedPayload := redactPSPPayload(result.RawPayload)
 	h.db.Exec(`
 		UPDATE payments SET psp_payment_id=$1, psp_payload=$2, updated_at=now() WHERE id=$3
-	`, result.PSPID, result.RawPayload, paymentID)
+	`, result.PSPID, redactedPayload, paymentID)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":           paymentID,

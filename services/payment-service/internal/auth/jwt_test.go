@@ -55,6 +55,17 @@ func TestParseAccessToken_Expirado(t *testing.T) {
 	}
 }
 
+// A16-M7: HS384/HS512 também devem ser rejeitados — só HS256 exato.
+func TestParseAccessToken_HS384Rejeitado(t *testing.T) {
+	c := Claims{UserID: "user-1"}
+	c.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(1 * time.Hour))
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS384, c)
+	tokStr, _ := tok.SignedString([]byte(testSecret))
+	if _, err := ParseAccessToken(tokStr, testSecret); err == nil {
+		t.Fatal("HS384 deveria ser rejeitado (lock em HS256)")
+	}
+}
+
 // H2 essence: rejeita algoritmo errado (none, RS256 com chave HMAC, etc).
 func TestParseAccessToken_AlgoritmoErrado(t *testing.T) {
 	// "none" — gerar manualmente porque a lib bloqueia

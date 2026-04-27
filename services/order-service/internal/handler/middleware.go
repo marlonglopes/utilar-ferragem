@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/utilar/pkg/requestid"
 )
 
 const RequestIDHeader = "X-Request-Id"
@@ -17,7 +18,7 @@ func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.GetHeader(RequestIDHeader)
 		if id == "" {
-			id = newRequestID()
+			id = requestid.New()
 		}
 		c.Set("request_id", id)
 		c.Header(RequestIDHeader, id)
@@ -119,9 +120,10 @@ func RequireUser(jwtSecret string, devMode bool) gin.HandlerFunc {
 }
 
 // parseJWTSubject extrai a claim `sub` do JWT HS256 (compatível com auth-service.Claims).
+// A16-M7: lock estrito no algoritmo HS256.
 func parseJWTSubject(tokenStr, secret string) (string, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+		if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 			return nil, errors.New("unexpected signing method")
 		}
 		return []byte(secret), nil
@@ -143,13 +145,3 @@ func parseJWTSubject(tokenStr, secret string) (string, error) {
 	return sub, nil
 }
 
-func newRequestID() string {
-	const hex = "0123456789abcdef"
-	n := time.Now().UnixNano()
-	buf := make([]byte, 16)
-	for i := 15; i >= 0; i-- {
-		buf[i] = hex[n&0xf]
-		n >>= 4
-	}
-	return string(buf)
-}

@@ -93,7 +93,7 @@ func setupPaymentRouter(t *testing.T, gw psp.Gateway, oc handler.OrderLookup, de
 		c.Set("user_email", "test@utilar.dev")
 		c.Next()
 	})
-	pH := handler.NewPaymentHandler(db, gw, oc, devMode)
+	pH := handler.NewPaymentHandler(db, gw, oc, nil, devMode)
 	r.POST("/api/v1/payments", pH.Create)
 
 	cleanup := func() {

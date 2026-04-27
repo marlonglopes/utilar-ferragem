@@ -13,6 +13,7 @@ type Config struct {
 	DevMode           bool   // habilita X-User-Id fallback (audit O1-C3)
 	AllowedOrigins    []string
 	CatalogServiceURL string // base URL do catalog-service pra validação de price (O2-H5)
+	RedisURL          string // O3-M3: vazio = rate limit desabilitado
 }
 
 const devSecret = "dev-only-secret-not-for-production"
@@ -42,6 +43,7 @@ func Load() (*Config, error) {
 		DevMode:           devMode,
 		AllowedOrigins:    parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		CatalogServiceURL: env("CATALOG_SERVICE_URL", "http://localhost:8091"),
+		RedisURL:          os.Getenv("REDIS_URL"),
 	}, nil
 }
 

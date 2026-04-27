@@ -129,7 +129,7 @@ func TestRegister_DuplicateEmail(t *testing.T) {
 	// test1@utilar.com.br existe no seed
 	w := do(r, http.MethodPost, "/api/v1/auth/register", "", map[string]any{
 		"email":    "test1@utilar.com.br",
-		"password": "anything-works",
+		"password": "Senha-Forte-1!",
 		"name":     "Dup",
 	})
 	if w.Code != http.StatusConflict {

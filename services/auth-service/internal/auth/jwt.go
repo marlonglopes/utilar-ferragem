@@ -33,9 +33,16 @@ func GenerateAccessToken(userID, email, role, secret string, ttl time.Duration) 
 }
 
 // ParseAccessToken valida assinatura + expiração e devolve as claims.
+//
+// SEGURANÇA (A16-M7): trava o algoritmo em HS256 exato — não basta aceitar
+// "qualquer HMAC" porque outras variantes (HS384, HS512) com chave do tamanho
+// errado podem falsear comparações em libs que truncam silenciosamente.
+// Algorithm-confusion attack clássico: atacante muda o header `alg` pra
+// `none` ou pra `RS256` esperando que o server use o secret HMAC como chave
+// pública. Aqui exigimos `HS256` literal.
 func ParseAccessToken(tokenStr, secret string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+		if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 			return nil, errors.New("unexpected signing method")
 		}
 		return []byte(secret), nil
