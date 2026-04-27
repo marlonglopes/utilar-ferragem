@@ -54,20 +54,19 @@ func CORS() gin.HandlerFunc {
 	}
 }
 
-// RequireUser valida o usuário por uma de duas fontes, nesta ordem:
-//  1. Authorization: Bearer <JWT>  (emitido pelo auth-service; mesmo JWT_SECRET)
-//  2. X-User-Id: <opaque>           (fallback para dev sem auth real / tests)
-//
-// JWT_SECRET precisa ser o mesmo do auth-service. Em produção, só JWT é válido
-// (X-User-Id será desabilitado via flag de build/env quando auth-service estiver em prod).
-func RequireUser(jwtSecret string) gin.HandlerFunc {
+// RequireUser valida o usuário por JWT (Authorization: Bearer <token>).
+// Quando devMode=true, aceita também o fallback X-User-Id pra facilitar tests
+// e desenvolvimento sem auth-service rodando. Em produção devMode=false e o
+// fallback é rejeitado (audit O1-C3 — IDOR trivial via header).
+func RequireUser(jwtSecret string, devMode bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 1) Tenta JWT primeiro
+		// 1) JWT (caminho de produção)
 		if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
 			tokenStr := strings.TrimPrefix(auth, "Bearer ")
 			sub, err := parseJWTSubject(tokenStr, jwtSecret)
 			if err != nil {
-				Unauthorized(c, "invalid token: "+err.Error())
+				slog.Warn("invalid jwt", "error", err.Error(), "request_id", c.GetString("request_id"))
+				Unauthorized(c, "invalid token")
 				c.Abort()
 				return
 			}
@@ -76,14 +75,16 @@ func RequireUser(jwtSecret string) gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		// 2) Fallback: X-User-Id (dev only)
-		if userID := c.GetHeader("X-User-Id"); userID != "" {
-			c.Set("user_id", userID)
-			c.Set("auth_source", "x-user-id")
-			c.Next()
-			return
+		// 2) X-User-Id fallback — só em dev
+		if devMode {
+			if userID := c.GetHeader("X-User-Id"); userID != "" {
+				c.Set("user_id", userID)
+				c.Set("auth_source", "x-user-id")
+				c.Next()
+				return
+			}
 		}
-		Unauthorized(c, "missing Authorization header or X-User-Id")
+		Unauthorized(c, "missing or invalid Authorization header")
 		c.Abort()
 	}
 }

@@ -18,7 +18,12 @@ import (
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("config", "error", err.Error(),
+			"hint", "set JWT_SECRET to a 32+ char random value, or DEV_MODE=true for local dev")
+		os.Exit(1)
+	}
 
 	database, err := db.Open(cfg.DatabaseURL)
 	if err != nil {

@@ -30,8 +30,11 @@ func (h *ProductHandler) List(c *gin.Context) {
 		idx++
 	}
 	if params.Q != "" {
-		where = append(where, fmt.Sprintf("(p.name ILIKE $%d OR COALESCE(p.description,'') ILIKE $%d OR s.name ILIKE $%d)", idx, idx, idx))
-		args = append(args, "%"+params.Q+"%")
+		// SEGURANÇA (audit CT1-C1): escapar `%` `_` `\` no termo de busca antes
+		// do ILIKE, com `ESCAPE '\'`. Sem isso, atacante envia `%_%_%_%_%_%_%_`
+		// e força ReDoS no pg_trgm (consumo CPU 100%).
+		where = append(where, fmt.Sprintf("(p.name ILIKE $%d ESCAPE '\\' OR COALESCE(p.description,'') ILIKE $%d ESCAPE '\\' OR s.name ILIKE $%d ESCAPE '\\')", idx, idx, idx))
+		args = append(args, "%"+escapeLikePattern(params.Q)+"%")
 		idx++
 	}
 	if params.Brand != "" {
@@ -53,6 +56,7 @@ func (h *ProductHandler) List(c *gin.Context) {
 		where = append(where, "p.stock > 0")
 	}
 
+	// orderBy é whitelist — qualquer valor não reconhecido cai no default (audit CT1-M3).
 	orderBy := "p.created_at DESC"
 	switch params.Sort {
 	case "price_asc":
@@ -61,7 +65,7 @@ func (h *ProductHandler) List(c *gin.Context) {
 		orderBy = "p.price DESC"
 	case "top_rated":
 		orderBy = "p.rating DESC, p.review_count DESC"
-	case "newest":
+	case "newest", "":
 		orderBy = "p.created_at DESC"
 	}
 
@@ -170,8 +174,8 @@ func (h *ProductHandler) Facets(c *gin.Context) {
 		idx++
 	}
 	if params.Q != "" {
-		where = append(where, fmt.Sprintf("(p.name ILIKE $%d OR COALESCE(p.description,'') ILIKE $%d)", idx, idx))
-		args = append(args, "%"+params.Q+"%")
+		where = append(where, fmt.Sprintf("(p.name ILIKE $%d ESCAPE '\\' OR COALESCE(p.description,'') ILIKE $%d ESCAPE '\\')", idx, idx))
+		args = append(args, "%"+escapeLikePattern(params.Q)+"%")
 		idx++
 	}
 	whereSQL := strings.Join(where, " AND ")
@@ -283,17 +287,29 @@ func parseProductsQuery(c *gin.Context) productsQuery {
 		PerPage:  perPage,
 	}
 
+	// price_min/max só aceitos se não-negativos (audit CT1-H3) — preço negativo
+	// causa lógica de negócio surpresa.
 	if v := c.Query("price_min"); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f >= 0 {
 			q.PriceMin = &f
 		}
 	}
 	if v := c.Query("price_max"); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f >= 0 {
 			q.PriceMax = &f
 		}
 	}
 	return q
+}
+
+// escapeLikePattern escapa os metacaracteres do LIKE/ILIKE (`%`, `_`, `\`).
+// Usado junto com `ESCAPE '\'` no SQL pra prevenir ReDoS via wildcard injection
+// no pg_trgm (audit CT1-C1).
+func escapeLikePattern(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
 }
 
 type scanner interface {

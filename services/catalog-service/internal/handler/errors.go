@@ -32,6 +32,12 @@ func Respond(c *gin.Context, status int, code, msg string) {
 func BadRequest(c *gin.Context, msg string)     { Respond(c, http.StatusBadRequest, "bad_request", msg) }
 func NotFound(c *gin.Context, msg string)       { Respond(c, http.StatusNotFound, "not_found", msg) }
 func InternalError(c *gin.Context, msg string)  { Respond(c, http.StatusInternalServerError, "internal", msg) }
+// DBError loga internamente, responde genérico (audit CT1-C2).
 func DBError(c *gin.Context, err error) {
-	Respond(c, http.StatusInternalServerError, "db_error", err.Error())
+	slog.Error("db.error",
+		"request_id", c.GetString("request_id"),
+		"path", c.FullPath(),
+		"error", err.Error(),
+	)
+	Respond(c, http.StatusInternalServerError, "db_error", "database error")
 }

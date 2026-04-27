@@ -38,7 +38,12 @@ func setupTestDB(t *testing.T) (*sql.DB, *config.Config) {
 	if n == 0 {
 		t.Skip("no users in DB — run `make auth-db-seed`")
 	}
-	cfg := config.Load()
+	// DevMode=true pra config.Load aceitar JWT_SECRET vazio em tests.
+	t.Setenv("DEV_MODE", "true")
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("config.Load: %v", err)
+	}
 	cfg.JWTSecret = testJWTSecret
 	return db, cfg
 }

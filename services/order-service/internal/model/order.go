@@ -20,24 +20,34 @@ const (
 	MethodCard   PaymentMethod = "card"
 )
 
+// OrderItem é o item de um pedido. Validação de binding é OBRIGATÓRIA aqui pra
+// evitar tamper de preço/quantidade pelo cliente (audit O1-C1):
+//   - Quantity > 0 e <= 999 (limites razoáveis pra hardware/ferramentas)
+//   - UnitPrice > 0 e <= 999999.99 (cliente não envia preço grátis nem absurdo)
+//
+// NOTA: o ideal é o backend buscar o preço do catalog-service (audit O2-H5),
+// mas até lá pelo menos travamos o range plausível.
 type OrderItem struct {
-	ProductID  string  `json:"productId"`
-	Name       string  `json:"name"`
-	Icon       string  `json:"icon"`
-	SellerID   string  `json:"sellerId"`
-	SellerName string  `json:"sellerName"`
-	Quantity   int     `json:"quantity"`
-	UnitPrice  float64 `json:"unitPrice"`
+	ProductID  string  `json:"productId" binding:"required,max=64"`
+	Name       string  `json:"name" binding:"required,max=255"`
+	Icon       string  `json:"icon" binding:"max=16"`
+	SellerID   string  `json:"sellerId" binding:"required,max=64"`
+	SellerName string  `json:"sellerName" binding:"required,max=255"`
+	Quantity   int     `json:"quantity" binding:"required,gt=0,lte=999"`
+	UnitPrice  float64 `json:"unitPrice" binding:"required,gt=0,lte=999999.99"`
 }
 
+// OrderAddress — campos de endereço com limites de tamanho pra prevenir DoS por
+// payload absurdo + XSS (audit O1-C2). CEP é validado por regex (8 dígitos com
+// hífen opcional). Estado é UF de 2 chars.
 type OrderAddress struct {
-	Street       string  `json:"street"`
-	Number       string  `json:"number"`
-	Complement   *string `json:"complement,omitempty"`
-	Neighborhood string  `json:"neighborhood"`
-	City         string  `json:"city"`
-	State        string  `json:"state"`
-	CEP          string  `json:"cep"`
+	Street       string  `json:"street" binding:"required,max=255"`
+	Number       string  `json:"number" binding:"required,max=20"`
+	Complement   *string `json:"complement,omitempty" binding:"omitempty,max=100"`
+	Neighborhood string  `json:"neighborhood" binding:"required,max=100"`
+	City         string  `json:"city" binding:"required,max=100"`
+	State        string  `json:"state" binding:"required,len=2"`
+	CEP          string  `json:"cep" binding:"required,max=9"`
 }
 
 type TrackingEvent struct {
@@ -71,10 +81,11 @@ type Order struct {
 	UpdatedAt      time.Time       `json:"updatedAt"`
 }
 
-// Payload de criação (POST /api/v1/orders)
+// CreateOrderRequest — payload de POST /api/v1/orders.
+// Limites de tamanho previnem DoS por payload absurdo (audit O3-M1).
 type CreateOrderRequest struct {
 	PaymentMethod PaymentMethod `json:"paymentMethod" binding:"required,oneof=pix boleto card"`
-	Items         []OrderItem   `json:"items" binding:"required,min=1,dive"`
-	ShippingCost  float64       `json:"shippingCost" binding:"gte=0"`
+	Items         []OrderItem   `json:"items" binding:"required,min=1,max=100,dive"`
+	ShippingCost  float64       `json:"shippingCost" binding:"gte=0,lte=99999.99"`
 	Address       OrderAddress  `json:"address" binding:"required"`
 }

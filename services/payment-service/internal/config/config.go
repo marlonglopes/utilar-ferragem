@@ -11,6 +11,7 @@ type Config struct {
 	DatabaseURL     string
 	RedpandaBrokers []string
 	JWTSecret       string
+	DevMode         bool
 
 	// PSP selector — qual provider usar.
 	// Valores: "stripe" (recomendado em dev + test mode robusto)
@@ -28,16 +29,32 @@ type Config struct {
 	MPWebhookSecret string
 }
 
+const devSecret = "dev-only-secret-not-for-production"
+
 func Load() (*Config, error) {
 	dbURL := env("PAYMENT_DB_URL", "postgres://utilar:utilar@localhost:5435/payment_service?sslmode=disable")
 	brokers := strings.Split(env("REDPANDA_BROKERS", "localhost:19092"), ",")
 	provider := strings.ToLower(env("PSP_PROVIDER", "stripe"))
+	devMode := env("DEV_MODE", "false") == "true"
+
+	// JWT_SECRET fail-closed (audit transversal — mesmo padrão de auth/order).
+	jwt := os.Getenv("JWT_SECRET")
+	if jwt == "" {
+		if !devMode {
+			return nil, fmt.Errorf("JWT_SECRET is required (set DEV_MODE=true for local dev)")
+		}
+		jwt = devSecret
+	}
+	if !devMode && (jwt == "change-me" || jwt == "change-me-in-prod-please" || len(jwt) < 32) {
+		return nil, fmt.Errorf("JWT_SECRET must be at least 32 chars and not a development default")
+	}
 
 	cfg := &Config{
 		Port:            env("PORT", "8090"),
 		DatabaseURL:     dbURL,
 		RedpandaBrokers: brokers,
-		JWTSecret:       env("JWT_SECRET", "change-me"),
+		JWTSecret:       jwt,
+		DevMode:         devMode,
 		PSPProvider:     provider,
 
 		StripeSecretKey:      os.Getenv("STRIPE_SECRET_KEY"),

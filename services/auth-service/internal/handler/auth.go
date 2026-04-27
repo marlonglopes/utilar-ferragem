@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -157,8 +158,6 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	_, _ = h.db.Exec(`UPDATE refresh_tokens SET last_used_at = now() WHERE token = $1`, req.RefreshToken)
-
 	u, err := h.loadUser(userID)
 	if err != nil {
 		DBError(c, err)
@@ -169,7 +168,38 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		InternalError(c, "could not sign token")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"accessToken": access})
+
+	// SEGURANÇA (audit A4-C4): rotação obrigatória do refresh token.
+	// Sem isso, atacante que rouba refresh token tem 30 dias de acesso mesmo após
+	// usuário fazer logout. Implementação: revoga o atual + emite novo na mesma
+	// transação (atômico — se a inserção falhar, a revogação rola back).
+	tx, err := h.db.Begin()
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`UPDATE refresh_tokens SET revoked_at = now() WHERE token = $1 AND revoked_at IS NULL`, req.RefreshToken); err != nil {
+		DBError(c, err)
+		return
+	}
+
+	newRefresh := randToken()
+	if _, err := tx.Exec(`
+		INSERT INTO refresh_tokens (token, user_id, user_agent, ip, expires_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`, newRefresh, u.ID, c.GetHeader("User-Agent"), c.ClientIP(), time.Now().Add(h.cfg.RefreshTokenTTL)); err != nil {
+		DBError(c, err)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		DBError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"accessToken": access, "refreshToken": newRefresh})
 }
 
 // -- me (GET /me) -----------------------------------------------------------
@@ -369,9 +399,16 @@ func (h *AuthHandler) issueTokens(c *gin.Context, u *model.User) (access, refres
 	return access, refresh, err
 }
 
-// randToken gera um UUID-like opaco (32 hex chars = 128 bits entropy).
+// randToken gera um token opaco (32 hex chars = 128 bits entropy).
+// Refresh tokens, password reset tokens e email verify tokens dependem disso.
+//
+// SEGURANÇA (audit A3-C3): se crypto/rand falhar (PRNG quebrado, /dev/urandom
+// indisponível em container mal configurado), panic — preferimos crash a emitir
+// tokens com entropia degradada (zeros, parcial) que viabilizariam brute-force.
 func randToken() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("crypto/rand failed: %v — refusing to generate weak token", err))
+	}
 	return hex.EncodeToString(b)
 }

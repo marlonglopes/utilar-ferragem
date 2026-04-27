@@ -31,6 +31,12 @@ func Unauthorized(c *gin.Context, msg string)  { Respond(c, http.StatusUnauthori
 func NotFound(c *gin.Context, msg string)      { Respond(c, http.StatusNotFound, "not_found", msg) }
 func InternalError(c *gin.Context, msg string) { Respond(c, http.StatusInternalServerError, "internal", msg) }
 func BadGateway(c *gin.Context, msg string)    { Respond(c, http.StatusBadGateway, "bad_gateway", msg) }
+// DBError loga internamente, responde genérico (audit transversal).
 func DBError(c *gin.Context, err error) {
-	Respond(c, http.StatusInternalServerError, "db_error", err.Error())
+	slog.Error("db.error",
+		"request_id", c.GetString("request_id"),
+		"path", c.FullPath(),
+		"error", err.Error(),
+	)
+	Respond(c, http.StatusInternalServerError, "db_error", "database error")
 }

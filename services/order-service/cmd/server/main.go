@@ -18,7 +18,12 @@ import (
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("config", "error", err.Error(),
+			"hint", "set JWT_SECRET to a 32+ char random value, or DEV_MODE=true for local dev")
+		os.Exit(1)
+	}
 
 	database, err := db.Open(cfg.DatabaseURL)
 	if err != nil {
@@ -38,7 +43,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery(), handler.RequestID(), handler.AccessLog(), handler.CORS())
 
-	api := r.Group("/api/v1", handler.RequireUser(cfg.JWTSecret))
+	api := r.Group("/api/v1", handler.RequireUser(cfg.JWTSecret, cfg.DevMode))
 	{
 		api.POST("/orders", orderH.Create)
 		api.GET("/orders", orderH.List)

@@ -48,7 +48,7 @@ func setupRouter(db *sql.DB) *gin.Engine {
 	r := gin.New()
 	orderH := handler.NewOrderHandler(db)
 	r.Use(handler.RequestID())
-	api := r.Group("/api/v1", handler.RequireUser("test-secret"))
+	api := r.Group("/api/v1", handler.RequireUser("test-secret", true))
 	api.POST("/orders", orderH.Create)
 	api.GET("/orders", orderH.List)
 	api.GET("/orders/:id", orderH.Get)

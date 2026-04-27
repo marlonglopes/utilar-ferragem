@@ -31,6 +31,12 @@ func Forbidden(c *gin.Context, msg string)     { Respond(c, http.StatusForbidden
 func NotFound(c *gin.Context, msg string)      { Respond(c, http.StatusNotFound, "not_found", msg) }
 func Conflict(c *gin.Context, msg string)      { Respond(c, http.StatusConflict, "conflict", msg) }
 func InternalError(c *gin.Context, msg string) { Respond(c, http.StatusInternalServerError, "internal", msg) }
+// DBError loga internamente, responde genérico (audit O2-H1).
 func DBError(c *gin.Context, err error) {
-	Respond(c, http.StatusInternalServerError, "db_error", err.Error())
+	slog.Error("db.error",
+		"request_id", c.GetString("request_id"),
+		"path", c.FullPath(),
+		"error", err.Error(),
+	)
+	Respond(c, http.StatusInternalServerError, "db_error", "database error")
 }
