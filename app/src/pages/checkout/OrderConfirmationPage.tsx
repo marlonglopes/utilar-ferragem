@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback } from 'react'
-import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useEffect, useRef, useCallback, useState } from 'react'
+import { useParams, useSearchParams, Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Clock, XCircle, Package } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
@@ -13,7 +13,8 @@ function usePollingConfirmation(
   method: string,
   onUpdate: (status: PaymentStatus) => void
 ) {
-  const token = useAuthStore((s) => s.token())
+  // U4 mesma justificativa: selector direto, não a função `s.token()`.
+  const token = useAuthStore((s) => s.user?.token ?? null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const countRef = useRef(0)
 
@@ -25,8 +26,9 @@ function usePollingConfirmation(
   }, [])
 
   useEffect(() => {
-    // Only poll for pix — card and boleto don't need real-time confirmation here
-    if (method !== 'pix') return
+    // Pix e Boleto pendem confirmação async (PSP empurra via webhook).
+    // Card vem como confirmed direto da Stripe Elements antes de chegar aqui.
+    if (method !== 'pix' && method !== 'boleto') return
     if (!isApiEnabled) return
 
     pollingRef.current = setInterval(async () => {
@@ -53,31 +55,53 @@ function usePollingConfirmation(
   }, [paymentId, method, token, stop, onUpdate])
 }
 
+interface ConfirmationLocationState {
+  orderNumber?: string
+}
+
 export default function OrderConfirmationPage() {
   const { t } = useTranslation('checkout')
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const method = searchParams.get('method') ?? 'pix'
   const userEmail = useAuthStore((s) => s.user?.email ?? '')
-
-  // In dev mode, status is derived from the URL method (always pending initially)
-  // Real polling handled by hook above
   const paymentId = id ?? ''
 
-  usePollingConfirmation(paymentId, method, (_status) => {
-    // In a real app, update local state; for now the page re-reads on nav
-  })
+  // U5: orderNumber humano (ex: "2026-ZGJWBMDE") passado via location.state pelo
+  // CheckoutPage no momento da navegação. Fallback: 8 primeiros chars do paymentId.
+  const orderNumber =
+    (location.state as ConfirmationLocationState | null)?.orderNumber ??
+    paymentId.slice(0, 8).toUpperCase()
+
+  // B3: status reativo. Card já vem confirmed (frontend setou via Stripe Elements).
+  // Pix/Boleto pendem confirmação webhook → polling atualiza este state.
+  const [status, setStatus] = useState<PaymentStatus>(method === 'card' ? 'confirmed' : 'pending')
+
+  const handleStatusUpdate = useCallback((newStatus: PaymentStatus) => {
+    setStatus(newStatus)
+  }, [])
+
+  usePollingConfirmation(paymentId, method, handleStatusUpdate)
 
   const boletoDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
   })
 
   function StatusBadge() {
-    if (method === 'card') {
+    if (status === 'confirmed') {
       return (
         <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
           <CheckCircle2 className="h-4 w-4" />
           {t('confirmation.confirmed')}
+        </div>
+      )
+    }
+    if (status === 'failed') {
+      return (
+        <div className="flex items-center gap-2 px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-semibold">
+          <XCircle className="h-4 w-4" />
+          {t('confirmation.failed', { defaultValue: 'Falhou' })}
         </div>
       )
     }
@@ -90,6 +114,18 @@ export default function OrderConfirmationPage() {
   }
 
   function MethodMessage() {
+    if (status === 'confirmed') {
+      return <p className="text-sm text-gray-500 text-center">{t('confirmation.cardApproved')}</p>
+    }
+    if (status === 'failed') {
+      return (
+        <p className="text-sm text-gray-500 text-center">
+          {t('confirmation.failedHint', {
+            defaultValue: 'O pagamento foi recusado. Tente novamente em alguns minutos.',
+          })}
+        </p>
+      )
+    }
     if (method === 'pix') {
       return <p className="text-sm text-gray-500 text-center">{t('confirmation.pixPending')}</p>
     }
@@ -103,17 +139,23 @@ export default function OrderConfirmationPage() {
     return <p className="text-sm text-gray-500 text-center">{t('confirmation.cardApproved')}</p>
   }
 
-  const IconEl = method === 'card' ? CheckCircle2 : method === 'failed' ? XCircle : Package
+  const IconEl = status === 'confirmed' ? CheckCircle2 : status === 'failed' ? XCircle : Package
 
   return (
     <div className="container py-16 flex flex-col items-center gap-6 text-center max-w-md mx-auto">
       <IconEl
-        className={`h-20 w-20 ${method === 'card' ? 'text-green-500' : method === 'failed' ? 'text-red-500' : 'text-brand-orange'}`}
+        className={`h-20 w-20 ${
+          status === 'confirmed'
+            ? 'text-green-500'
+            : status === 'failed'
+              ? 'text-red-500'
+              : 'text-brand-orange'
+        }`}
       />
 
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold text-gray-900">{t('confirmation.title')}</h1>
-        <p className="text-sm text-gray-400">{t('confirmation.orderNumber', { id: paymentId })}</p>
+        <p className="text-sm text-gray-400">{t('confirmation.orderNumber', { id: orderNumber })}</p>
       </div>
 
       <StatusBadge />

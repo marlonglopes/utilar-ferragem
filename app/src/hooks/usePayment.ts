@@ -153,7 +153,9 @@ function parseApiResult(raw: ApiPaymentResponse, method: PaymentMethod): Payment
 }
 
 export function usePayment() {
-  const token = useAuthStore((s) => s.token())
+  // Selector direto da prop em vez de função (`s.token()`) pra evitar re-render
+  // a cada mudança do store — a função retornaria nova referência sempre.
+  const token = useAuthStore((s) => s.user?.token ?? null)
   const [result, setResult] = useState<PaymentResult | null>(null)
   const [error, setError] = useState('')
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)

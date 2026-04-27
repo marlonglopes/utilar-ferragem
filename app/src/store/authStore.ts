@@ -9,6 +9,8 @@ export interface User {
   token: string           // JWT access token (expires em 15min quando vindo do auth-service)
   refreshToken?: string   // opaco, revogável (30 dias)
   emailVerified?: boolean
+  cpf?: string            // 11 dígitos, opcional — usado pra pre-fill checkout (boleto)
+  phone?: string
 }
 
 interface AuthState {
@@ -19,6 +21,9 @@ interface AuthState {
   token: () => string | null
   isLoggedIn: () => boolean
   isCustomer: () => boolean
+  // Atualiza apenas o access token (após refresh) preservando o refreshToken
+  // e demais dados do user. Usado pelo refresh-on-401 em api.ts.
+  updateAccessToken: (token: string) => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -31,6 +36,10 @@ export const useAuthStore = create<AuthState>()(
       token: () => get().user?.token ?? null,
       isLoggedIn: () => get().user !== null,
       isCustomer: () => get().user?.role === 'customer',
+      updateAccessToken: (token) => {
+        const u = get().user
+        if (u) set({ user: { ...u, token } })
+      },
     }),
     { name: 'utilar-auth' }
   )

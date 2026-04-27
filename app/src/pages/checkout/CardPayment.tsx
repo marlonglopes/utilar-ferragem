@@ -179,16 +179,34 @@ function CardFormInner({
     }
 
     if (paymentIntent) {
-      if (paymentIntent.status === 'succeeded') {
-        onConfirmed()
-      } else if (paymentIntent.status === 'processing') {
-        // Card capture eventual (pra alguns processadores) — webhook vai promover
-        onConfirmed()
-      } else if (paymentIntent.status === 'requires_payment_method') {
-        const msg = 'Cartão recusado. Tente outro cartão.'
-        setErrorMsg(msg)
-        onFailed(msg)
+      switch (paymentIntent.status) {
+        case 'succeeded':
+        case 'processing':
+          // processing = capture eventual (alguns processadores); webhook promove pra confirmed
+          onConfirmed()
+          break
+        case 'requires_payment_method': {
+          const msg = 'Cartão recusado. Tente outro cartão.'
+          setErrorMsg(msg)
+          onFailed(msg)
+          break
+        }
+        case 'requires_action':
+        case 'requires_confirmation':
+        case 'requires_capture':
+        default: {
+          // Status que não chegamos a tratar — informa user em vez de spinner sumir silencioso.
+          const msg = `Pagamento em estado inesperado: ${paymentIntent.status}. Tente novamente.`
+          setErrorMsg(msg)
+          onFailed(msg)
+          break
+        }
       }
+    } else {
+      // Sem error e sem paymentIntent — caso edge da API. Fail-safe.
+      const msg = 'Resposta inesperada do processador de pagamento.'
+      setErrorMsg(msg)
+      onFailed(msg)
     }
 
     setSubmitting(false)

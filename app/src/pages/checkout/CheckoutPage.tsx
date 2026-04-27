@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Check, ChevronRight, Loader2, Plus } from 'lucide-react'
@@ -8,7 +8,7 @@ import { useAddressStore, type Address as StoredAddress } from '@/store/addressS
 import { usePayment, type PaymentMethod } from '@/hooks/usePayment'
 import { formatCurrency, formatCEP } from '@/lib/format'
 import { cn } from '@/lib/cn'
-import { isApiEnabled } from '@/lib/api'
+import { isApiEnabled, isOrderEnabled, orderPostWithJWT } from '@/lib/api'
 import { Input } from '@/components/ui'
 import PixPayment from './PixPayment'
 import BoletoPayment from './BoletoPayment'
@@ -408,18 +408,40 @@ function ShippingStep({
 
 function PaymentStep({
   total,
-  orderId,
+  ensureOrderId,
   onPaymentCreated,
 }: {
   total: number
-  orderId: string
+  ensureOrderId: (method: PaymentMethod) => Promise<string>
   onPaymentCreated: (paymentId: string, method: PaymentMethod) => void
 }) {
   const { t } = useTranslation('checkout')
   const { result, error, createPayment, simulateConfirm, markConfirmed, markFailed } = usePayment()
+  const user = useAuthStore((s) => s.user)
   const [method, setMethod] = useState<PaymentMethod>('pix')
-  const [payerCPF, setPayerCPF] = useState('')
-  const [payerName, setPayerName] = useState('')
+  // U1: pre-fill com CPF/Nome do user logado quando disponível.
+  // Backend (M6) também busca de /auth/me, mas pre-fill é melhor UX.
+  // Bug B: re-sincroniza se user mudar durante o checkout (login/logout).
+  const [payerCPF, setPayerCPF] = useState(() => user?.cpf ?? '')
+  const [payerName, setPayerName] = useState(() => user?.name ?? '')
+  useEffect(() => {
+    if (user?.cpf) setPayerCPF(user.cpf)
+    if (user?.name) setPayerName(user.name)
+  }, [user?.cpf, user?.name])
+
+  // Persiste a orderId após o primeiro POST /orders bem-sucedido pra evitar
+  // criar pedidos duplicados em retries (regenerate boleto/pix, falha no PSP).
+  const [committedOrderId, setCommittedOrderId] = useState<string | null>(null)
+  const [orderError, setOrderError] = useState<string | null>(null)
+
+  // U2: invalida o pedido cacheado quando:
+  // (a) ensureOrderId muda — items/endereço/frete diferentes, OU
+  // (b) method muda — Bug A: order tem paymentMethod gravado no DB que precisa
+  //     bater com o que o user vai pagar. Order criada como `card` não pode ser
+  //     reusada pra `pix`/`boleto`. Cria nova order com método novo.
+  useEffect(() => {
+    setCommittedOrderId(null)
+  }, [ensureOrderId, method])
 
   const pixTotal = +(total * 0.95).toFixed(2)
   const displayTotal = method === 'pix' ? pixTotal : total
@@ -429,7 +451,25 @@ function PaymentStep({
     payerCPF.replace(/\D/g, '').length === 11 && payerName.trim().length >= 3
   )
 
+  // Garante que existe um order id real do backend antes de criar payment.
+  // Usa cache (committedOrderId) — só cria UMA order por sessão de checkout.
+  async function getOrCreateOrderId(): Promise<string | null> {
+    if (committedOrderId) return committedOrderId
+    setOrderError(null)
+    try {
+      const id = await ensureOrderId(method)
+      setCommittedOrderId(id)
+      return id
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao criar pedido'
+      setOrderError(msg)
+      return null
+    }
+  }
+
   async function handleConfirm() {
+    const orderId = await getOrCreateOrderId()
+    if (!orderId) return
     const extras = method === 'boleto'
       ? { payer_cpf: payerCPF.replace(/\D/g, ''), payer_name: payerName.trim() }
       : undefined
@@ -443,6 +483,8 @@ function PaymentStep({
   }
 
   async function handleRegenerate() {
+    const orderId = committedOrderId ?? await getOrCreateOrderId()
+    if (!orderId) return
     await createPayment(orderId, method, displayTotal)
   }
 
@@ -451,29 +493,34 @@ function PaymentStep({
     if (result) onPaymentCreated(result.paymentId, method)
   }
 
-  if (result && result.status !== 'creating') {
-    return (
-      <div className="flex flex-col gap-5">
-        {method === 'pix' && (
-          <PixPayment
-            result={result}
-            onRegenerate={handleRegenerate}
-            onSimulateConfirm={!isApiEnabled ? simulateConfirm : undefined}
-          />
-        )}
-        {method === 'boleto' && <BoletoPayment result={result} />}
-        {method === 'card' && (
-          <CardPayment
-            result={result}
-            amount={displayTotal}
-            onSimulateConfirm={!isApiEnabled ? simulateConfirm : undefined}
-            onConfirmed={handleStripeConfirmed}
-            onFailed={(msg) => markFailed(msg)}
-          />
-        )}
-      </div>
-    )
-  }
+  // B1: pra cartão, criar o PaymentIntent automaticamente quando o user
+  // seleciona o método. Stripe Elements precisa de clientSecret pra montar;
+  // sem isso, ficamos com tela de método selecionado e nenhum input de cartão
+  // aparece até clicar "Pagar" — UX confusa.
+  // Pix/Boleto continuam sob clique do "Pagar" porque o resultado é um QR
+  // ou boleto que o user precisa decidir gerar conscientemente.
+  useEffect(() => {
+    if (method !== 'card') return
+    // Já temos resultado pra este método? Não recria.
+    if (result && result.method === 'card' && result.status !== 'creating') return
+    // Já está em criação? Não dispara duplicado.
+    if (result?.status === 'creating') return
+    void (async () => {
+      const orderId = await getOrCreateOrderId()
+      if (!orderId) return
+      await createPayment(orderId, 'card', displayTotal)
+    })()
+    // Disparamos quando o método muda OU o total muda (ex: shipping diferente).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method, displayTotal])
+
+  // Result que efetivamente é desta sessão pra esse método (renderiza componente específico).
+  const activeResult = result && result.method === method && result.status !== 'creating'
+    ? result
+    : null
+  // Só considera "creating" se for do método atual — evita travar botão quando
+  // user troca de método durante criação anterior em flight.
+  const isCreating = result?.status === 'creating' && result?.method === method
 
   return (
     <div className="flex flex-col gap-5">
@@ -482,8 +529,11 @@ function PaymentStep({
       {error && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
       )}
+      {orderError && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{orderError}</p>
+      )}
 
-      {/* Method selector */}
+      {/* Method selector — sempre visível pra permitir trocar de método */}
       <div className="grid grid-cols-3 gap-3">
         {(['pix', 'boleto', 'card'] as PaymentMethod[]).map((m) => (
           <button
@@ -508,13 +558,13 @@ function PaymentStep({
         ))}
       </div>
 
-      {method === 'pix' && (
+      {method === 'pix' && !activeResult && (
         <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
           {t('payment.pixDiscount')} — {formatCurrency(pixTotal)}
         </p>
       )}
 
-      {method === 'boleto' && (
+      {method === 'boleto' && !activeResult && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="CPF do pagador"
@@ -534,23 +584,54 @@ function PaymentStep({
         </div>
       )}
 
-      <button
-        onClick={handleConfirm}
-        disabled={result?.status === 'creating' || !boletoReady}
-        className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        {result?.status === 'creating' ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Processando...
-          </>
-        ) : (
-          <>
-            {t('payment.confirm')}
-            <ChevronRight className="h-4 w-4" />
-          </>
-        )}
-      </button>
+      {/* Resultado/UI específico por método */}
+      {activeResult && method === 'pix' && (
+        <PixPayment
+          result={activeResult}
+          onRegenerate={handleRegenerate}
+          onSimulateConfirm={!isApiEnabled ? simulateConfirm : undefined}
+        />
+      )}
+      {activeResult && method === 'boleto' && <BoletoPayment result={activeResult} />}
+      {activeResult && method === 'card' && (
+        <CardPayment
+          result={activeResult}
+          amount={displayTotal}
+          onSimulateConfirm={!isApiEnabled ? simulateConfirm : undefined}
+          onConfirmed={handleStripeConfirmed}
+          onFailed={(msg) => markFailed(msg)}
+        />
+      )}
+
+      {/* Botão "Pagar"/"Continuar" sempre visível quando ainda não há resultado
+          ativo do método selecionado. Pra card, o useEffect de B1 dispara o
+          create automaticamente, mas o botão fica como retry quando falha
+          (ex: STRIPE_SECRET_KEY dummy → 502).
+          Quando o card cria com sucesso e Stripe Elements monta, este botão
+          some e o submit passa a ser o do form do Elements. */}
+      {!activeResult && (
+        <button
+          onClick={handleConfirm}
+          disabled={isCreating || !boletoReady}
+          className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isCreating ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {method === 'card'
+                ? t('card.preparing', { defaultValue: 'Preparando formulário do cartão...' })
+                : 'Processando...'}
+            </>
+          ) : (
+            <>
+              {method === 'card'
+                ? t('card.continue', { defaultValue: 'Continuar com cartão' })
+                : t('payment.confirm')}
+              <ChevronRight className="h-4 w-4" />
+            </>
+          )}
+        </button>
+      )}
     </div>
   )
 }
@@ -613,19 +694,15 @@ export default function CheckoutPage() {
   const navigate = useNavigate()
   const items = useCartStore((s) => s.items)
   const clearCart = useCartStore((s) => s.clearCart)
+  const accessToken = useAuthStore((s) => s.user?.token ?? null)
 
   const [step, setStep] = useState<Step>('address')
-  const [_address, setAddress] = useState<Address | null>(null)
+  const [address, setAddress] = useState<Address | null>(null)
   const [shipping, setShipping] = useState<ShippingOption | null>(null)
 
   const subtotal = items.reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0)
   const shippingCost = shipping?.price ?? 0
   const total = subtotal + shippingCost
-
-  // UUID v4 estável durante a sessão de checkout — backend exige formato UUID.
-  // Quando order-service estiver no fluxo, troca por orderId real do POST /orders.
-  const orderIdRef = useRef<string>(crypto.randomUUID())
-  const orderId = orderIdRef.current
 
   const handleAddressDone = useCallback((addr: Address) => {
     setAddress(addr)
@@ -637,10 +714,60 @@ export default function CheckoutPage() {
     setStep('payment')
   }, [])
 
-  const handlePaymentCreated = useCallback((paymentId: string, method: PaymentMethod) => {
-    clearCart()
-    navigate(`/pedido/${paymentId}?method=${method}`)
-  }, [clearCart, navigate])
+  // U5: cacheia o orderNumber retornado pelo order-service pra mostrar
+  // (humano "2026-XYZ") na tela de confirmação em vez do UUID do payment.
+  const [committedOrderNumber, setCommittedOrderNumber] = useState<string | null>(null)
+
+  // Cria o pedido no order-service quando o usuário confirma o pagamento.
+  // Mantém um único pedido por sessão de checkout (PaymentStep cacheia o id).
+  const ensureOrderId = useCallback(
+    async (method: PaymentMethod): Promise<string> => {
+      if (!isOrderEnabled || !accessToken || !address) {
+        // Fallback dev/mock: gera UUID local. Backend real recusará via 404 se for chamado.
+        return crypto.randomUUID()
+      }
+      const payload = {
+        paymentMethod: method,
+        shippingCost,
+        items: items.map((i) => ({
+          productId: i.productId,
+          name: i.name,
+          icon: i.icon,
+          sellerId: i.sellerId,
+          sellerName: i.sellerName,
+          quantity: i.quantity,
+          unitPrice: i.priceSnapshot,
+        })),
+        address: {
+          street: address.street,
+          number: address.number,
+          complement: address.complement || undefined,
+          neighborhood: address.neighborhood,
+          city: address.city,
+          state: address.state,
+          cep: address.cep.replace(/\D/g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2'),
+        },
+      }
+      const order = await orderPostWithJWT<{ id: string; number: string }>(
+        '/api/v1/orders',
+        accessToken,
+        payload,
+      )
+      setCommittedOrderNumber(order.number)
+      return order.id
+    },
+    [accessToken, address, items, shippingCost],
+  )
+
+  const handlePaymentCreated = useCallback(
+    (paymentId: string, method: PaymentMethod) => {
+      clearCart()
+      navigate(`/pedido/${paymentId}?method=${method}`, {
+        state: committedOrderNumber ? { orderNumber: committedOrderNumber } : undefined,
+      })
+    },
+    [clearCart, navigate, committedOrderNumber],
+  )
 
   if (items.length === 0 && step === 'address') {
     navigate('/carrinho')
@@ -663,7 +790,7 @@ export default function CheckoutPage() {
           {step === 'payment' && (
             <PaymentStep
               total={total}
-              orderId={orderId}
+              ensureOrderId={ensureOrderId}
               onPaymentCreated={handlePaymentCreated}
             />
           )}

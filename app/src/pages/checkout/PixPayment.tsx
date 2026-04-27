@@ -83,7 +83,13 @@ export default function PixPayment({ result, onRegenerate, onSimulateConfirm }: 
             <p className="text-sm text-gray-500">{t('pix.scanQR')}</p>
             {result.qrCodeBase64 ? (
               <img
-                src={`data:image/png;base64,${result.qrCodeBase64}`}
+                // Stripe entrega URL HTTP em pix_display_qr_code.image_url_png;
+                // MP/mock entregam base64 nu — detecta e prefixa só nesse caso.
+                src={
+                  result.qrCodeBase64.startsWith('http')
+                    ? result.qrCodeBase64
+                    : `data:image/png;base64,${result.qrCodeBase64}`
+                }
                 alt="QR Code Pix"
                 className="w-48 h-48 rounded-lg border border-gray-200"
               />

@@ -9,9 +9,11 @@ app/dist/
 .env
 .env.local
 .env.*.local
+.env.local.bak*
 app/.env
 app/.env.local
 app/.env.*.local
+app/.env.local.bak*
 
 # Editor
 .vscode/

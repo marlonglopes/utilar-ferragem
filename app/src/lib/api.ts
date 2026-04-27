@@ -13,6 +13,57 @@ interface ApiError {
   messages?: string[]
 }
 
+// Hooks injetados pelo App em runtime — evita ciclo de dependência com o store
+// e mantém api.ts isolado de React. Sem hook setado, 401 só "throw" como antes.
+type AuthHooks = {
+  getToken: () => string | null
+  getRefreshToken: () => string | null
+  setAccessToken: (token: string) => void
+  clearSession: () => void
+}
+let authHooks: AuthHooks | null = null
+export function configureAuthHooks(hooks: AuthHooks) {
+  authHooks = hooks
+}
+
+// Estado pra evitar refresh paralelo: se múltiplas requests dispararem 401
+// simultâneas, só um refresh acontece e os outros aguardam o mesmo Promise.
+let inflightRefresh: Promise<string | null> | null = null
+
+async function tryRefreshToken(): Promise<string | null> {
+  if (!authHooks) return null
+  if (inflightRefresh) return inflightRefresh
+  const refreshToken = authHooks.getRefreshToken()
+  if (!refreshToken) return null
+
+  inflightRefresh = (async () => {
+    try {
+      const res = await fetch(`${AUTH_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      })
+      if (!res.ok) {
+        authHooks?.clearSession()
+        return null
+      }
+      const data = (await res.json()) as { accessToken?: string }
+      if (!data.accessToken) {
+        authHooks?.clearSession()
+        return null
+      }
+      authHooks?.setAccessToken(data.accessToken)
+      return data.accessToken
+    } catch {
+      authHooks?.clearSession()
+      return null
+    } finally {
+      inflightRefresh = null
+    }
+  })()
+  return inflightRefresh
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body: ApiError = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
@@ -21,32 +72,47 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
+// Wrapper que tenta refresh se a resposta for 401 e há refreshToken disponível.
+// Retorna a Response final (já com retry feito ou a 401 original se refresh falhou).
+async function fetchWithAutoRefresh(
+  doFetch: (token: string | null) => Promise<Response>,
+  initialToken?: string,
+): Promise<Response> {
+  const tokenAttempt1 = initialToken ?? null
+  let res = await doFetch(tokenAttempt1)
+  if (res.status !== 401 || !authHooks) return res
+  // 401 — tenta um refresh + retry uma única vez. Se falhar, clearSession já foi
+  // chamado por tryRefreshToken e a Response 401 cai pro caller normalmente.
+  const newToken = await tryRefreshToken()
+  if (!newToken) return res
+  res = await doFetch(newToken)
+  return res
+}
+
 export async function apiPost<T>(path: string, body: unknown, token?: string): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  })
+  const res = await fetchWithAutoRefresh((tok) => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (tok) headers['Authorization'] = `Bearer ${tok}`
+    return fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
+  }, token)
   return handleResponse<T>(res)
 }
 
 export async function apiGet<T>(path: string, token?: string): Promise<T> {
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  const res = await fetch(`${BASE_URL}${path}`, { headers })
+  const res = await fetchWithAutoRefresh((tok) => {
+    const headers: Record<string, string> = {}
+    if (tok) headers['Authorization'] = `Bearer ${tok}`
+    return fetch(`${BASE_URL}${path}`, { headers })
+  }, token)
   return handleResponse<T>(res)
 }
 
 export async function apiPatch<T>(path: string, body: unknown, token?: string): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: 'PATCH',
-    headers,
-    body: JSON.stringify(body),
-  })
+  const res = await fetchWithAutoRefresh((tok) => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (tok) headers['Authorization'] = `Bearer ${tok}`
+    return fetch(`${BASE_URL}${path}`, { method: 'PATCH', headers, body: JSON.stringify(body) })
+  }, token)
   return handleResponse<T>(res)
 }
 
@@ -114,28 +180,31 @@ export async function authGet<T>(path: string, token: string): Promise<T> {
 
 // Quando auth-service está ligado, o frontend passa o JWT como Bearer para order-service.
 // Essa helper troca X-User-Id por Authorization quando aplicável.
+// Usa fetchWithAutoRefresh: 401 dispara refresh+retry automático.
 export async function orderGetWithJWT<T>(path: string, token: string): Promise<T> {
-  const res = await fetch(`${ORDER_URL}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  const res = await fetchWithAutoRefresh((tok) => {
+    return fetch(`${ORDER_URL}${path}`, {
+      headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+    })
+  }, token)
   if (res.status === 404) throw new Error('not_found')
   return handleResponse<T>(res)
 }
 
 export async function orderPostWithJWT<T>(path: string, token: string, body: unknown): Promise<T> {
-  const res = await fetch(`${ORDER_URL}${path}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  const res = await fetchWithAutoRefresh((tok) => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (tok) headers['Authorization'] = `Bearer ${tok}`
+    return fetch(`${ORDER_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
+  }, token)
   return handleResponse<T>(res)
 }
 
 export async function orderPatchWithJWT<T>(path: string, token: string, body: unknown = {}): Promise<T> {
-  const res = await fetch(`${ORDER_URL}${path}`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  const res = await fetchWithAutoRefresh((tok) => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (tok) headers['Authorization'] = `Bearer ${tok}`
+    return fetch(`${ORDER_URL}${path}`, { method: 'PATCH', headers, body: JSON.stringify(body) })
+  }, token)
   return handleResponse<T>(res)
 }
