@@ -40,6 +40,7 @@ type Config struct {
 	RedisURL string
 }
 
+// #nosec G101 — placeholder dev-only, rejeitado em prod via fail-closed em Load().
 const devSecret = "dev-only-secret-not-for-production"
 
 func Load() (*Config, error) {

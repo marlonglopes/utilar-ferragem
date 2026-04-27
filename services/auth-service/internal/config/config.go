@@ -22,6 +22,7 @@ type Config struct {
 
 // devSecret só é aceito em DEV_MODE=true. Em prod, JWT_SECRET é obrigatório
 // e qualquer valor que comece com "change-me" é rejeitado (audit A2-C2).
+// #nosec G101 — placeholder dev-only, rejeitado em prod via fail-closed em Load().
 const devSecret = "dev-only-secret-not-for-production"
 
 // ErrInsecureJWTSecret é retornado se JWT_SECRET não está configurado ou usa

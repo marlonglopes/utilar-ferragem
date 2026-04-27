@@ -97,6 +97,10 @@ func (h *ProductHandler) List(c *gin.Context) {
 	offset := (params.Page - 1) * params.PerPage
 	args = append(args, params.PerPage, offset)
 
+	// #nosec G202 — whereSQL/orderBy são construídos só de literais hardcoded
+	// (`p.brand = $N`, `p.price ASC`, etc.) com placeholders posicionais.
+	// orderBy passa por whitelist em parseProductsQuery (CT1-M3); valores
+	// entram via `args`. Atacante não controla os fragmentos de SQL.
 	querySQL := `
 		SELECT
 		  p.id, p.slug, p.name, p.category_id, p.price, p.original_price, p.currency, p.icon, p.brand,
@@ -255,7 +259,10 @@ func (h *ProductHandler) Facets(c *gin.Context) {
 	}
 	whereSQL := strings.Join(where, " AND ")
 
-	// Brands with counts
+	// Brands with counts.
+	// #nosec G202 — whereSQL é construído só de literais hardcoded (`p.brand = $N`,
+	// `p.category_id = $N`, etc) com placeholders posicionais; valores entram via `args`,
+	// nunca em string concat. Atacante não controla os fragmentos de SQL.
 	brandSQL := `
 		SELECT p.brand, count(*) AS cnt
 		FROM products p

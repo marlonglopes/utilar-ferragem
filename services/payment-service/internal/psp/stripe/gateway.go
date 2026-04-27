@@ -144,12 +144,16 @@ func (g *Gateway) CreatePayment(ctx context.Context, req psp.CreateRequest) (*ps
 		return nil, fmt.Errorf("%w: %v", psp.ErrUpstream, err)
 	}
 
+	// #nosec G117 — `pi` inclui client_secret, que é deliberadamente público
+	// (expira ao confirmar, escopado a um único PaymentIntent, projetado pra
+	// uso em browser via stripe.confirmPayment). RawPayload passa por
+	// redactPSPPayload antes do INSERT em psp_payload (M2).
 	raw, _ := json.Marshal(pi)
 
 	return &psp.CreateResult{
 		PSPID:        pi.ID,
 		Status:       normalizeStatus(string(pi.Status)),
-		ClientSecret: pi.ClientSecret, // frontend usa isso no stripe.confirmPayment
+		ClientSecret: pi.ClientSecret,
 		ClientData:   extractClientData(pi),
 		RawPayload:   raw,
 	}, nil
@@ -165,6 +169,9 @@ func (g *Gateway) GetPayment(ctx context.Context, pspID string) (*psp.GetResult,
 		}
 		return nil, fmt.Errorf("%w: %v", psp.ErrUpstream, err)
 	}
+	// #nosec G117 — `pi` (PaymentIntent) inclui client_secret, que é
+	// deliberadamente público (vide nota acima). RawPayload passa por
+	// redactPSPPayload antes do INSERT em psp_payload (M2).
 	raw, _ := json.Marshal(pi)
 	return &psp.GetResult{
 		PSPID:      pi.ID,

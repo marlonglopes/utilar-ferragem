@@ -16,6 +16,7 @@ type Config struct {
 	RedisURL          string // O3-M3: vazio = rate limit desabilitado
 }
 
+// #nosec G101 — placeholder dev-only, rejeitado em prod via fail-closed em Load().
 const devSecret = "dev-only-secret-not-for-production"
 
 // ErrInsecureJWTSecret é retornado se JWT_SECRET não está configurado ou usa
