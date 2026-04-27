@@ -6,8 +6,9 @@
 | **Escopo** | `services/payment-service/` (commit `a3a860a`) — handlers, middlewares, webhook, outbox, cliente Mercado Pago, migrations |
 | **Revisor** | Claude Opus 4.7 (1M context) + validação conjunta com fundador |
 | **Motivação** | Payment-service é o core financeiro do ecossistema; antes de habilitar MP em prod ou alto volume sandbox, blindar contra fraude |
-| **Status** | ⛔ **BLOQUEADO PARA PRODUÇÃO** até resolução das vulnerabilidades críticas |
-| **Próximo passo** | Sprint 8.5 — Payment Hardening (ver §8) |
+| **Status** | 🟡 **CRITICAL fechados em 2026-04-27** — payment-service tecnicamente desbloqueado pra prod; HIGH/MEDIUM/LOW pendentes (ver §8) |
+| **Próximo passo** | Sprint 8.5 — Hardening operacional (Idempotency-Key, rate limit, CORS whitelist, etc) |
+| **Status fix CRITICALs** | C1 ✅ \| C2 ✅ \| C3 ✅ \| C4 ✅ \| C5 ✅ — ver [§8 status atualizado](#status-da-remediação-2026-04-27) |
 
 ---
 
@@ -496,19 +497,44 @@ MP retorna em `/v1/payments/:id` campos como `card.last_four_digits`, `card.firs
 
 ---
 
+## Status da remediação (2026-04-27)
+
+Todos os 5 CRITICALs originais foram fechados. Detalhes:
+
+| Issue | Status | Commit/PR | Localização do fix |
+|---|---|---|---|
+| **C1** Tamper de amount | ✅ Fechado | 2026-04-27 | [payment.go](../../services/payment-service/internal/handler/payment.go) — `authoritativeAmount` vem do order-service; body amount é apenas hint (logado se diverge). [orderclient/](../../services/payment-service/internal/orderclient/) implementa o fetch com JWT propagation. |
+| **C2** Ownership de order_id | ✅ Fechado | 2026-04-27 | order-service já filtra por user_id — payment chama `orderClient.Get` e recebe 404 se não-dono. Defesa em profundidade: `order.UserID == jwt.sub` revalidado no payment. |
+| **C3** Webhook não valida amount | ✅ Fechado | 2026-04-27 | [webhook.go](../../services/payment-service/internal/handler/webhook.go) — `processEvent` chama `gateway.GetPayment(pspID)` antes de promover status. Amount mismatch → flag `psp_metadata.amount_mismatch=true` + outbox event `payment.fraud_suspect` + status fica em pending pra revisão. |
+| **C4** HMAC MP fora do protocolo | ✅ Fechado | 2026-04-27 | [psp/mercadopago/gateway.go](../../services/payment-service/internal/psp/mercadopago/gateway.go) — `VerifyWebhook` parsa `ts=X,v1=Y`, monta manifest `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`, HMAC-SHA256 + constant-time compare. Replay window de 5min. Stripe já estava OK via SDK oficial. |
+| **C5** Fail-closed ausente | ✅ Fechado | 2026-04-27 | [config/config.go](../../services/payment-service/internal/config/config.go) — `Load()` recusa subir em prod se `STRIPE_WEBHOOK_SECRET` (PSP=stripe) ou `MP_WEBHOOK_SECRET` (PSP=mp) estiver vazio. Mesma proteção pro `JWT_SECRET` (audit transversal — fechado em 2026-04-26). |
+
+**Testes adicionados** (28 novos):
+- [internal/config/config_test.go](../../services/payment-service/internal/config/config_test.go) — 8 testes de fail-closed do JWT + webhook secrets
+- [internal/handler/webhook_test.go](../../services/payment-service/internal/handler/webhook_test.go) — 4 integration tests: idempotency, invalid signature, provider mismatch, **amount mismatch rejecting confirmation** (C3)
+- [internal/handler/payment_security_test.go](../../services/payment-service/internal/handler/payment_security_test.go) — 7 testes: amount tamper bloqueado, order not found = 404, user mismatch = 404, already-paid = 400, missing bearer = 401, dev/prod sem orderClient
+- [internal/orderclient/client_test.go](../../services/payment-service/internal/orderclient/client_test.go) — 7 testes: success, 404, 401, 5xx, empty inputs, JWT propagation
+- [internal/psp/mercadopago/webhook_test.go](../../services/payment-service/internal/psp/mercadopago/webhook_test.go) — 23 subtests: V2 format, legacy resource format, missing/bad/tampered signature, replay (old/future ts), malformed header, dataID extraction
+
+Total payment-service: ~50 testes Go, **todos verdes**.
+
+**Nota**: o `payment-service` está agora tecnicamente desbloqueado para deploy em prod no que diz respeito aos CRITICALs originais. As HIGH (Idempotency-Key, rate limit, CORS whitelist, etc.) ainda recomendam-se antes de tráfego significativo — ver §8 abaixo.
+
+---
+
 ## 8. Plano de remediação — Sprint 8.5 (Payment Hardening)
 
 **Objetivo:** desbloquear produção do payment-service. Esforço estimado: **~2 dias** (16h).
 
-### Fase 1 — Bloqueadores de produção (dia 1, ~8h)
+### Fase 1 — Bloqueadores de produção (dia 1, ~8h) — ✅ CONCLUÍDA 2026-04-27
 
-| Task | Issue | Esforço |
-|---|---|---|
-| 1.1 Propagar JWT do cliente no HTTP call ao order-service para validar order + pegar total | C1, C2 | 3h |
-| 1.2 Validar amount do webhook contra MP via `GetPayment` | C3 | 2h |
-| 1.3 Implementar HMAC do MP com formato `ts=X,v1=Y` + replay window | C4 | 2h |
-| 1.4 Fail-closed em config para `MP_WEBHOOK_SECRET` e `JWT_SECRET` em prod | C5, M4 | 30min |
-| 1.5 Testes de integração para C1-C5 | — | 30min |
+| Task | Issue | Esforço | Status |
+|---|---|---|---|
+| 1.1 Propagar JWT do cliente no HTTP call ao order-service para validar order + pegar total | C1, C2 | 3h | ✅ |
+| 1.2 Validar amount do webhook contra PSP via `GetPayment` | C3 | 2h | ✅ |
+| 1.3 Implementar HMAC do MP com formato `ts=X,v1=Y` + replay window | C4 | 2h | ✅ |
+| 1.4 Fail-closed em config para webhook secrets + `JWT_SECRET` em prod | C5, M4 | 30min | ✅ |
+| 1.5 Testes de integração para C1-C5 | — | 30min | ✅ (50+ testes adicionados) |
 
 ### Fase 2 — Hardening operacional (dia 2, ~8h)
 

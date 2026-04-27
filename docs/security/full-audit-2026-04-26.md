@@ -205,7 +205,7 @@ Esta sessão corrige transversalmente 2 padrões que também afetam payment:
 
 ### Backlog restante
 
-1. **Sprint 8.5 — payment hardening** (~16h): C1 tamper amount, C2 ownership, C3 webhook amount, C4 HMAC MP, C5 fail-closed
+1. ~~**Sprint 8.5 — payment hardening** (~16h): C1 tamper amount, C2 ownership, C3 webhook amount, C4 HMAC MP, C5 fail-closed~~ — ✅ **Fase 1 (5 CRITICALs) concluída em 2026-04-27**. Fase 2 (HIGHs operacionais — Idempotency-Key, rate limit, CORS whitelist, MaxBytesReader) ainda pendente (~8h). Ver [audit do payment](payment-service-audit-2026-04-24.md#status-da-remediação-2026-04-27)
 2. **Rate limiting** (~4h): Redis + middleware em auth (login/forgot/reset) e catalog (search)
 3. **Token hashing** (~3h): migration pra hashar refresh/reset/verify tokens no DB
 4. **Security headers** (~30min): CSP, HSTS, X-Frame-Options, X-Content-Type-Options

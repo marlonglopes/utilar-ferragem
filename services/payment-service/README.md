@@ -105,7 +105,7 @@ Middleware: `JWTMiddleware(JWT_SECRET)` decodifica `Authorization: Bearer <JWT>`
 - **Boleto (Stripe):** `next_action.boleto_display_details.hosted_voucher_url` (HTML imprimível) + `pdf` + `number` (linha digitável).
 - **Card (MP):** `psp_payload.init_point` (URL do Checkout Pro — redirect).
 
-> **Nota (audit issues C1/C2):** `amount`, `order_id` e `payer_*` ainda vêm do cliente neste momento. Sprint 8.5 troca isso por propagação JWT → auth-service (CPF/nome) + order-service (amount/ownership). Ver [audit](../../docs/security/payment-service-audit-2026-04-24.md).
+> **Nota (audit C1/C2 — fechado em 2026-04-27):** `amount` e `order_id` agora são validados via order-service. O backend chama `GET /api/v1/orders/:id` propagando o JWT do cliente; usa `order.total` autoritativamente (body amount vira hint), e o order-service responde 404 se o pedido não pertence ao user. Detalhes: [§Segurança abaixo](#segurança--sprint-85-fase-1--2026-04-27). `payer_cpf`/`payer_name` ainda vêm do cliente (backlog: buscar do auth-service). Ver [audit](../../docs/security/payment-service-audit-2026-04-24.md).
 
 ---
 
@@ -115,8 +115,11 @@ Middleware: `JWTMiddleware(JWT_SECRET)` decodifica `Authorization: Bearer <JWT>`
 |---|---|---|
 | `PORT` | `8090` | porta HTTP |
 | `PAYMENT_DB_URL` | `postgres://utilar:utilar@localhost:5435/payment_service?sslmode=disable` | DSN Postgres |
-| `JWT_SECRET` | `change-me` | **precisa ser o mesmo** em auth + order + payment |
-| `MP_ACCESS_TOKEN` | — | **obrigatório** — token sandbox/prod do Mercado Pago |
+| `JWT_SECRET` | (obrigatório em prod) | **mesmo valor** em auth + order + payment; em prod precisa ≥ 32 chars não-default; em dev (`DEV_MODE=true`) aceita qualquer coisa |
+| `DEV_MODE` | `false` | `true` libera fallbacks de dev (X-User-Id, secret curto, webhook sem secret). NUNCA em prod |
+| `ORDER_SERVICE_URL` | `http://localhost:8092` | base URL pro `GET /orders/:id` (audit C1/C2) |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | (obrigatórios em prod se `PSP_PROVIDER=stripe`) | secret + webhook signing key da Stripe |
+| `MP_ACCESS_TOKEN` / `MP_WEBHOOK_SECRET` | (obrigatórios em prod se `PSP_PROVIDER=mercadopago`) | token + webhook signing key do MP |
 | `MP_PUBLIC_KEY` | — | chave pública MP (usada pelo frontend; serviço apenas propaga) |
 | `MP_WEBHOOK_SECRET` | — | segredo para verificar HMAC dos webhooks |
 | `REDPANDA_BROKERS` | `localhost:19092` | brokers do Redpanda para publicar outbox |
@@ -298,13 +301,23 @@ Mercado Pago   payment-service             payments_outbox   Redpanda   order-se
 
 ---
 
+## Segurança — Sprint 8.5 Fase 1 ✅ (2026-04-27)
+
+5 CRITICALs do [audit](../../docs/security/payment-service-audit-2026-04-24.md) fechados:
+
+- **C1+C2 — cross-service amount/ownership**: `POST /api/v1/payments` agora chama `GET /api/v1/orders/:id` no order-service propagando o JWT do cliente. O `amount` que vai pro PSP vem de `order.total` (server-side); body amount vira hint logado. Se order não existe, não pertence ao user, ou está em status que não aceita pagamento → 4xx. Cliente: [`internal/orderclient`](internal/orderclient/).
+- **C3 — webhook valida amount via PSP**: handler reescrito provider-agnostic em `/webhooks/:provider`. Antes de promover status, chama `gateway.GetPayment(pspID)` e compara `pspResult.Amount` com `payments.amount` local. Mismatch → não confirma + flag `psp_metadata.amount_mismatch=true` + outbox event `payment.fraud_suspect` pra revisão manual.
+- **C4 — MP HMAC formato V2**: `parseMPSignatureHeader` parsa `ts=X,v1=Y`, manifest `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`, HMAC-SHA256 + `hmac.Equal` constant-time, replay window de 5 minutos. Stripe já estava OK via SDK oficial.
+- **C5 — fail-closed**: `config.Load` em produção (`DEV_MODE=false`) recusa subir sem `STRIPE_WEBHOOK_SECRET` (PSP=stripe) ou `MP_WEBHOOK_SECRET` (PSP=mp). Mesmo padrão pro `JWT_SECRET` (auth/order/payment).
+
+50+ testes Go cobrindo os fixes — ver `internal/{config,handler,orderclient}/*_test.go` + `internal/psp/mercadopago/webhook_test.go`.
+
 ## Próximos passos
 
-- **Webhook genérico `/webhooks/:provider`** — handler usando `Gateway.VerifyWebhook` + `ParseWebhookEvent`. Roda `stripe listen --forward-to localhost:8090/webhooks/stripe` em dev pra promover `pending → confirmed` automaticamente.
-- **Sprint 8.5 — Hardening** — endereçar 5 CRITICAL + 5 HIGH do [audit](../../docs/security/payment-service-audit-2026-04-24.md): tamper de amount, ownership, validação de amount no webhook, fail-closed quando webhook secret ausente.
-- **Sprint 15** — disputas/estornos: endpoints `POST /payments/:id/refund`, webhook `chargeback.*`.
-- **Sprint 22** — métricas Prometheus em `/metrics`, Sentry SDK, alertas payment_success_rate < 95%.
-- **order-service integration** — quando `payment.confirmed` chega no Redpanda, order-service consome e atualiza `orders.status` + `paid_at`. (hoje o drainer publica mas ninguém consome ainda.)
+- **Sprint 8.5 Fase 2 — Hardening operacional** (~8h): Idempotency-Key, rate limit em `/payments`, CORS whitelist via env, `MaxBytesReader` no body, JWT claims tipadas.
+- **order-service consumer** — quando `payment.confirmed` chega no Redpanda, order-service consome e avança status pra `paid` + `paid_at`. (Hoje drainer publica mas ninguém consome.)
+- **Sprint 15** — disputas/estornos: `POST /payments/:id/refund`, webhook `chargeback.*`.
+- **Sprint 22** — métricas Prometheus em `/metrics`, Sentry SDK, alertas `payment_success_rate < 95%`.
 
 ---
 

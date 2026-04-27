@@ -5,26 +5,61 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/utilar/payment-service/internal/model"
+	"github.com/utilar/payment-service/internal/orderclient"
 	"github.com/utilar/payment-service/internal/psp"
 )
 
-type PaymentHandler struct {
-	db      *sql.DB
-	gateway psp.Gateway
+// extractBearerToken pega o JWT do header Authorization. Vazio se ausente/malformado.
+func extractBearerToken(c *gin.Context) string {
+	auth := c.GetHeader("Authorization")
+	if !strings.HasPrefix(auth, "Bearer ") {
+		return ""
+	}
+	return strings.TrimPrefix(auth, "Bearer ")
 }
 
-func NewPaymentHandler(db *sql.DB, gateway psp.Gateway) *PaymentHandler {
-	return &PaymentHandler{db: db, gateway: gateway}
+// OrderLookup é a interface que o PaymentHandler precisa pra resolver pedidos.
+// Definida aqui (ao invés de usar diretamente *orderclient.Client) pra permitir
+// mock em testes e pra facilitar swap futuro (gRPC, message bus etc).
+type OrderLookup interface {
+	Get(ctx context.Context, orderID, jwt string) (*orderclient.Order, error)
+}
+
+type PaymentHandler struct {
+	db          *sql.DB
+	gateway     psp.Gateway
+	orderClient OrderLookup
+	devMode     bool // permite skip da validação cross-service em tests/dev
+}
+
+func NewPaymentHandler(db *sql.DB, gateway psp.Gateway, orderClient OrderLookup, devMode bool) *PaymentHandler {
+	return &PaymentHandler{
+		db:          db,
+		gateway:     gateway,
+		orderClient: orderClient,
+		devMode:     devMode,
+	}
 }
 
 // Create handles POST /api/v1/payments
+//
+// SEGURANÇA (audit C1, C2):
+//   - Antes de criar o pagamento, busca o pedido no order-service propagando o
+//     JWT do cliente. order-service filtra por user_id, então 404 = "não é seu".
+//   - O `amount` é DERIVADO do `order.total` retornado pelo order-service —
+//     ignoramos qualquer valor que o cliente envie no body. Logamos warning
+//     se diverge (sinal de bug ou tentativa de tamper).
+//   - Em DevMode, se `orderClient` for nil, fazemos best-effort com o amount
+//     do body (com warning).
 func (h *PaymentHandler) Create(c *gin.Context) {
 	var req model.CreatePaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -39,30 +74,97 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Insert payment row (pending) — ainda sem psp_payment_id
+	// Resolve order no order-service (audit C1+C2).
+	// authoritativeAmount é o que vamos cobrar — sempre source-of-truth do server.
+	authoritativeAmount := req.Amount
+	if h.orderClient != nil {
+		jwt := extractBearerToken(c)
+		if jwt == "" {
+			Unauthorized(c, "missing bearer token")
+			return
+		}
+
+		order, err := h.orderClient.Get(c.Request.Context(), req.OrderID, jwt)
+		if err != nil {
+			switch {
+			case errors.Is(err, orderclient.ErrNotFound):
+				// Pedido não existe OU não pertence ao user — mesma 404 (anti-enum).
+				NotFound(c, "order not found")
+			case errors.Is(err, orderclient.ErrUnauthorized):
+				Unauthorized(c, "invalid token")
+			default:
+				slog.Error("create payment: order lookup",
+					"order_id", req.OrderID,
+					"error", err,
+					"request_id", c.GetString("request_id"))
+				BadGateway(c, "order service unavailable")
+			}
+			return
+		}
+
+		// Sanity check: order.userId precisa bater com o JWT (defesa em profundidade).
+		if order.UserID != userID {
+			slog.Error("create payment: order user mismatch — possible auth bug",
+				"order_id", req.OrderID,
+				"order_user", order.UserID,
+				"jwt_user", userID,
+				"request_id", c.GetString("request_id"))
+			NotFound(c, "order not found")
+			return
+		}
+
+		// Status do pedido tem que permitir pagamento.
+		if order.Status != "pending_payment" {
+			BadRequest(c, fmt.Sprintf("order status %q does not accept payments", order.Status))
+			return
+		}
+
+		// AMOUNT AUTHORITATIVE — vem do order-service, não do body.
+		// Se diverge do que o cliente mandou, loga (mas usa o do server).
+		if math.Abs(req.Amount-order.Total) > 0.01 {
+			slog.Warn("create payment: amount mismatch — using server-side total",
+				"client_amount", req.Amount,
+				"server_amount", order.Total,
+				"order_id", req.OrderID,
+				"user_id", userID,
+				"request_id", c.GetString("request_id"))
+		}
+		authoritativeAmount = order.Total
+	} else if !h.devMode {
+		// Sem orderClient e não está em dev → config bug
+		slog.Error("create payment: orderClient is nil in non-dev mode",
+			"request_id", c.GetString("request_id"))
+		InternalError(c, "service misconfigured")
+		return
+	} else {
+		slog.Warn("create payment: skipping order validation (dev mode, no orderClient)",
+			"request_id", c.GetString("request_id"))
+	}
+
+	// Insert payment row (pending) — usa amount autoritativo
 	var paymentID string
 	err := h.db.QueryRow(`
 		INSERT INTO payments (order_id, user_id, method, amount)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id
-	`, req.OrderID, userID, req.Method, req.Amount).Scan(&paymentID)
+	`, req.OrderID, userID, req.Method, authoritativeAmount).Scan(&paymentID)
 	if err != nil {
 		slog.Error("create payment: db insert", "error", err, "request_id", c.GetString("request_id"))
 		InternalError(c, "could not create payment")
 		return
 	}
 
-	// Call PSP via Gateway abstraction
+	// Call PSP via Gateway abstraction com amount autoritativo
 	pspReq := psp.CreateRequest{
 		OrderID:        req.OrderID,
 		UserID:         userID,
-		Amount:         req.Amount,
+		Amount:         authoritativeAmount,
 		Currency:       "BRL",
 		Method:         psp.PaymentMethod(req.Method),
 		PayerEmail:     userEmail,
 		PayerName:      req.PayerName,
 		PayerCPF:       req.PayerCPF,
-		IdempotencyKey: c.GetString("request_id"), // foundation de H1 — melhoraremos na Sprint 8.5
+		IdempotencyKey: c.GetString("request_id"),
 	}
 	result, pspErr := h.gateway.CreatePayment(c.Request.Context(), pspReq)
 

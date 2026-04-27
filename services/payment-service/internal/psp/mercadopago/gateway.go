@@ -126,28 +126,117 @@ func (g *Gateway) GetPayment(ctx context.Context, pspID string) (*psp.GetResult,
 	}, nil
 }
 
-// VerifyWebhook valida x-signature (formato ts=X,v1=Y).
-// NOTA: implementação atual é parcial — a versão correta (template
-// "id:<data.id>;request-id:<req-id>;ts:<ts>;") entra na Sprint 8.5 C4.
-// Em dev com webhookSecret="", pula validação.
+// maxClockSkew — janela de replay aceita pra timestamp do webhook.
+// MP recomenda 5min. Webhooks com ts mais antigos são rejeitados como replay.
+const maxClockSkew = 5 * time.Minute
+
+// VerifyWebhook valida o header `x-signature` no formato oficial Mercado Pago
+// Webhook V2 (audit C4):
+//   - Parse `x-signature: ts=TIMESTAMP,v1=HASH`
+//   - Manifest: `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`
+//   - HMAC-SHA256(manifest, secret), constant-time compare com v1
+//   - Replay protection: rejeita ts com delta > maxClockSkew
+//
+// Em dev com webhookSecret="", pula validação (audit C5 — controle separado
+// no config.Load fail-closed).
+//
+// Refs: https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks
 func (g *Gateway) VerifyWebhook(body []byte, headers http.Header) error {
 	if g.webhookSecret == "" {
-		return nil // dev mode — ver issue C5 do audit
+		return nil
 	}
 
-	sig := headers.Get("x-signature")
+	sig := headers.Get("X-Signature")
 	if sig == "" {
-		return psp.ErrInvalidSignature
+		// Tenta lowercase também (Gin canonicaliza, mas defensivo)
+		sig = headers.Get("x-signature")
+	}
+	if sig == "" {
+		return fmt.Errorf("%w: missing x-signature header", psp.ErrInvalidSignature)
 	}
 
-	// Implementação simplificada — Sprint 8.5 C4 vai tratar formato correto
+	requestID := headers.Get("X-Request-Id")
+	if requestID == "" {
+		return fmt.Errorf("%w: missing x-request-id header", psp.ErrInvalidSignature)
+	}
+
+	ts, v1, err := parseMPSignatureHeader(sig)
+	if err != nil {
+		return fmt.Errorf("%w: %v", psp.ErrInvalidSignature, err)
+	}
+
+	// Replay protection
+	tsInt, err := strconv.ParseInt(ts, 10, 64)
+	if err != nil {
+		return fmt.Errorf("%w: ts not numeric", psp.ErrInvalidSignature)
+	}
+	if delta := time.Since(time.UnixMilli(tsInt)); delta > maxClockSkew || delta < -maxClockSkew {
+		return fmt.Errorf("%w: ts out of window (delta=%s)", psp.ErrInvalidSignature, delta)
+	}
+
+	dataID, err := extractDataID(body)
+	if err != nil {
+		return fmt.Errorf("%w: %v", psp.ErrInvalidSignature, err)
+	}
+
+	manifest := fmt.Sprintf("id:%s;request-id:%s;ts:%s;", dataID, requestID, ts)
 	mac := hmac.New(sha256.New, []byte(g.webhookSecret))
-	mac.Write(body)
+	mac.Write([]byte(manifest))
 	expected := hex.EncodeToString(mac.Sum(nil))
-	if !hmac.Equal([]byte(expected), []byte(sig)) {
-		return psp.ErrInvalidSignature
+
+	if !hmac.Equal([]byte(expected), []byte(v1)) {
+		return fmt.Errorf("%w: hmac mismatch", psp.ErrInvalidSignature)
 	}
 	return nil
+}
+
+// parseMPSignatureHeader parsa o header `ts=X,v1=Y` do Mercado Pago.
+// Aceita campos em qualquer ordem e ignora campos desconhecidos.
+func parseMPSignatureHeader(h string) (ts, v1 string, err error) {
+	for _, part := range strings.Split(h, ",") {
+		kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key, val := strings.TrimSpace(kv[0]), strings.TrimSpace(kv[1])
+		switch key {
+		case "ts":
+			ts = val
+		case "v1":
+			v1 = val
+		}
+	}
+	if ts == "" || v1 == "" {
+		return "", "", fmt.Errorf("malformed signature header (missing ts/v1)")
+	}
+	return ts, v1, nil
+}
+
+// extractDataID extrai `data.id` do body do webhook MP. Suporta formato V2
+// (`{"data":{"id":"..."}}`) e fallback legacy (`{"resource":"...","topic":"payment"}`)
+// extraindo o ID do final da URL do resource.
+func extractDataID(body []byte) (string, error) {
+	var v2 struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &v2); err == nil && v2.Data.ID != "" {
+		return v2.Data.ID, nil
+	}
+
+	var legacy struct {
+		Resource string `json:"resource"`
+	}
+	if err := json.Unmarshal(body, &legacy); err == nil && legacy.Resource != "" {
+		// Resource format: ".../payments/<id>"
+		idx := strings.LastIndex(legacy.Resource, "/")
+		if idx >= 0 && idx+1 < len(legacy.Resource) {
+			return legacy.Resource[idx+1:], nil
+		}
+	}
+
+	return "", fmt.Errorf("could not extract data.id from body")
 }
 
 // ParseWebhookEvent extrai o evento normalizado do payload MP.
@@ -213,5 +302,4 @@ func normalizeStatusFromAction(action string) psp.PaymentStatus {
 
 // Compile-time assertion que Gateway implementa psp.Gateway.
 var _ psp.Gateway = (*Gateway)(nil)
-var _ = time.Now // silência vet se time nao usado
-var _ = errors.New
+var _ = errors.New // mantém import disponível pra refactors futuros

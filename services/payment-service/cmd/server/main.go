@@ -13,6 +13,7 @@ import (
 	"github.com/utilar/payment-service/internal/config"
 	"github.com/utilar/payment-service/internal/db"
 	"github.com/utilar/payment-service/internal/handler"
+	"github.com/utilar/payment-service/internal/orderclient"
 	"github.com/utilar/payment-service/internal/outbox"
 	"github.com/utilar/payment-service/internal/psp"
 	mpgateway "github.com/utilar/payment-service/internal/psp/mercadopago"
@@ -68,10 +69,16 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery(), handler.RequestID(), handler.AccessLog(), handler.CORS())
 
-	paymentH := handler.NewPaymentHandler(database, gateway)
-	webhookH := handler.NewWebhookHandler(database, cfg.MPWebhookSecret)
+	// Cliente HTTP pra order-service (audit C1, C2 — server-side amount/ownership).
+	orderC := orderclient.New(cfg.OrderServiceURL)
 
-	r.POST("/webhooks/mp", webhookH.HandleMercadoPago)
+	paymentH := handler.NewPaymentHandler(database, gateway, orderC, cfg.DevMode)
+	webhookH := handler.NewWebhookHandler(database, gateway)
+
+	// Webhook endpoint provider-agnostic. O `:provider` precisa bater com
+	// gateway.Name() — assim o atacante não consegue forçar webhook pra um
+	// provider inativo.
+	r.POST("/webhooks/:provider", webhookH.Handle)
 
 	api := r.Group("/api/v1", handler.JWTMiddleware(cfg.JWTSecret))
 	{

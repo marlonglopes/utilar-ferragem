@@ -13,6 +13,10 @@ type Config struct {
 	JWTSecret       string
 	DevMode         bool
 
+	// OrderServiceURL é usado pra validar amount/ownership de pedidos antes de
+	// criar pagamento (audit C1, C2). O JWT do cliente é propagado.
+	OrderServiceURL string
+
 	// PSP selector — qual provider usar.
 	// Valores: "stripe" (recomendado em dev + test mode robusto)
 	//          "mercadopago" (prod BR quando merchant onboarded)
@@ -55,6 +59,7 @@ func Load() (*Config, error) {
 		RedpandaBrokers: brokers,
 		JWTSecret:       jwt,
 		DevMode:         devMode,
+		OrderServiceURL: env("ORDER_SERVICE_URL", "http://localhost:8092"),
 		PSPProvider:     provider,
 
 		StripeSecretKey:      os.Getenv("STRIPE_SECRET_KEY"),
@@ -66,15 +71,21 @@ func Load() (*Config, error) {
 		MPWebhookSecret: os.Getenv("MP_WEBHOOK_SECRET"),
 	}
 
-	// Valida credenciais do provider escolhido
+	// Valida credenciais do provider escolhido + webhook secret fail-closed em prod (audit C5).
 	switch cfg.PSPProvider {
 	case "stripe":
 		if cfg.StripeSecretKey == "" {
 			return nil, fmt.Errorf("STRIPE_SECRET_KEY is required when PSP_PROVIDER=stripe")
 		}
+		if !devMode && cfg.StripeWebhookSecret == "" {
+			return nil, fmt.Errorf("STRIPE_WEBHOOK_SECRET is required in non-dev mode (audit C5: fail-closed)")
+		}
 	case "mercadopago":
 		if cfg.MPAccessToken == "" {
 			return nil, fmt.Errorf("MP_ACCESS_TOKEN is required when PSP_PROVIDER=mercadopago")
+		}
+		if !devMode && cfg.MPWebhookSecret == "" {
+			return nil, fmt.Errorf("MP_WEBHOOK_SECRET is required in non-dev mode (audit C5: fail-closed)")
 		}
 	default:
 		return nil, fmt.Errorf("invalid PSP_PROVIDER=%q (expected: stripe | mercadopago)", cfg.PSPProvider)
