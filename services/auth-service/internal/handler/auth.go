@@ -63,7 +63,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	`, token, userID, time.Now().Add(h.cfg.EmailVerifyTTL))
 	if err != nil {
 		slog.Warn("verify token insert failed", "error", err)
-	} else {
+	} else if h.cfg.DevMode {
+		// Token só é logado em dev (audit A8-H4) — em prod logs vão pra agregadores
+		// que podem ser comprometidos, expondo tokens ativos.
 		slog.Info("email verify link (dev only)", "email", email, "token", token)
 	}
 
@@ -310,7 +312,10 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		DBError(c, err)
 		return
 	}
-	slog.Info("password reset link (dev only)", "email", email, "token", token)
+	if h.cfg.DevMode {
+		// Audit A8-H4: token só logado em dev. Em prod, vai pra serviço de email.
+		slog.Info("password reset link (dev only)", "email", email, "token", token)
+	}
 	c.JSON(http.StatusOK, gin.H{"sent": true})
 }
 

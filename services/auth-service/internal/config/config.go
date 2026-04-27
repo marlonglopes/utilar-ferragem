@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -10,7 +11,8 @@ type Config struct {
 	Port             string
 	DatabaseURL      string
 	JWTSecret        string
-	DevMode          bool // habilita comportamentos de dev (logs verbose, fallback de auth)
+	DevMode          bool     // habilita comportamentos de dev (logs verbose, fallback de auth)
+	AllowedOrigins   []string // CORS whitelist; vazio = "*" (dev mode)
 	AccessTokenTTL   time.Duration
 	RefreshTokenTTL  time.Duration
 	EmailVerifyTTL   time.Duration
@@ -47,11 +49,28 @@ func Load() (*Config, error) {
 		DatabaseURL:      env("AUTH_DB_URL", "postgres://utilar:utilar@localhost:5438/auth_service?sslmode=disable"),
 		JWTSecret:        jwt,
 		DevMode:          devMode,
+		AllowedOrigins:   parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		AccessTokenTTL:   15 * time.Minute,
 		RefreshTokenTTL:  30 * 24 * time.Hour, // 30 dias
 		EmailVerifyTTL:   24 * time.Hour,
 		PasswordResetTTL: 1 * time.Hour,
 	}, nil
+}
+
+// parseOrigins quebra "https://a.com,https://b.com" em []string. Vazio → nil
+// (CORS cai pro modo wildcard `*` — útil em dev).
+func parseOrigins(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if v := strings.TrimSpace(p); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func env(key, fallback string) string {

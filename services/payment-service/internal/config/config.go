@@ -12,6 +12,7 @@ type Config struct {
 	RedpandaBrokers []string
 	JWTSecret       string
 	DevMode         bool
+	AllowedOrigins  []string // CORS whitelist; vazio = wildcard "*"
 
 	// OrderServiceURL é usado pra validar amount/ownership de pedidos antes de
 	// criar pagamento (audit C1, C2). O JWT do cliente é propagado.
@@ -59,6 +60,7 @@ func Load() (*Config, error) {
 		RedpandaBrokers: brokers,
 		JWTSecret:       jwt,
 		DevMode:         devMode,
+		AllowedOrigins:  parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		OrderServiceURL: env("ORDER_SERVICE_URL", "http://localhost:8092"),
 		PSPProvider:     provider,
 
@@ -92,6 +94,20 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func parseOrigins(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if v := strings.TrimSpace(p); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func env(key, fallback string) string {

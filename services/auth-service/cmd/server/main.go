@@ -42,7 +42,13 @@ func main() {
 	addrH := handler.NewAddressHandler(database)
 
 	r := gin.New()
-	r.Use(gin.Recovery(), handler.RequestID(), handler.AccessLog(), handler.CORS())
+	r.Use(
+		gin.Recovery(),
+		handler.RequestID(),
+		handler.AccessLog(),
+		handler.SecurityHeaders(),
+		handler.CORS(cfg.AllowedOrigins),
+	)
 
 	pub := r.Group("/api/v1")
 	{

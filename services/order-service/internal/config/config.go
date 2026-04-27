@@ -3,13 +3,15 @@ package config
 import (
 	"errors"
 	"os"
+	"strings"
 )
 
 type Config struct {
-	Port        string
-	DatabaseURL string
-	JWTSecret   string
-	DevMode     bool // habilita X-User-Id fallback (audit O1-C3)
+	Port           string
+	DatabaseURL    string
+	JWTSecret      string
+	DevMode        bool     // habilita X-User-Id fallback (audit O1-C3)
+	AllowedOrigins []string // CORS whitelist; vazio = wildcard "*"
 }
 
 const devSecret = "dev-only-secret-not-for-production"
@@ -33,11 +35,26 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Port:        env("PORT", "8092"),
-		DatabaseURL: env("ORDER_DB_URL", "postgres://utilar:utilar@localhost:5437/order_service?sslmode=disable"),
-		JWTSecret:   jwt,
-		DevMode:     devMode,
+		Port:           env("PORT", "8092"),
+		DatabaseURL:    env("ORDER_DB_URL", "postgres://utilar:utilar@localhost:5437/order_service?sslmode=disable"),
+		JWTSecret:      jwt,
+		DevMode:        devMode,
+		AllowedOrigins: parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 	}, nil
+}
+
+func parseOrigins(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if v := strings.TrimSpace(p); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func env(key, fallback string) string {

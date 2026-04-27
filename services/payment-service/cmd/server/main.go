@@ -67,7 +67,13 @@ func main() {
 
 	// Router
 	r := gin.New()
-	r.Use(gin.Recovery(), handler.RequestID(), handler.AccessLog(), handler.CORS())
+	r.Use(
+		gin.Recovery(),
+		handler.RequestID(),
+		handler.AccessLog(),
+		handler.SecurityHeaders(),
+		handler.CORS(cfg.AllowedOrigins),
+	)
 
 	// Cliente HTTP pra order-service (audit C1, C2 — server-side amount/ownership).
 	orderC := orderclient.New(cfg.OrderServiceURL)

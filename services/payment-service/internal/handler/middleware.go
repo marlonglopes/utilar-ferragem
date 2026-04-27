@@ -40,10 +40,26 @@ func AccessLog() gin.HandlerFunc {
 	}
 }
 
-// CORS para requisições do SPA em dev.
-func CORS() gin.HandlerFunc {
+// CORS — whitelist via lista de origens. Vazio = wildcard (dev).
+func CORS(allowed []string) gin.HandlerFunc {
+	allowedSet := make(map[string]struct{}, len(allowed))
+	for _, o := range allowed {
+		allowedSet[o] = struct{}{}
+	}
+	wildcard := len(allowed) == 0
+
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		origin := c.GetHeader("Origin")
+		switch {
+		case wildcard:
+			c.Header("Access-Control-Allow-Origin", "*")
+		case origin != "":
+			if _, ok := allowedSet[origin]; ok {
+				c.Header("Access-Control-Allow-Origin", origin)
+				c.Header("Vary", "Origin")
+			}
+		}
+
 		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, "+RequestIDHeader)
 		c.Header("Access-Control-Expose-Headers", RequestIDHeader)
@@ -51,6 +67,18 @@ func CORS() gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
+		c.Next()
+	}
+}
+
+// SecurityHeaders — baseline defensivo (CSP, HSTS, X-Frame-Options, etc).
+func SecurityHeaders() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("Content-Security-Policy", "default-src 'none'")
+		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		c.Header("Referrer-Policy", "no-referrer")
 		c.Next()
 	}
 }

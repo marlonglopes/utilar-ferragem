@@ -41,7 +41,13 @@ func main() {
 	orderH := handler.NewOrderHandler(database)
 
 	r := gin.New()
-	r.Use(gin.Recovery(), handler.RequestID(), handler.AccessLog(), handler.CORS())
+	r.Use(
+		gin.Recovery(),
+		handler.RequestID(),
+		handler.AccessLog(),
+		handler.SecurityHeaders(),
+		handler.CORS(cfg.AllowedOrigins),
+	)
 
 	api := r.Group("/api/v1", handler.RequireUser(cfg.JWTSecret, cfg.DevMode))
 	{

@@ -39,9 +39,32 @@ func AccessLog() gin.HandlerFunc {
 	}
 }
 
-func CORS() gin.HandlerFunc {
+// CORS retorna um middleware com whitelist de origens. Se `allowed` é vazio,
+// libera "*" (modo dev/legacy). Em prod, passar lista de origens explícita
+// (ex: ["https://utilarferragem.com.br","https://www.utilarferragem.com.br"]).
+//
+// Esse padrão é replicado nos 4 services. Origens não-whitelisted recebem
+// header `Access-Control-Allow-Origin` ausente — browser bloqueia request
+// cross-origin.
+func CORS(allowed []string) gin.HandlerFunc {
+	allowedSet := make(map[string]struct{}, len(allowed))
+	for _, o := range allowed {
+		allowedSet[o] = struct{}{}
+	}
+	wildcard := len(allowed) == 0
+
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		origin := c.GetHeader("Origin")
+		switch {
+		case wildcard:
+			c.Header("Access-Control-Allow-Origin", "*")
+		case origin != "":
+			if _, ok := allowedSet[origin]; ok {
+				c.Header("Access-Control-Allow-Origin", origin)
+				c.Header("Vary", "Origin")
+			}
+		}
+
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, "+RequestIDHeader)
 		c.Header("Access-Control-Expose-Headers", RequestIDHeader)
@@ -49,6 +72,25 @@ func CORS() gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
+		c.Next()
+	}
+}
+
+// SecurityHeaders adiciona um conjunto baseline de headers defensivos:
+//   - X-Content-Type-Options: nosniff (MIME-sniffing)
+//   - X-Frame-Options: DENY (clickjacking)
+//   - Content-Security-Policy: default-src 'none' (esse serviço só serve JSON)
+//   - Strict-Transport-Security: max-age=31536000; includeSubDomains (HTTPS-only — só efetivo se servido via HTTPS)
+//   - Referrer-Policy: no-referrer (não vaza URL pra third-parties)
+//
+// Esse padrão é transversal aos 4 services backend.
+func SecurityHeaders() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("Content-Security-Policy", "default-src 'none'")
+		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		c.Header("Referrer-Policy", "no-referrer")
 		c.Next()
 	}
 }
