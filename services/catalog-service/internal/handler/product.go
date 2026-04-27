@@ -134,6 +134,10 @@ func (h *ProductHandler) List(c *gin.Context) {
 }
 
 // GetBySlug GET /api/v1/products/:slug
+//
+// L-CATALOG-2: gera ETag derivado do `updated_at` do produto. Se o cliente
+// envia `If-None-Match` que bate, retorna 304 Not Modified — economiza
+// bandwidth em browsers/CDN com produto não-modificado.
 func (h *ProductHandler) GetBySlug(c *gin.Context) {
 	start := time.Now()
 	defer padToMinElapsed(start, slugLookupMinElapsed)
@@ -174,6 +178,9 @@ func (h *ProductHandler) GetBySlug(c *gin.Context) {
 		}
 	}
 
+	if respondWithETag(c, p.UpdatedAt) {
+		return
+	}
 	c.JSON(http.StatusOK, p)
 }
 
@@ -222,6 +229,9 @@ func (h *ProductHandler) GetByID(c *gin.Context) {
 		}
 	}
 
+	if respondWithETag(c, p.UpdatedAt) {
+		return
+	}
 	c.JSON(http.StatusOK, p)
 }
 

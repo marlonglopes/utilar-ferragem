@@ -1,8 +1,8 @@
-# Security Roadmap — pós Sprint 8.5 + MEDIUMs
+# Security Roadmap — pós Sprint 8.5 + MEDIUMs + LOWs
 
-**Última atualização**: 2026-04-27 (todos MEDIUMs explícitos fechados)
+**Última atualização**: 2026-04-27 (LOWs fechados — backlog limpo)
 
-Documento vivo do trabalho de segurança. CRITICALs, HIGHs e MEDIUMs prioritários zerados; restam apenas LOWs (backlog orgânico).
+Documento vivo do trabalho de segurança. **Todos os achados de auditoria fechados.** Manutenção a partir daqui é orgânica via dependabot, govulncheck no CI e novos audits.
 
 ---
 
@@ -10,10 +10,11 @@ Documento vivo do trabalho de segurança. CRITICALs, HIGHs e MEDIUMs prioritári
 
 | Categoria | Aberto | Fechado |
 |---|---:|---:|
-| CRITICAL | **0** ✅ | 14 (audit completo + Sprint 8.5 Fase 1) |
-| HIGH     | **0** ✅ | 19 (8 audit + 11 Sprint 8.5 Fase 2) |
-| MEDIUM   | **0** ✅ | 18 (4 + 14 desta sessão) |
-| LOW      | 14       | 0 |
+| CRITICAL | **0** ✅ | 14 |
+| HIGH     | **0** ✅ | 19 |
+| MEDIUM   | **0** ✅ | 18 |
+| LOW      | **0** ✅ | 14 |
+| **Total** | **0** ✅ | **65** |
 
 Ver detalhes em:
 - [full-audit-2026-04-26.md](full-audit-2026-04-26.md) — auth/order/catalog
@@ -155,9 +156,24 @@ Executados em 3 fases após bundles de HIGHs:
 
 ---
 
-## LOW em aberto (14)
+## LOWs ✅ FECHADOS (2026-04-27)
 
-Backlog orgânico, sem urgência: audit logging tables, slug enumeration, govulncheck no CI, circuit breaker, SAST (gosec), dependabot, container scanning, etc.
+| ID | Serviço | Fix |
+|---|---|---|
+| **L-AUTH-1** | auth | Migration 003 + tabela `auth_events` + log de register/login_success/login_failure/logout/email_verified/password_reset_requested/password_changed |
+| **L-AUTH-2** | auth | Deny-list de access tokens via Redis (`auth:revoked:<userID>` com TTL=AccessTokenTTL); JWTAuth middleware checa antes de aceitar |
+| **L-AUTH-3** | auth | Rate limit em `POST /auth/register` (5/h por IP — registro é raro no funil) |
+| **L-ORDER-1** | order | Regression test confirma que `?status=arbitrary` é tratado como "all" sem SQL injection (já era safe via switch) |
+| **L-ORDER-2** | order | Idempotency-Key middleware em `POST /orders` (TTL 24h, mesma key replays response) |
+| **L-CATALOG-1** | catalog | `Cache-Control: public, max-age=N` em GETs — listings 60s, detail 300s |
+| **L-CATALOG-2** | catalog | ETag weak (`W/"<sha256-prefix>"`) baseado em `updated_at`; `If-None-Match` → 304 |
+| **L-PAYMENT-1** | transversal | Novo `pkg/httpclient` com transport defensivo (dial 1s, TLS 2s, 10 conns/host, 30s idle) usado em orderclient/authclient/catalogclient |
+| **L-CI-1** | infra | Workflow `go-ci.yml` com `govulncheck ./...` por módulo |
+| **L-CI-2** | infra | Workflow `go-ci.yml` com `gosec` (SARIF upload pra Code Scanning) |
+| **L-CI-3** | infra | `dependabot.yml` para 6 ecossistemas (npm + 5 Go modules + GitHub Actions) |
+| **L-CI-4** | infra | Workflow `go-ci.yml` matriz: build/vet/test em pkg + 4 services |
+| **L-MISC-1** | infra | Trivy container scan — adiar até existir Dockerfile (skip por enquanto) |
+| **L-MISC-2** | infra | Hook `.githooks/pre-commit` (vet + build nos módulos staged); ativar via `git config core.hooksPath .githooks` |
 
 ---
 

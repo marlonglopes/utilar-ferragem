@@ -16,6 +16,7 @@ import (
 	"github.com/utilar/order-service/internal/config"
 	"github.com/utilar/order-service/internal/db"
 	"github.com/utilar/order-service/internal/handler"
+	"github.com/utilar/pkg/idempotency"
 	"github.com/utilar/pkg/ratelimit"
 )
 
@@ -56,31 +57,41 @@ func main() {
 
 	// O3-M3: rate limit em POST /orders. 20/min/user — folga acima do uso humano,
 	// mas bloqueia bot que tenta inflar tabelas.
+	// L-ORDER-2: Idempotency-Key middleware (mesma key 24h) — evita pedidos
+	// duplicados em retry/double-click.
 	var createRL gin.HandlerFunc
+	var createIdem gin.HandlerFunc
 	if cfg.RedisURL != "" {
 		opts, err := redis.ParseURL(cfg.RedisURL)
 		if err != nil {
 			slog.Error("redis url", "error", err)
 			os.Exit(1)
 		}
+		rdb := redis.NewClient(opts)
 		createRL = ratelimit.Middleware(
-			ratelimit.New(redis.NewClient(opts)),
+			ratelimit.New(rdb),
 			"order:create",
 			ratelimit.Limit{Max: 20, Window: time.Minute},
 			ratelimit.UserKey,
 		)
-		slog.Info("rate limit enabled", "redis", opts.Addr)
+		createIdem = idempotency.Middleware(idempotency.New(rdb, 24*time.Hour), "order:create")
+		slog.Info("rate limit + idempotency enabled", "redis", opts.Addr)
 	} else {
-		slog.Warn("REDIS_URL not set — order rate limit DISABLED (O3-M3 unprotected)")
+		slog.Warn("REDIS_URL not set — order rate limit + idempotency DISABLED")
 	}
 
 	api := r.Group("/api/v1", handler.RequireUser(cfg.JWTSecret, cfg.DevMode))
 	{
-		if createRL != nil {
-			api.POST("/orders", createRL, orderH.Create)
-		} else {
-			api.POST("/orders", orderH.Create)
+		// Idempotency primeiro (replay rápido), depois rate limit, depois handler.
+		createChain := []gin.HandlerFunc{}
+		if createIdem != nil {
+			createChain = append(createChain, createIdem)
 		}
+		if createRL != nil {
+			createChain = append(createChain, createRL)
+		}
+		createChain = append(createChain, orderH.Create)
+		api.POST("/orders", createChain...)
 		api.GET("/orders", orderH.List)
 		api.GET("/orders/:id", orderH.Get)
 		api.PATCH("/orders/:id/cancel", orderH.Cancel)

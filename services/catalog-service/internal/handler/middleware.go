@@ -3,6 +3,7 @@ package handler
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -84,6 +85,28 @@ func SecurityHeaders() gin.HandlerFunc {
 		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		c.Header("Referrer-Policy", "no-referrer")
 		c.Next()
+	}
+}
+
+// CacheControl define cache HTTP por tipo de endpoint (L-CATALOG-1).
+//
+// Valores escolhidos:
+//   - listings (`/products`, `/categories`, `/sellers`): public, max-age=60
+//     (humanos navegam categorias por minutos; CDN cacheia por 1min)
+//   - detail (`/products/:slug`, `/products/by-id/:id`): public, max-age=300
+//     (produto muda raramente — preço/estoque atualizam mas 5min é OK)
+//
+// Use no router via `api.GET(..., handler.CacheControl(60), productH.List)`.
+func CacheControl(maxAgeSeconds int) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+		// Só seta Cache-Control em respostas 200 OK.
+		// Erros não devem ser cacheados (especialmente 404, que pode mudar
+		// quando o produto for criado).
+		if c.Writer.Status() < 200 || c.Writer.Status() >= 300 {
+			return
+		}
+		c.Header("Cache-Control", "public, max-age="+strconv.Itoa(maxAgeSeconds))
 	}
 }
 

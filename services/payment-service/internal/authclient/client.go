@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/utilar/pkg/httpclient"
 )
 
 // User é o subset que payment precisa. Espelha auth-service/internal/model.User.
@@ -35,7 +37,7 @@ type Client struct {
 func New(baseURL string) *Client {
 	return &Client{
 		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: 5 * time.Second},
+		httpClient: httpclient.New(5 * time.Second), // L-PAYMENT-1
 	}
 }
 

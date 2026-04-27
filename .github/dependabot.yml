@@ -1,0 +1,66 @@
+version: 2
+updates:
+  # Frontend (Vite + React)
+  - package-ecosystem: npm
+    directory: /app
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(app)"
+    groups:
+      eslint:
+        patterns: ["eslint*", "@typescript-eslint/*"]
+      vitest:
+        patterns: ["vitest", "@vitest/*"]
+
+  # Shared Go pkg (ratelimit, idempotency, requestid, httpclient)
+  - package-ecosystem: gomod
+    directory: /pkg
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(pkg)"
+
+  # 4 microservices Go
+  - package-ecosystem: gomod
+    directory: /services/auth-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(auth)"
+
+  - package-ecosystem: gomod
+    directory: /services/catalog-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(catalog)"
+
+  - package-ecosystem: gomod
+    directory: /services/order-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(order)"
+
+  - package-ecosystem: gomod
+    directory: /services/payment-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(payment)"
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps(ci)"

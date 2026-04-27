@@ -66,20 +66,24 @@ func main() {
 		handler.CORS(cfg.AllowedOrigins),
 	)
 
+	// L-CATALOG-1: cache headers — listings 1min, detail 5min.
+	listCache := handler.CacheControl(60)
+	detailCache := handler.CacheControl(300)
+
 	api := r.Group("/api/v1")
 	{
-		api.GET("/categories", categoryH.List)
-		api.GET("/sellers", sellerH.List)
+		api.GET("/categories", listCache, categoryH.List)
+		api.GET("/sellers", listCache, sellerH.List)
 		if searchRL != nil {
-			api.GET("/products", searchRL, productH.List)
-			api.GET("/products/facets", searchRL, productH.Facets)
+			api.GET("/products", searchRL, listCache, productH.List)
+			api.GET("/products/facets", searchRL, listCache, productH.Facets)
 		} else {
-			api.GET("/products", productH.List)
-			api.GET("/products/facets", productH.Facets)
+			api.GET("/products", listCache, productH.List)
+			api.GET("/products/facets", listCache, productH.Facets)
 		}
-		api.GET("/products/by-id/:id", productH.GetByID)
-		api.GET("/products/:slug", productH.GetBySlug)
-		api.GET("/products/:slug/related", productH.Related)
+		api.GET("/products/by-id/:id", detailCache, productH.GetByID)
+		api.GET("/products/:slug", detailCache, productH.GetBySlug)
+		api.GET("/products/:slug/related", listCache, productH.Related)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

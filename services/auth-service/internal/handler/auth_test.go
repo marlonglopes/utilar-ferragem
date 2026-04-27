@@ -62,7 +62,7 @@ func setupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	pub.POST("/auth/forgot-password", authH.ForgotPassword)
 	pub.POST("/auth/reset-password", authH.ResetPassword)
 
-	priv := r.Group("/api/v1", handler.JWTAuth(cfg.JWTSecret))
+	priv := r.Group("/api/v1", handler.JWTAuth(cfg.JWTSecret, nil))
 	priv.GET("/me", authH.Me)
 	priv.POST("/auth/logout", authH.Logout)
 	priv.GET("/addresses", addrH.List)

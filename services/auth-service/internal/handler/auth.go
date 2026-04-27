@@ -17,12 +17,26 @@ import (
 )
 
 type AuthHandler struct {
-	db  *sql.DB
-	cfg *config.Config
+	db       *sql.DB
+	cfg      *config.Config
+	denyList *AccessTokenDenyList // L-AUTH-2: opcional; nil = sem deny-list
 }
 
 func NewAuthHandler(db *sql.DB, cfg *config.Config) *AuthHandler {
 	return &AuthHandler{db: db, cfg: cfg}
+}
+
+// SetAccessTokenDenyList wire opcional pra que Logout possa revogar
+// access tokens em circulação. Se não chamado, logout só revoga refresh.
+func (h *AuthHandler) SetAccessTokenDenyList(d *AccessTokenDenyList) {
+	h.denyList = d
+}
+
+// AccessTokenDenyList retorna o deny-list configurado (ou nil) — usado pra
+// passar pra middleware JWTAuth, garantindo que o mesmo deny-list é
+// consultado nas rotas privadas.
+func (h *AuthHandler) AccessTokenDenyList() *AccessTokenDenyList {
+	return h.denyList
 }
 
 // -- register ---------------------------------------------------------------
@@ -101,6 +115,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	logAuthEvent(c.Request.Context(), h.db, c, EventRegister, u.ID, nil)
 	c.JSON(http.StatusCreated, model.AuthResponse{User: *u, AccessToken: access, RefreshToken: refresh})
 }
 
@@ -121,6 +136,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	`, email).Scan(&userID, &hash, &name, &role)
 	if err == sql.ErrNoRows {
 		// Mensagem genérica — não revelar se o email existe.
+		// L-AUTH-1: registramos failure mesmo sem userID pra detectar enum/bruteforce.
+		logAuthEvent(c.Request.Context(), h.db, c, EventLoginFailure, "", map[string]any{"reason": "user_not_found"})
 		Unauthorized(c, "invalid credentials")
 		return
 	}
@@ -131,6 +148,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	ok, err := auth.VerifyPassword(req.Password, hash)
 	if err != nil || !ok {
+		logAuthEvent(c.Request.Context(), h.db, c, EventLoginFailure, userID, map[string]any{"reason": "wrong_password"})
 		Unauthorized(c, "invalid credentials")
 		return
 	}
@@ -146,6 +164,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	logAuthEvent(c.Request.Context(), h.db, c, EventLoginSuccess, u.ID, nil)
 	c.JSON(http.StatusOK, model.AuthResponse{User: *u, AccessToken: access, RefreshToken: refresh})
 }
 
@@ -254,6 +273,15 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		return
 	}
 	_, _ = h.db.Exec(`UPDATE refresh_tokens SET revoked_at = now() WHERE token_hash = $1`, hashToken(req.RefreshToken))
+
+	// L-AUTH-2: revoga também o access token via deny-list pra reduzir janela
+	// de roubo. Sem isso, atacante com access token roubado tem até 15min
+	// de validade mesmo após user logout.
+	if uid := c.GetString("user_id"); uid != "" {
+		_ = h.denyList.Revoke(c.Request.Context(), uid)
+	}
+
+	logAuthEvent(c.Request.Context(), h.db, c, EventLogout, c.GetString("user_id"), nil)
 	c.JSON(http.StatusNoContent, nil)
 }
 
@@ -304,6 +332,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 	tx.Commit()
+	logAuthEvent(c.Request.Context(), h.db, c, EventEmailVerified, userID, nil)
 	c.JSON(http.StatusOK, gin.H{"verified": true})
 }
 
@@ -346,6 +375,7 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		// Audit A8-H4: token só logado em dev. Em prod, vai pra serviço de email.
 		slog.Info("password reset link (dev only)", "email", email, "token", token)
 	}
+	logAuthEvent(c.Request.Context(), h.db, c, EventPasswordResetRequested, userID, nil)
 	c.JSON(http.StatusOK, gin.H{"sent": true})
 }
 
@@ -411,6 +441,7 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		return
 	}
 	tx.Commit()
+	logAuthEvent(c.Request.Context(), h.db, c, EventPasswordChanged, userID, nil)
 	c.JSON(http.StatusOK, gin.H{"reset": true})
 }
 

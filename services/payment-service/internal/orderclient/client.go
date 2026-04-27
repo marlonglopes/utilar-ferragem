@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/utilar/pkg/httpclient"
 )
 
 // Order é o subset do Order do order-service que o payment-service consome.
@@ -53,8 +55,9 @@ type Client struct {
 // se está lento, melhor abortar o checkout que segurar o cliente.
 func New(baseURL string) *Client {
 	return &Client{
-		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: 5 * time.Second},
+		baseURL: baseURL,
+		// L-PAYMENT-1: transport defensivo (dial 1s, conn pool capped, etc).
+		httpClient: httpclient.New(5 * time.Second),
 	}
 }
 

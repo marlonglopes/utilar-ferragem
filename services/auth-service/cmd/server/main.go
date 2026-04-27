@@ -50,21 +50,29 @@ func main() {
 	handler.StartTokenCleanup(cleanupCtx, database)
 
 	// A6-H2: rate limiter via Redis. Em dev sem REDIS_URL, mid noop (limiters nil-safe).
-	var loginRL, forgotRL, resetRL, verifyRL gin.HandlerFunc
+	var loginRL, forgotRL, resetRL, verifyRL, registerRL gin.HandlerFunc
 	if cfg.RedisURL != "" {
 		opts, err := redis.ParseURL(cfg.RedisURL)
 		if err != nil {
 			slog.Error("redis url", "error", err)
 			os.Exit(1)
 		}
-		rl := ratelimit.New(redis.NewClient(opts))
+		rdb := redis.NewClient(opts)
+		rl := ratelimit.New(rdb)
 		loginRL = ratelimit.Middleware(rl, "auth:login", ratelimit.Limit{Max: 5, Window: time.Minute}, ratelimit.IPKey)
 		forgotRL = ratelimit.Middleware(rl, "auth:forgot", ratelimit.Limit{Max: 5, Window: time.Minute}, ratelimit.IPKey)
 		resetRL = ratelimit.Middleware(rl, "auth:reset", ratelimit.Limit{Max: 5, Window: time.Minute}, ratelimit.IPKey)
 		verifyRL = ratelimit.Middleware(rl, "auth:verify", ratelimit.Limit{Max: 10, Window: time.Minute}, ratelimit.IPKey)
-		slog.Info("rate limit enabled", "redis", opts.Addr)
+		// L-AUTH-3: registro é raro (1 por usuário no funil). 5/h por IP.
+		registerRL = ratelimit.Middleware(rl, "auth:register", ratelimit.Limit{Max: 5, Window: time.Hour}, ratelimit.IPKey)
+
+		// L-AUTH-2: deny-list de access tokens via Redis. TTL = TTL do access token.
+		denyList := handler.NewAccessTokenDenyList(rdb, cfg.AccessTokenTTL)
+		authH.SetAccessTokenDenyList(denyList)
+
+		slog.Info("rate limit + deny-list enabled", "redis", opts.Addr)
 	} else {
-		slog.Warn("REDIS_URL not set — auth rate limit DISABLED (A6-H2 unprotected)")
+		slog.Warn("REDIS_URL not set — auth rate limit + access deny-list DISABLED")
 	}
 
 	r := gin.New()
@@ -78,7 +86,7 @@ func main() {
 
 	pub := r.Group("/api/v1")
 	{
-		pub.POST("/auth/register", authH.Register)
+		pub.POST("/auth/register", withRL(registerRL, authH.Register)...)
 		pub.POST("/auth/login", withRL(loginRL, authH.Login)...)
 		pub.POST("/auth/refresh", authH.Refresh)
 		pub.POST("/auth/forgot-password", withRL(forgotRL, authH.ForgotPassword)...)
@@ -86,7 +94,7 @@ func main() {
 		pub.POST("/auth/verify-email", withRL(verifyRL, authH.VerifyEmail)...)
 	}
 
-	priv := r.Group("/api/v1", handler.JWTAuth(cfg.JWTSecret))
+	priv := r.Group("/api/v1", handler.JWTAuth(cfg.JWTSecret, authH.AccessTokenDenyList()))
 	{
 		priv.GET("/me", authH.Me)
 		priv.POST("/auth/logout", authH.Logout)

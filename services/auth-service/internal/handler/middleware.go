@@ -98,7 +98,11 @@ func SecurityHeaders() gin.HandlerFunc {
 
 // JWTAuth valida `Authorization: Bearer <jwt>` e injeta user_id/email/role
 // no contexto. 401 em token ausente/inválido/expirado.
-func JWTAuth(secret string) gin.HandlerFunc {
+//
+// L-AUTH-2: se denyList é não-nil, consulta também o deny-list (logout via
+// Redis). Tokens emitidos antes do logout do usuário são rejeitados mesmo
+// dentro do TTL de 15min. denyList nil = comportamento clássico (sem lookup).
+func JWTAuth(secret string, denyList *AccessTokenDenyList) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		h := c.GetHeader("Authorization")
 		if !strings.HasPrefix(h, "Bearer ") {
@@ -112,6 +116,13 @@ func JWTAuth(secret string) gin.HandlerFunc {
 			Unauthorized(c, "invalid token: "+err.Error())
 			c.Abort()
 			return
+		}
+		if denyList != nil && claims.IssuedAt != nil {
+			if denyList.IsRevoked(c.Request.Context(), claims.UserID, claims.IssuedAt.Unix()) {
+				Unauthorized(c, "token revoked")
+				c.Abort()
+				return
+			}
 		}
 		c.Set("user_id", claims.UserID)
 		c.Set("user_email", claims.Email)

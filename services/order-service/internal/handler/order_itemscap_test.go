@@ -1,9 +1,13 @@
 // O3-M1: cap em items array (max=100). Regressão pra prevenir DoS via array
 // gigante.
+//
+// L-ORDER-1: regressão — `status` query param fora do whitelist deve ser
+// tratado como "all" sem invocar SQL injection ou comportamento surpresa.
 package handler_test
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 )
 
@@ -16,6 +20,25 @@ func makeItem(productID string) map[string]any {
 		"sellerName": "Seller",
 		"quantity":   1,
 		"unitPrice":  10.0,
+	}
+}
+
+func TestOrders_List_StatusFilterArbitrario_Aceito(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	r := setupRouter(db)
+
+	// L-ORDER-1: payload arbitrário no status, incluindo SQL injection attempt.
+	// Esperado: handler trata como "all" (default) sem panicar nem injetar.
+	for _, payload := range []string{
+		"' OR 1=1 --",
+		"unknown",
+		"DROP TABLE orders",
+	} {
+		w := do(r, http.MethodGet, "/api/v1/orders?status="+url.QueryEscape(payload), testUserID, nil)
+		if w.Code != http.StatusOK {
+			t.Errorf("status=%q retornou %d, esperado 200", payload, w.Code)
+		}
 	}
 }
 

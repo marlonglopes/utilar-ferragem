@@ -17,6 +17,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/utilar/pkg/httpclient"
 )
 
 // Product é o subset de Product do catalog-service que o order-service
@@ -43,7 +45,7 @@ type Client struct {
 func New(baseURL string) *Client {
 	return &Client{
 		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: 5 * time.Second},
+		httpClient: httpclient.New(5 * time.Second), // L-PAYMENT-1
 	}
 }
 
