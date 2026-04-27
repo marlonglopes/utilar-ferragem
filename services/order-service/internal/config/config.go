@@ -7,11 +7,12 @@ import (
 )
 
 type Config struct {
-	Port           string
-	DatabaseURL    string
-	JWTSecret      string
-	DevMode        bool     // habilita X-User-Id fallback (audit O1-C3)
-	AllowedOrigins []string // CORS whitelist; vazio = wildcard "*"
+	Port              string
+	DatabaseURL       string
+	JWTSecret         string
+	DevMode           bool   // habilita X-User-Id fallback (audit O1-C3)
+	AllowedOrigins    []string
+	CatalogServiceURL string // base URL do catalog-service pra validação de price (O2-H5)
 }
 
 const devSecret = "dev-only-secret-not-for-production"
@@ -35,11 +36,12 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Port:           env("PORT", "8092"),
-		DatabaseURL:    env("ORDER_DB_URL", "postgres://utilar:utilar@localhost:5437/order_service?sslmode=disable"),
-		JWTSecret:      jwt,
-		DevMode:        devMode,
-		AllowedOrigins: parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
+		Port:              env("PORT", "8092"),
+		DatabaseURL:       env("ORDER_DB_URL", "postgres://utilar:utilar@localhost:5437/order_service?sslmode=disable"),
+		JWTSecret:         jwt,
+		DevMode:           devMode,
+		AllowedOrigins:    parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
+		CatalogServiceURL: env("CATALOG_SERVICE_URL", "http://localhost:8091"),
 	}, nil
 }
 

@@ -1,8 +1,8 @@
-# Security Roadmap — pós Sprint 8.5 Fase 1
+# Security Roadmap — pós Sprint 8.5 Fase 2
 
-**Última atualização**: 2026-04-27
+**Última atualização**: 2026-04-27 (Bundles 1+2+3+4 fechados)
 
-Documento vivo do trabalho de segurança restante. CRITICALs estão todos fechados; este doc rastreia HIGHs e MEDIUMs por ordem de impacto + esforço, e organiza os HIGHs em **4 bundles de trabalho** prontos pra execução em sequência.
+Documento vivo do trabalho de segurança. CRITICALs e HIGHs zerados; agora rastreia apenas MEDIUMs (hardening orgânico) e LOWs (backlog).
 
 ---
 
@@ -11,9 +11,9 @@ Documento vivo do trabalho de segurança restante. CRITICALs estão todos fechad
 | Categoria | Aberto | Fechado |
 |---|---:|---:|
 | CRITICAL | **0** ✅ | 14 (audit completo + Sprint 8.5 Fase 1) |
-| HIGH | 11 | 8 |
-| MEDIUM | 18 | 4 |
-| LOW | 14 | 0 |
+| HIGH     | **0** ✅ | 19 (8 audit + 11 Sprint 8.5 Fase 2) |
+| MEDIUM   | 18       | 4 |
+| LOW      | 14       | 0 |
 
 Ver detalhes em:
 - [full-audit-2026-04-26.md](full-audit-2026-04-26.md) — auth/order/catalog
@@ -25,107 +25,90 @@ Ver detalhes em:
 
 Os 11 HIGHs em aberto agrupados em 4 bundles pelo eixo dependência/coesão. Cada bundle pode ser um PR independente, na ordem proposta abaixo (de menor pra maior risco de regressão).
 
-### Bundle 1 — Quick wins isolados (~3h, sem dependências)
+### Bundle 1 — Quick wins isolados ✅ FECHADO (2026-04-27)
 
-Pequenos fixes pontuais, baixo risco, alto sinal-pra-ruído. Fazer primeiro pra reduzir surface de ataque enquanto bundles maiores são planejados.
+Pequenos fixes pontuais, baixo risco, alto sinal-pra-ruído. Concluídos em ~3h.
 
-| ID | Serviço | Issue | Esforço | Fix |
-|---|---|---|---:|---|
-| **O2-H4** | order | Order number sequencial enumerável | 1h | `crypto/rand` 8 chars base32 em vez de `UnixNano()%100000` (mantém prefix de ano) |
-| **CT1-H4** | catalog | Slug GET timing attack | 1h | Pad fixo de ~50ms via `time.Sleep(50ms - elapsed)` na resposta |
-| **A9-H5** | auth | Forgot-password timing-safe | 30min | Jitter artificial fixo quando email não encontrado |
-| **H2** | payment | JWT claims tipadas | 1h | Extrair `auth.Claims` struct pra pacote shared ou redefinir local; trocar `jwt.MapClaims` cru por struct tipada |
-| **H5** | payment | MaxBytesReader em `POST /payments` | 30min | `c.Request.Body = http.MaxBytesReader(...)` antes do bind (já feito no webhook) |
+| ID | Serviço | Issue | Status | Fix |
+|---|---|---|---|---|
+| **O2-H4** | order | Order number sequencial enumerável | ✅ | `generateOrderNumber()` usa `crypto/rand` + 8 chars base32 (40 bits) — `internal/handler/ordernumber.go` |
+| **CT1-H4** | catalog | Slug GET timing attack | ✅ | `padToMinElapsed(50ms)` em `GetBySlug` e `Related` — `internal/handler/product.go` |
+| **A9-H5** | auth | Forgot-password timing-safe | ✅ | `padToMinElapsed(200ms)` em `ForgotPassword` — `internal/handler/timing.go` |
+| **H2** | payment | JWT claims tipadas | ✅ | Novo `internal/auth/jwt.go` com `Claims` struct + `ParseAccessToken`; middleware migrado de `jwt.MapClaims` |
+| **H5** | payment | MaxBytesReader em `POST /payments` | ✅ | `http.MaxBytesReader(16KB)` antes do bind — `internal/handler/payment.go` |
 
-**Validação**: testes unitários novos pra cada (timing-safe verifiable; entropy de order number; etc).
+**Testes adicionados**: `ordernumber_test.go` (formato/entropia/colisão), `timing_test.go` (catalog + auth), `jwt_test.go` (assinatura/expiração/algoritmo none), `payment_bodylimit_test.go` (cap 16KB).
 
-### Bundle 2 — Rate limiting + Idempotency-Key via Redis (~9h)
+### Bundle 2 — Rate limiting + Idempotency-Key via Redis ✅ FECHADO (2026-04-27)
 
-Maior PR. Adiciona dependência **Redis** ao projeto. Resolve 4 HIGHs num só pacote (todos compartilham infra).
+Adicionou Redis ao stack e helpers compartilhados em `pkg/` via Go workspace.
 
-**Setup (~2h)**:
-- Adicionar `redis` ao `docker-compose.yml`
-- `go get github.com/redis/go-redis/v9`
-- Helper `internal/ratelimit/limiter.go` (token bucket no Redis, key=`rl:{endpoint}:{key}`)
-- Helper `internal/idempotency/store.go` (hash → response com TTL 24h)
-- Config: `REDIS_URL` env var em `auth/order/catalog/payment`
+**Decisão de arquitetura**: criado `go.work` na raiz + módulo `github.com/utilar/pkg` com:
+- `pkg/ratelimit/limiter.go` — janela fixa via `INCR + EXPIRE` (1 round-trip), fail-open quando Redis cai
+- `pkg/idempotency/store.go` — `SETNX` reservation + replay (handshake protege contra concorrência)
+- Tests com `miniredis` (sem dependência de Redis real)
 
-**Aplicação dos middlewares (~7h)**:
+**Setup**:
+- `redis:7-alpine` em [docker-compose.yml](../../docker-compose.yml) (256MB, allkeys-lru)
+- `REDIS_URL` env var em todos os 4 serviços; vazio = features desabilitadas + log warn
 
-| ID | Serviço | Endpoint | Limite | Esforço |
-|---|---|---|---|---:|
-| **A6-H2** | auth | `/auth/login` | 5/min/IP | 30min |
-| | auth | `/auth/forgot-password` | 5/min/IP | 30min |
-| | auth | `/auth/reset-password` | 5/min/IP | 30min |
-| | auth | `/auth/verify-email` | 10/min/IP | 30min |
-| **CT1-H1** | catalog | `/products` (search) | 100/min/IP | 1h |
-| **H4** | payment | `/payments` | 10/min/user | 1h |
-| **H1** | payment | `/payments` | `Idempotency-Key` middleware (separado do rate limit) | 3h |
+| ID | Serviço | Endpoint | Limite | Status |
+|---|---|---|---|---|
+| **A6-H2** | auth | `/auth/login` | 5/min/IP | ✅ |
+|           | auth | `/auth/forgot-password` | 5/min/IP | ✅ |
+|           | auth | `/auth/reset-password`  | 5/min/IP | ✅ |
+|           | auth | `/auth/verify-email`    | 10/min/IP | ✅ |
+| **CT1-H1** | catalog | `/products` + `/products/facets` | 100/min/IP | ✅ |
+| **H4** | payment | `POST /payments` | 10/min/user | ✅ |
+| **H1** | payment | `POST /payments` Idempotency-Key | TTL 24h | ✅ |
 
-**Validação**:
-- Tests integration: 11ª req em janela retorna 429
-- Tests integration: segundo POST `/payments` com mesma `Idempotency-Key` retorna response cached do primeiro
-- Smoke test fim-a-fim com Redis rodando
+**Testes**: `pkg/ratelimit/limiter_test.go` (5 casos: bloqueio, reset de janela, IPs distintos, fail-open) + `pkg/idempotency/store_test.go` (4 casos: replay, keys distintas, key inválida, sem header).
 
-### Bundle 3 — Cross-service price validation (~3h)
+### Bundle 3 — Cross-service price validation ✅ FECHADO (2026-04-27)
 
-Resolve **O2-H5**. Aproveita o fato de que agora o order-service precisa chamar catalog (segundo caller cross-service depois do payment→order) — bom momento pra **extrair** `internal/orderclient/` do payment pra `pkg/serviceclient/` shared.
+Resolveu **O2-H5**. Decidiu-se NÃO extrair orderclient pra shared (mantém isolamento entre serviços) — apenas adicionou catalogclient autocontido em order-service.
 
-**Etapas**:
-1. (~1h) Extrair `payment-service/internal/orderclient/` → `pkg/serviceclient/order/` (shared) e `payment-service/internal/orderclient/` vira thin wrapper
-2. (~1h) Criar `pkg/serviceclient/catalog/` espelhando o pattern (`Get(ctx, productID, jwt)`) — sem JWT propagation aqui (catalog é público)
-3. (~1h) `OrderHandler.Create` consulta catalog antes de aceitar `unitPrice` do body; usa `product.price` autoritativo. Logs warning se diverge. Mesma pattern do payment vs order
+| ID | Serviço | Issue | Status |
+|---|---|---|---|
+| **O2-H5** | order | `unitPrice` autoritativo via catalog | ✅ |
 
-**Validação**: testes integration que tentam tampering com `unitPrice` e verificam que o pedido fica com preço autoritativo do catalog.
+**Mudanças**:
+- Novo endpoint `GET /api/v1/products/by-id/:id` em [catalog-service](../../services/catalog-service/internal/handler/product.go)
+- Novo cliente `services/order-service/internal/catalogclient/` (mesmo pattern do payment→order)
+- `OrderHandler.Create` agora chama `catalog.GetByID()` por item, sobrescreve `unitPrice` com valor do catalog, loga warning se diverge >1¢
+- Erro upstream → 502; produto não existe → 400
+- Config nova: `CATALOG_SERVICE_URL` em order-service (default `http://localhost:8091`)
 
-### Bundle 4 — Token hashing migration (~3h)
+**Testes**: `order_pricing_test.go` cobre tamper bloqueado (0.01 → 599.90), produto não encontrado, upstream error, tolerância de 1 centavo.
 
-Resolve **A7-H3** (e MEDIUMs A12, A13 por consequência). Maior risco operacional dos 4 bundles porque envolve migration + backfill + zero-downtime deploy.
+### Bundle 4 — Token hashing migration ✅ FECHADO (2026-04-27)
 
-**Etapas**:
+Resolveu **A7-H3**. Migração single-shot (pre-launch, sem dados reais) — substituiu coluna `token` por `token_hash` em uma só transação, sem zero-downtime gymnastics.
 
-1. (~30min) Migration `add_token_hash`:
-   ```sql
-   ALTER TABLE refresh_tokens ADD COLUMN token_hash TEXT;
-   ALTER TABLE password_reset_tokens ADD COLUMN token_hash TEXT;
-   ALTER TABLE email_verification_tokens ADD COLUMN token_hash TEXT;
-   CREATE UNIQUE INDEX idx_refresh_token_hash ON refresh_tokens(token_hash) WHERE token_hash IS NOT NULL;
-   -- idem outras
-   ```
+| ID | Serviço | Issue | Status |
+|---|---|---|---|
+| **A7-H3** | auth | Tokens armazenados como SHA-256 | ✅ |
 
-2. (~30min) Backfill SQL:
-   ```sql
-   UPDATE refresh_tokens SET token_hash = encode(digest(token, 'sha256'), 'base64') WHERE token_hash IS NULL;
-   ```
-   (Requer extension `pgcrypto`. Se não tiver, fazer backfill em Go.)
+**Mudanças**:
+- Migration [`002_token_hash.up.sql`](../../services/auth-service/migrations/002_token_hash.up.sql) (+ down): TRUNCATE + DROP `token` + ADD `token_hash` PRIMARY KEY nas 3 tabelas
+- Helper `hashToken()` em [tokenhash.go](../../services/auth-service/internal/handler/tokenhash.go) — SHA-256 hex (sem salt: input já tem 128 bits de entropia via `randToken()`)
+- Todos os handlers (Register, Login, Refresh, Logout, VerifyEmail, ForgotPassword, ResetPassword, issueTokens) inserem `hashToken(token)` e fazem lookup por `WHERE token_hash = $1`
+- Plaintext só sai pro cliente (cookie/email), nunca volta pro DB
 
-3. (~1h30min) Handlers:
-   - `Refresh`/`Logout`: hash o token recebido e compara com `token_hash` (substitui SELECT atual por `WHERE token_hash = $1`)
-   - `VerifyEmail`/`ResetPassword`: idem
-   - Constant-time compare via `subtle.ConstantTimeCompare`
-
-4. (~30min) Migration de drop da coluna `token` (em PR separado, após confirmar que nada lê `token` direto):
-   ```sql
-   ALTER TABLE refresh_tokens DROP COLUMN token;
-   ```
-
-**Validação**:
-- Testes unitários do hashing (constant-time)
-- Testes integration: registrar → login → /refresh com token hashado funciona
-- Backup do DB antes do deploy de prod (rollback path conhecido)
+**Testes**:
+- `tokenhash_test.go`: determinismo, vetor conhecido SHA-256("abc"), shape hex 64 chars
+- `tokenhash_integration_test.go`: invariante "DB nunca tem plaintext" — login emite refresh, query confirma que `token_hash` ≠ plaintext mas == sha256(plaintext)
 
 ---
 
-## Ordem de execução recomendada
+## Ordem de execução
 
-1. **Bundle 1** (~3h) — Quick wins. Sem risco de regressão, fecha 5 HIGHs imediato.
-2. **Bundle 2** (~9h) — Redis. Maior PR mas autocontido. Exige `docker-compose up redis` em dev.
-3. **Bundle 3** (~3h) — Cross-service price. Refactor do orderclient + cliente novo pro catalog.
-4. **Bundle 4** (~3h) — Token hashing. Última coisa porque é a mais arriscada (DB migration).
+1. ~~**Bundle 1** — Quick wins.~~ ✅ Fechado 2026-04-27.
+2. ~~**Bundle 3** — Cross-service price validation.~~ ✅ Fechado 2026-04-27.
+3. ~~**Bundle 4** — Token hashing migration.~~ ✅ Fechado 2026-04-27.
+4. ~~**Bundle 2** — Redis: rate limit + Idempotency-Key.~~ ✅ Fechado 2026-04-27.
 
-**Total**: ~19h. Distribuição sugerida: 2.5 dias dedicados, ou 4–5 sessões de ~4h.
-
-Após Bundle 4, **payment-service e auth-service estão em estado de produção saudável**: 0 CRITICAL, 0 HIGH abertos. Restam apenas MEDIUM/LOW (hardening orgânico, sem urgência).
+**Sprint 8.5 Fase 2 fechada**. payment-service e auth-service em estado **saudável pra produção**: 0 CRITICAL, 0 HIGH. Restam apenas MEDIUM/LOW (hardening orgânico, sem urgência).
 
 ---
 

@@ -17,6 +17,7 @@ type Config struct {
 	RefreshTokenTTL  time.Duration
 	EmailVerifyTTL   time.Duration
 	PasswordResetTTL time.Duration
+	RedisURL         string // ex: redis://localhost:6379. Vazio desabilita rate limit.
 }
 
 // devSecret só é aceito em DEV_MODE=true. Em prod, JWT_SECRET é obrigatório
@@ -54,6 +55,7 @@ func Load() (*Config, error) {
 		RefreshTokenTTL:  30 * 24 * time.Hour, // 30 dias
 		EmailVerifyTTL:   24 * time.Hour,
 		PasswordResetTTL: 1 * time.Hour,
+		RedisURL:         os.Getenv("REDIS_URL"),
 	}, nil
 }
 

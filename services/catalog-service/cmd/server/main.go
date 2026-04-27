@@ -10,9 +10,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/utilar/catalog-service/internal/config"
 	"github.com/utilar/catalog-service/internal/db"
 	"github.com/utilar/catalog-service/internal/handler"
+	"github.com/utilar/pkg/ratelimit"
 )
 
 func main() {
@@ -37,6 +40,23 @@ func main() {
 	categoryH := handler.NewCategoryHandler(database)
 	sellerH := handler.NewSellerHandler(database)
 
+	// CT1-H1: rate limit em /products (search). 100/min/IP. Outros endpoints
+	// (categories, sellers, by-id) têm tráfego baixo e são alvos pouco
+	// interessantes pra brute-force, não recebem limit (ainda).
+	var searchRL gin.HandlerFunc
+	if cfg.RedisURL != "" {
+		opts, err := redis.ParseURL(cfg.RedisURL)
+		if err != nil {
+			slog.Error("redis url", "error", err)
+			os.Exit(1)
+		}
+		rl := ratelimit.New(redis.NewClient(opts))
+		searchRL = ratelimit.Middleware(rl, "catalog:search", ratelimit.Limit{Max: 100, Window: time.Minute}, ratelimit.IPKey)
+		slog.Info("rate limit enabled", "redis", opts.Addr)
+	} else {
+		slog.Warn("REDIS_URL not set — catalog rate limit DISABLED (CT1-H1 unprotected)")
+	}
+
 	r := gin.New()
 	r.Use(
 		gin.Recovery(),
@@ -50,8 +70,14 @@ func main() {
 	{
 		api.GET("/categories", categoryH.List)
 		api.GET("/sellers", sellerH.List)
-		api.GET("/products", productH.List)
-		api.GET("/products/facets", productH.Facets)
+		if searchRL != nil {
+			api.GET("/products", searchRL, productH.List)
+			api.GET("/products/facets", searchRL, productH.Facets)
+		} else {
+			api.GET("/products", productH.List)
+			api.GET("/products/facets", productH.Facets)
+		}
+		api.GET("/products/by-id/:id", productH.GetByID)
 		api.GET("/products/:slug", productH.GetBySlug)
 		api.GET("/products/:slug/related", productH.Related)
 	}

@@ -53,6 +53,7 @@ func setupRouter(db *sql.DB) *gin.Engine {
 	api.GET("/sellers", sellerH.List)
 	api.GET("/products", productH.List)
 	api.GET("/products/facets", productH.Facets)
+	api.GET("/products/by-id/:id", productH.GetByID)
 	api.GET("/products/:slug", productH.GetBySlug)
 	return r
 }
@@ -293,6 +294,50 @@ func TestProduct_GetBySlug_NotFound(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/products/slug-inexistente-xyz", nil))
 
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d want 404", w.Code)
+	}
+}
+
+// O2-H5: /products/by-id/:id é o endpoint que order-service usa pra validar
+// preço autoritativo. Resolve um produto pelo seu UUID interno.
+func TestProduct_GetByID(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	r := setupRouter(db)
+
+	// Pega um id real do seed
+	var id string
+	if err := db.QueryRow("SELECT id FROM products LIMIT 1").Scan(&id); err != nil {
+		t.Skipf("nenhum produto no DB: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/products/by-id/"+id, nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", w.Code, w.Body.String())
+	}
+	var p struct {
+		ID    string  `json:"id"`
+		Price float64 `json:"price"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &p)
+	if p.ID != id {
+		t.Errorf("id mismatch: got %q want %q", p.ID, id)
+	}
+	if p.Price <= 0 {
+		t.Errorf("price não populado: %v", p.Price)
+	}
+}
+
+func TestProduct_GetByID_NotFound(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	r := setupRouter(db)
+
+	w := httptest.NewRecorder()
+	// UUID válido mas não existe
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/products/by-id/00000000-0000-0000-0000-000000000000", nil))
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status = %d want 404", w.Code)
 	}

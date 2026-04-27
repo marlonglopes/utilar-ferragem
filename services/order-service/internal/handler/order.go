@@ -1,23 +1,52 @@
 package handler
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/utilar/order-service/internal/catalogclient"
 	"github.com/utilar/order-service/internal/model"
 )
 
-type OrderHandler struct{ db *sql.DB }
+// priceTolerance é o desvio máximo aceito entre o preço do body e o do catalog
+// antes de logar warning. Float64 não é exato; 1 centavo é folga aceitável.
+const priceTolerance = 0.01
 
-func NewOrderHandler(db *sql.DB) *OrderHandler { return &OrderHandler{db: db} }
+// CatalogLookup é a interface mínima que OrderHandler precisa pra validar
+// preço dos itens contra o catalog-service (audit O2-H5).
+type CatalogLookup interface {
+	GetByID(ctx context.Context, productID string) (*catalogclient.Product, error)
+}
+
+type OrderHandler struct {
+	db      *sql.DB
+	catalog CatalogLookup
+	devMode bool
+}
+
+// NewOrderHandler. catalog pode ser nil em dev pra simplificar smoke tests
+// locais sem catalog-service rodando — mas em DevMode=false um catalog nil
+// faria a validação ser pulada e isso seria um regression de O2-H5.
+// Logamos no boot pra deixar visível.
+func NewOrderHandler(db *sql.DB, catalog CatalogLookup, devMode bool) *OrderHandler {
+	return &OrderHandler{db: db, catalog: catalog, devMode: devMode}
+}
 
 // Create POST /api/v1/orders
 // Cria pedido + items + endereço em uma transação.
 // Status inicial: pending_payment. Total calculado no servidor (nunca confia em cliente).
+//
+// SEGURANÇA (audit O2-H5):
+// O `unitPrice` de cada item é validado contra o catalog-service. Se diverge
+// do `product.price` autoritativo, **sobrescrevemos** com o valor do catalog
+// e logamos warning (sinal de tamper ou bug de frontend).
 func (h *OrderHandler) Create(c *gin.Context) {
 	var req model.CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -26,6 +55,22 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	}
 
 	userID := c.GetString("user_id")
+	requestID := c.GetString("request_id")
+
+	// O2-H5: resolve price autoritativo via catalog-service. Mutates req.Items
+	// in-place pra que o INSERT abaixo use os valores corretos.
+	if err := h.applyAuthoritativePricing(c.Request.Context(), userID, requestID, req.Items); err != nil {
+		switch {
+		case errors.Is(err, catalogclient.ErrNotFound):
+			BadRequest(c, "product not found")
+		default:
+			slog.Error("create order: catalog lookup",
+				"error", err, "request_id", requestID)
+			BadGateway(c, "catalog service unavailable")
+		}
+		return
+	}
+
 	subtotal := 0.0
 	for _, it := range req.Items {
 		subtotal += float64(it.Quantity) * it.UnitPrice
@@ -39,8 +84,8 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
-	// gera número de pedido humano: ANO-SEQ (simples para dev; em prod usar sequence dedicada)
-	orderNumber := fmt.Sprintf("%d-%d", time.Now().Year(), time.Now().UnixNano()%100000)
+	// número de pedido = ano + 8 chars base32 de crypto/rand (não enumerável)
+	orderNumber := generateOrderNumber(time.Now().Year())
 
 	var orderID string
 	err = tx.QueryRow(`
@@ -228,6 +273,53 @@ func (h *OrderHandler) Cancel(c *gin.Context) {
 
 	order, _ := h.loadOrder(id, userID)
 	c.JSON(http.StatusOK, order)
+}
+
+// applyAuthoritativePricing valida e sobrescreve o `unitPrice` de cada item
+// usando o catalog-service. Em caso de divergência, loga warning e usa o valor
+// do catalog (autoritativo).
+//
+// Quando catalog é nil (DevMode sem catalog rodando), pula a validação com
+// warning. Em prod isso seria um regression mas é detectável via log na boot.
+//
+// Se o produto não existe no catalog, retorna catalogclient.ErrNotFound — o
+// caller traduz pra HTTP 400.
+func (h *OrderHandler) applyAuthoritativePricing(ctx context.Context, userID, requestID string, items []model.OrderItem) error {
+	if h.catalog == nil {
+		if !h.devMode {
+			slog.Error("create order: catalog client missing in non-dev mode", "request_id", requestID)
+		} else {
+			slog.Warn("create order: skipping price validation (dev mode, no catalog)", "request_id", requestID)
+		}
+		return nil
+	}
+
+	for i := range items {
+		it := &items[i]
+		p, err := h.catalog.GetByID(ctx, it.ProductID)
+		if err != nil {
+			return err
+		}
+		// Detecta tampering: cliente enviou preço significativamente diferente.
+		// Não recusa — apenas loga + sobrescreve. Recusar quebraria UX em casos
+		// legítimos de cache stale do frontend; mas o amount cobrado fica
+		// sempre igual ao do catalog.
+		diff := it.UnitPrice - p.Price
+		if diff < 0 {
+			diff = -diff
+		}
+		if diff > priceTolerance {
+			slog.Warn("create order: price tamper or stale frontend",
+				"product_id", it.ProductID,
+				"client_price", it.UnitPrice,
+				"catalog_price", p.Price,
+				"user_id", userID,
+				"request_id", requestID)
+		}
+		it.UnitPrice = p.Price
+		it.Name = p.Name
+	}
+	return nil
 }
 
 // -- helpers ----------------------------------------------------------------

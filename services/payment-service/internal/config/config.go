@@ -32,6 +32,9 @@ type Config struct {
 	MPAccessToken   string
 	MPPublicKey     string
 	MPWebhookSecret string
+
+	// Redis (rate limit + idempotency). Vazio em dev = features desabilitadas.
+	RedisURL string
 }
 
 const devSecret = "dev-only-secret-not-for-production"
@@ -71,6 +74,8 @@ func Load() (*Config, error) {
 		MPAccessToken:   os.Getenv("MP_ACCESS_TOKEN"),
 		MPPublicKey:     os.Getenv("MP_PUBLIC_KEY"),
 		MPWebhookSecret: os.Getenv("MP_WEBHOOK_SECRET"),
+
+		RedisURL: os.Getenv("REDIS_URL"),
 	}
 
 	// Valida credenciais do provider escolhido + webhook secret fail-closed em prod (audit C5).

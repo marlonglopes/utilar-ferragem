@@ -6,10 +6,24 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/utilar/catalog-service/internal/model"
 )
+
+// slugLookupMinElapsed é o tempo mínimo de resposta de GetBySlug e Related.
+// Mitiga timing attack que distinguiria slug existente vs inexistente
+// (CT1-H4). Valor pequeno o suficiente pra não impactar UX humana.
+const slugLookupMinElapsed = 50 * time.Millisecond
+
+// padToMinElapsed bloqueia até que pelo menos `min` tenha decorrido desde
+// `start`. Usado pra normalizar tempo de respostas sensíveis a timing.
+func padToMinElapsed(start time.Time, min time.Duration) {
+	if elapsed := time.Since(start); elapsed < min {
+		time.Sleep(min - elapsed)
+	}
+}
 
 type ProductHandler struct{ db *sql.DB }
 
@@ -121,6 +135,9 @@ func (h *ProductHandler) List(c *gin.Context) {
 
 // GetBySlug GET /api/v1/products/:slug
 func (h *ProductHandler) GetBySlug(c *gin.Context) {
+	start := time.Now()
+	defer padToMinElapsed(start, slugLookupMinElapsed)
+
 	slug := c.Param("slug")
 
 	row := h.db.QueryRow(`
@@ -144,6 +161,54 @@ func (h *ProductHandler) GetBySlug(c *gin.Context) {
 	}
 
 	// Load images
+	imgRows, err := h.db.Query(`
+		SELECT url, alt FROM product_images WHERE product_id=$1 ORDER BY sort_order ASC
+	`, p.ID)
+	if err == nil {
+		defer imgRows.Close()
+		for imgRows.Next() {
+			var im model.ProductImage
+			if err := imgRows.Scan(&im.URL, &im.Alt); err == nil {
+				p.Images = append(p.Images, im)
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, p)
+}
+
+// GetByID GET /api/v1/products/by-id/:id
+//
+// Endpoint usado por outros serviços (order-service) pra resolver um produto
+// pelo seu UUID — o frontend mantém ID em vez de slug nos itens do carrinho.
+// Retorna o mesmo payload que GetBySlug. O timing pad também aplica aqui pra
+// não vazar enumeração de IDs (CT1-H4 generalizado).
+func (h *ProductHandler) GetByID(c *gin.Context) {
+	start := time.Now()
+	defer padToMinElapsed(start, slugLookupMinElapsed)
+
+	id := c.Param("id")
+
+	row := h.db.QueryRow(`
+		SELECT
+		  p.id, p.slug, p.name, p.category_id, p.price, p.original_price, p.currency, p.icon, p.brand,
+		  s.name, s.id, s.rating, s.review_count,
+		  p.stock, p.rating, p.review_count, p.cashback_amount, p.badge::text, p.badge_label, p.installments,
+		  p.description, p.specs, p.created_at, p.updated_at
+		FROM products p
+		JOIN sellers s ON s.id = p.seller_id
+		WHERE p.id = $1
+	`, id)
+	p, err := scanProduct(row)
+	if err == sql.ErrNoRows {
+		NotFound(c, "product not found")
+		return
+	}
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+
 	imgRows, err := h.db.Query(`
 		SELECT url, alt FROM product_images WHERE product_id=$1 ORDER BY sort_order ASC
 	`, p.ID)
@@ -216,6 +281,9 @@ func (h *ProductHandler) Facets(c *gin.Context) {
 // Related GET /api/v1/products/:slug/related?limit=4
 // Produtos da mesma categoria, excluindo o slug atual.
 func (h *ProductHandler) Related(c *gin.Context) {
+	start := time.Now()
+	defer padToMinElapsed(start, slugLookupMinElapsed)
+
 	slug := c.Param("slug")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "4"))
 	if limit < 1 || limit > 24 {

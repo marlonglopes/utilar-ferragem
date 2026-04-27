@@ -18,6 +18,10 @@ import (
 	"github.com/utilar/payment-service/internal/psp"
 )
 
+// maxPaymentRequestBody — limite de body em POST /payments. Payload típico
+// é ~1KB; 16KB é folga generosa pra futuros campos sem abrir DoS por body grande.
+const maxPaymentRequestBody = 16 * 1024
+
 // extractBearerToken pega o JWT do header Authorization. Vazio se ausente/malformado.
 func extractBearerToken(c *gin.Context) string {
 	auth := c.GetHeader("Authorization")
@@ -61,6 +65,11 @@ func NewPaymentHandler(db *sql.DB, gateway psp.Gateway, orderClient OrderLookup,
 //   - Em DevMode, se `orderClient` for nil, fazemos best-effort com o amount
 //     do body (com warning).
 func (h *PaymentHandler) Create(c *gin.Context) {
+	// H5: cap o body antes de ler. Payments têm payload pequeno (~1KB);
+	// 16KB é folga generosa pra futuros campos. Excesso retorna 400 via
+	// erro do bind quando o reader corta.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxPaymentRequestBody)
+
 	var req model.CreatePaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		BadRequest(c, err.Error())

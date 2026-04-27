@@ -44,9 +44,15 @@ func setupTestDB(t *testing.T) *sql.DB {
 }
 
 func setupRouter(db *sql.DB) *gin.Engine {
+	return setupRouterWithCatalog(db, nil)
+}
+
+func setupRouterWithCatalog(db *sql.DB, catalog handler.CatalogLookup) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	orderH := handler.NewOrderHandler(db)
+	// devMode=true: aceita catalog nil sem panic (pula validação de price).
+	// Os testes de tampering injetam um stub de catalog explicitamente.
+	orderH := handler.NewOrderHandler(db, catalog, true)
 	r.Use(handler.RequestID())
 	api := r.Group("/api/v1", handler.RequireUser("test-secret", true))
 	api.POST("/orders", orderH.Create)

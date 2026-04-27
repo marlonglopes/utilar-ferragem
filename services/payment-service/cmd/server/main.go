@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/utilar/payment-service/internal/config"
 	"github.com/utilar/payment-service/internal/db"
 	"github.com/utilar/payment-service/internal/handler"
@@ -18,6 +20,8 @@ import (
 	"github.com/utilar/payment-service/internal/psp"
 	mpgateway "github.com/utilar/payment-service/internal/psp/mercadopago"
 	stripegateway "github.com/utilar/payment-service/internal/psp/stripe"
+	"github.com/utilar/pkg/idempotency"
+	"github.com/utilar/pkg/ratelimit"
 )
 
 func main() {
@@ -86,9 +90,42 @@ func main() {
 	// provider inativo.
 	r.POST("/webhooks/:provider", webhookH.Handle)
 
+	// H4 + H1: rate limit + Idempotency-Key em POST /payments.
+	// Sem REDIS_URL (dev): ambos features ficam desligadas — log warn explícito.
+	var paymentRL gin.HandlerFunc
+	var paymentIdem gin.HandlerFunc
+	if cfg.RedisURL != "" {
+		opts, err := redis.ParseURL(cfg.RedisURL)
+		if err != nil {
+			slog.Error("redis url", "error", err)
+			os.Exit(1)
+		}
+		rdb := redis.NewClient(opts)
+		paymentRL = ratelimit.Middleware(
+			ratelimit.New(rdb),
+			"payment:create",
+			ratelimit.Limit{Max: 10, Window: time.Minute},
+			ratelimit.UserKey, // por user_id (limita atacante autenticado, não IP só)
+		)
+		paymentIdem = idempotency.Middleware(idempotency.New(rdb, 24*time.Hour), "payment:create")
+		slog.Info("rate limit + idempotency enabled", "redis", opts.Addr)
+	} else {
+		slog.Warn("REDIS_URL not set — payment rate limit + idempotency DISABLED (H1, H4 unprotected)")
+	}
+
 	api := r.Group("/api/v1", handler.JWTMiddleware(cfg.JWTSecret))
 	{
-		api.POST("/payments", paymentH.Create)
+		// Idempotency vai ANTES do rate limit: requisição replayed do cache não
+		// deve consumir cota. Ordem: idem (replay rápido) → ratelimit → handler.
+		createChain := []gin.HandlerFunc{}
+		if paymentIdem != nil {
+			createChain = append(createChain, paymentIdem)
+		}
+		if paymentRL != nil {
+			createChain = append(createChain, paymentRL)
+		}
+		createChain = append(createChain, paymentH.Create)
+		api.POST("/payments", createChain...)
 		api.GET("/payments/:id", paymentH.Get)
 		api.POST("/payments/:id/sync", paymentH.Sync)
 	}

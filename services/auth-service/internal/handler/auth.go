@@ -56,11 +56,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	// Emite token de verificação de email (print no log — SES entra na Sprint 22/25)
+	// A7-H3: armazenamos só o hash; o plaintext só sai no log dev / email.
 	token := randToken()
 	_, err = h.db.Exec(`
-		INSERT INTO email_verification_tokens (token, user_id, expires_at)
+		INSERT INTO email_verification_tokens (token_hash, user_id, expires_at)
 		VALUES ($1, $2, $3)
-	`, token, userID, time.Now().Add(h.cfg.EmailVerifyTTL))
+	`, hashToken(token), userID, time.Now().Add(h.cfg.EmailVerifyTTL))
 	if err != nil {
 		slog.Warn("verify token insert failed", "error", err)
 	} else if h.cfg.DevMode {
@@ -137,12 +138,15 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
+	// A7-H3: lookup pelo hash, nunca pelo plaintext.
+	tokenHash := hashToken(req.RefreshToken)
+
 	var userID string
 	var revokedAt sql.NullTime
 	var expiresAt time.Time
 	err := h.db.QueryRow(`
-		SELECT user_id, revoked_at, expires_at FROM refresh_tokens WHERE token = $1
-	`, req.RefreshToken).Scan(&userID, &revokedAt, &expiresAt)
+		SELECT user_id, revoked_at, expires_at FROM refresh_tokens WHERE token_hash = $1
+	`, tokenHash).Scan(&userID, &revokedAt, &expiresAt)
 	if err == sql.ErrNoRows {
 		Unauthorized(c, "invalid refresh token")
 		return
@@ -182,16 +186,16 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`UPDATE refresh_tokens SET revoked_at = now() WHERE token = $1 AND revoked_at IS NULL`, req.RefreshToken); err != nil {
+	if _, err := tx.Exec(`UPDATE refresh_tokens SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL`, tokenHash); err != nil {
 		DBError(c, err)
 		return
 	}
 
 	newRefresh := randToken()
 	if _, err := tx.Exec(`
-		INSERT INTO refresh_tokens (token, user_id, user_agent, ip, expires_at)
+		INSERT INTO refresh_tokens (token_hash, user_id, user_agent, ip, expires_at)
 		VALUES ($1, $2, $3, $4, $5)
-	`, newRefresh, u.ID, c.GetHeader("User-Agent"), c.ClientIP(), time.Now().Add(h.cfg.RefreshTokenTTL)); err != nil {
+	`, hashToken(newRefresh), u.ID, c.GetHeader("User-Agent"), c.ClientIP(), time.Now().Add(h.cfg.RefreshTokenTTL)); err != nil {
 		DBError(c, err)
 		return
 	}
@@ -229,7 +233,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		c.JSON(http.StatusNoContent, nil)
 		return
 	}
-	_, _ = h.db.Exec(`UPDATE refresh_tokens SET revoked_at = now() WHERE token = $1`, req.RefreshToken)
+	_, _ = h.db.Exec(`UPDATE refresh_tokens SET revoked_at = now() WHERE token_hash = $1`, hashToken(req.RefreshToken))
 	c.JSON(http.StatusNoContent, nil)
 }
 
@@ -241,12 +245,13 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 		BadRequest(c, err.Error())
 		return
 	}
+	tokenHash := hashToken(req.Token)
 	var userID string
 	var expiresAt time.Time
 	var usedAt sql.NullTime
 	err := h.db.QueryRow(`
-		SELECT user_id, expires_at, used_at FROM email_verification_tokens WHERE token = $1
-	`, req.Token).Scan(&userID, &expiresAt, &usedAt)
+		SELECT user_id, expires_at, used_at FROM email_verification_tokens WHERE token_hash = $1
+	`, tokenHash).Scan(&userID, &expiresAt, &usedAt)
 	if err == sql.ErrNoRows {
 		BadRequest(c, "invalid token")
 		return
@@ -274,7 +279,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 		DBError(c, err)
 		return
 	}
-	if _, err := tx.Exec(`UPDATE email_verification_tokens SET used_at = now() WHERE token = $1`, req.Token); err != nil {
+	if _, err := tx.Exec(`UPDATE email_verification_tokens SET used_at = now() WHERE token_hash = $1`, tokenHash); err != nil {
 		DBError(c, err)
 		return
 	}
@@ -285,6 +290,11 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 // -- forgot / reset password ------------------------------------------------
 
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	// A9-H5: tempo de resposta normalizado pra que email cadastrado vs
+	// não cadastrado sejam indistinguíveis via timing.
+	start := time.Now()
+	defer padToMinElapsed(start, forgotPasswordMinElapsed)
+
 	var req model.ForgotPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		BadRequest(c, err.Error())
@@ -306,8 +316,8 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 
 	token := randToken()
 	_, err = h.db.Exec(`
-		INSERT INTO password_reset_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)
-	`, token, userID, time.Now().Add(h.cfg.PasswordResetTTL))
+		INSERT INTO password_reset_tokens (token_hash, user_id, expires_at) VALUES ($1, $2, $3)
+	`, hashToken(token), userID, time.Now().Add(h.cfg.PasswordResetTTL))
 	if err != nil {
 		DBError(c, err)
 		return
@@ -325,12 +335,13 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		BadRequest(c, err.Error())
 		return
 	}
+	tokenHash := hashToken(req.Token)
 	var userID string
 	var expiresAt time.Time
 	var usedAt sql.NullTime
 	err := h.db.QueryRow(`
-		SELECT user_id, expires_at, used_at FROM password_reset_tokens WHERE token = $1
-	`, req.Token).Scan(&userID, &expiresAt, &usedAt)
+		SELECT user_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash = $1
+	`, tokenHash).Scan(&userID, &expiresAt, &usedAt)
 	if err == sql.ErrNoRows {
 		BadRequest(c, "invalid token")
 		return
@@ -364,7 +375,7 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		DBError(c, err)
 		return
 	}
-	if _, err := tx.Exec(`UPDATE password_reset_tokens SET used_at = now() WHERE token = $1`, req.Token); err != nil {
+	if _, err := tx.Exec(`UPDATE password_reset_tokens SET used_at = now() WHERE token_hash = $1`, tokenHash); err != nil {
 		DBError(c, err)
 		return
 	}
@@ -397,10 +408,11 @@ func (h *AuthHandler) issueTokens(c *gin.Context, u *model.User) (access, refres
 		return "", "", err
 	}
 	refresh = randToken()
+	// A7-H3: insere o hash do refresh token; o plaintext segue só pro cliente.
 	_, err = h.db.Exec(`
-		INSERT INTO refresh_tokens (token, user_id, user_agent, ip, expires_at)
+		INSERT INTO refresh_tokens (token_hash, user_id, user_agent, ip, expires_at)
 		VALUES ($1, $2, $3, $4, $5)
-	`, refresh, u.ID, c.GetHeader("User-Agent"), c.ClientIP(), time.Now().Add(h.cfg.RefreshTokenTTL))
+	`, hashToken(refresh), u.ID, c.GetHeader("User-Agent"), c.ClientIP(), time.Now().Add(h.cfg.RefreshTokenTTL))
 	return access, refresh, err
 }
 

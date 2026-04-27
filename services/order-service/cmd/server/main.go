@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/utilar/order-service/internal/catalogclient"
 	"github.com/utilar/order-service/internal/config"
 	"github.com/utilar/order-service/internal/db"
 	"github.com/utilar/order-service/internal/handler"
@@ -38,7 +39,8 @@ func main() {
 	}
 	slog.Info("migrations applied")
 
-	orderH := handler.NewOrderHandler(database)
+	catalog := catalogclient.New(cfg.CatalogServiceURL)
+	orderH := handler.NewOrderHandler(database, catalog, cfg.DevMode)
 
 	r := gin.New()
 	r.Use(
