@@ -5,6 +5,8 @@
 **Método**: re-leitura dos audits + grep de anti-patterns + ferramentas (`go vet`, `govulncheck`, `gosec`, `npm audit`) + suite completa de testes.
 **Resultado**: ✅ **Backend e frontend liberados pra produção** — todos os 65 findings de auditoria fechados, 1 nova vulnerabilidade descoberta e fixada nesta sessão.
 
+> **Continuação**: este sweep cobriu segurança estática + suite de testes. A validação E2E do flow de pagamento (Card/Boleto/Pix com Stripe Test mode real) foi feita em [checkout-flow-validation-2026-04-28.md](checkout-flow-validation-2026-04-28.md).
+
 ---
 
 ## 1. Sumário executivo

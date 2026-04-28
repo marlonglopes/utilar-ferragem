@@ -1,6 +1,6 @@
 # Security Roadmap — pós Sprint 8.5 + MEDIUMs + LOWs
 
-**Última atualização**: 2026-04-27 (LOWs fechados — backlog limpo)
+**Última atualização**: 2026-04-28 (checkout flow validado end-to-end)
 
 Documento vivo do trabalho de segurança. **Todos os achados de auditoria fechados.** Manutenção a partir daqui é orgânica via dependabot, govulncheck no CI e novos audits.
 
@@ -16,9 +16,13 @@ Documento vivo do trabalho de segurança. **Todos os achados de auditoria fechad
 | LOW      | **0** ✅ | 14 |
 | **Total** | **0** ✅ | **65** |
 
+**Suite de testes**: 238 Go (race) + 154 frontend = **392 PASS, 0 FAIL, 0 SKIP**
+
 Ver detalhes em:
 - [full-audit-2026-04-26.md](full-audit-2026-04-26.md) — auth/order/catalog
 - [payment-service-audit-2026-04-24.md](payment-service-audit-2026-04-24.md) — payment
+- [verification-2026-04-27.md](verification-2026-04-27.md) — sweep pós-remediation
+- [checkout-flow-validation-2026-04-28.md](checkout-flow-validation-2026-04-28.md) — E2E das 3 formas de pagamento
 
 ---
 
