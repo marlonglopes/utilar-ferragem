@@ -9,12 +9,18 @@ import (
 // persistir o payload do PSP (M2). Inclui PCI-relevant (PAN, CVC) e PII
 // brasileiro (CPF). Keys já normalizadas (lowercase, sem `_`/`-`).
 //
-// Não inclui `last4` / `last_four_digits` — last4 não é PCI sensitive
-// (cliente vê na UI).
+// NÃO inclui:
+//   - `last4`/`last_four_digits` — não é PCI sensitive (cliente vê na UI)
+//   - `number` genérico — colide com `boleto_display_details.number` (linha
+//     digitável, público) e `point_of_interaction.transaction_data.qr_code`.
+//     Cartão Stripe/MP NUNCA retorna PAN no payload (sempre tokenizado).
+//     Pra cobrir o caso raro de PAN raw num webhook, usamos `cardnumber` e
+//     `pannumber` específicos.
 var piiFields = map[string]struct{}{
-	// PCI / PAN
-	"number":          {}, // card number
+	// PCI / PAN — keys explícitas. Stripe/MP serializam como "card_number"/"card.number"
+	// quando aparece (em webhooks customizados, não no payment_intent normal).
 	"cardnumber":      {},
+	"pannumber":       {},
 	"firstsixdigits":  {},
 	"first6":          {},
 	"cvv":             {},
@@ -31,6 +37,7 @@ var piiFields = map[string]struct{}{
 	"identification": {}, // MP nesting com number+type — mascara o objeto inteiro
 	"docnumber":      {},
 	"document":       {},
+	"taxid":          {}, // Stripe boleto: payer.tax_id
 
 	// Endereço/contato (parcial)
 	"phone":       {},

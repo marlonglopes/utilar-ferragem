@@ -6,7 +6,9 @@ import (
 	"testing"
 )
 
-func TestRedactPSPPayload_StripeCardNumber(t *testing.T) {
+func TestRedactPSPPayload_StripeCardSensitiveFields(t *testing.T) {
+	// Stripe raramente retorna PAN raw (sempre tokenizado), mas se vier em
+	// algum webhook custom, esses campos têm que ser mascarados.
 	in := json.RawMessage(`{
 		"id": "pi_123",
 		"amount": 1000,
@@ -16,7 +18,7 @@ func TestRedactPSPPayload_StripeCardNumber(t *testing.T) {
 				"last4": "4242",
 				"exp_month": 12,
 				"exp_year": 2030,
-				"number": "4242424242424242",
+				"card_number": "4242424242424242",
 				"cvc": "123"
 			}
 		}
@@ -34,6 +36,31 @@ func TestRedactPSPPayload_StripeCardNumber(t *testing.T) {
 	}
 	if !strings.Contains(s, "REDACTED") {
 		t.Error("placeholder REDACTED ausente")
+	}
+}
+
+// Boleto (Stripe): linha digitável fica em next_action.boleto_display_details.number.
+// É um valor PÚBLICO usado pra pagar — NÃO deve ser mascarado.
+func TestRedactPSPPayload_BoletoNumberPreserved(t *testing.T) {
+	in := json.RawMessage(`{
+		"id": "pi_boleto",
+		"status": "requires_action",
+		"next_action": {
+			"type": "boleto_display_details",
+			"boleto_display_details": {
+				"number": "00190.00009 02000.000000 00000.000000 1 12345678901234",
+				"pdf": "https://stripe.com/boleto/abc.pdf",
+				"hosted_voucher_url": "https://stripe.com/boleto/abc"
+			}
+		}
+	}`)
+	out := redactPSPPayload(in)
+	s := string(out)
+	if !strings.Contains(s, "00190.00009") {
+		t.Errorf("boleto number foi mascarado erroneamente: %s", s)
+	}
+	if !strings.Contains(s, "https://stripe.com/boleto/abc.pdf") {
+		t.Error("PDF URL sumiu")
 	}
 }
 

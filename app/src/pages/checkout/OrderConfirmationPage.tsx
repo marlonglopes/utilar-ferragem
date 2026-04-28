@@ -5,8 +5,24 @@ import { CheckCircle2, Clock, XCircle, Package } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { isApiEnabled } from '@/lib/api'
 import { apiGet } from '@/lib/api'
+import { paymentResultFromApi, type PaymentResult, type PaymentMethod } from '@/hooks/usePayment'
+import BoletoPayment from './BoletoPayment'
+import PixPayment from './PixPayment'
 
 type PaymentStatus = 'pending' | 'confirmed' | 'failed'
+
+// Subset do que GET /api/v1/payments/:id retorna, mapeado pro shape que
+// paymentResultFromApi espera. Backend usa snake_case mas tem `clientSecret`
+// camelCase — espelha o response shape do POST /payments.
+interface ApiPaymentDetail {
+  id: string
+  method: PaymentMethod
+  status: string
+  psp_payment_id?: string
+  psp_payload?: Record<string, unknown> | null
+  clientSecret?: string
+  provider?: 'stripe' | 'mercadopago' | 'mock'
+}
 
 function usePollingConfirmation(
   paymentId: string,
@@ -83,6 +99,45 @@ export default function OrderConfirmationPage() {
   }, [])
 
   usePollingConfirmation(paymentId, method, handleStatusUpdate)
+
+  // Pra Pix e Boleto: busca detalhes completos do payment pra re-exibir
+  // o QR / linha digitável caso user feche a aba e volte depois usando a
+  // URL do pedido. O componente do método é renderizado inline.
+  const token = useAuthStore((s) => s.user?.token ?? null)
+  const [details, setDetails] = useState<PaymentResult | null>(null)
+  useEffect(() => {
+    if (!isApiEnabled || !paymentId) return
+    if (method !== 'pix' && method !== 'boleto') return
+    let cancelled = false
+    void (async () => {
+      try {
+        const data = await apiGet<ApiPaymentDetail>(
+          `/api/v1/payments/${paymentId}`,
+          token ?? undefined,
+        )
+        if (cancelled) return
+        const result = paymentResultFromApi(
+          {
+            id: data.id,
+            psp_id: data.psp_payment_id,
+            method: data.method,
+            status: data.status,
+            provider: data.provider,
+            clientSecret: data.clientSecret,
+            psp_payload: data.psp_payload,
+          },
+          method as PaymentMethod,
+        )
+        setDetails(result)
+      } catch {
+        // Silencioso: se fetch falhar (404, 401), apenas não mostra detalhes.
+        // User ainda vê status + link "Acompanhar pedido".
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [paymentId, method, token])
 
   const boletoDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
@@ -161,6 +216,20 @@ export default function OrderConfirmationPage() {
       <StatusBadge />
 
       <MethodMessage />
+
+      {/* Re-exibe boleto/QR quando user volta pela URL do pedido. Componente
+          mostra a linha digitável + links pra PDF/voucher (boleto) ou QR +
+          copy-paste (pix). Não mostra se status já é confirmed. */}
+      {details && status !== 'confirmed' && method === 'boleto' && (
+        <div className="w-full bg-white border border-gray-200 rounded-xl p-5 text-left">
+          <BoletoPayment result={details} />
+        </div>
+      )}
+      {details && status !== 'confirmed' && method === 'pix' && (
+        <div className="w-full bg-white border border-gray-200 rounded-xl p-5 text-left">
+          <PixPayment result={details} onRegenerate={() => undefined} />
+        </div>
+      )}
 
       {userEmail && (
         <p className="text-sm text-gray-400">

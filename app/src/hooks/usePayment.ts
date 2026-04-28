@@ -152,6 +152,13 @@ function parseApiResult(raw: ApiPaymentResponse, method: PaymentMethod): Payment
   return parseStripeResult(raw, method)
 }
 
+// Exposto pra OrderConfirmationPage reusar: re-construir o PaymentResult a
+// partir do GET /payments/:id quando user volta na página depois de fechar
+// a aba sem ter copiado o boleto/QR.
+export function paymentResultFromApi(raw: ApiPaymentResponse, method: PaymentMethod): PaymentResult {
+  return parseApiResult(raw, method)
+}
+
 export function usePayment() {
   // Selector direto da prop em vez de função (`s.token()`) pra evitar re-render
   // a cada mudança do store — a função retornaria nova referência sempre.
