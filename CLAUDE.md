@@ -104,7 +104,7 @@ Go 1.26, Gin 1.12, lib/pq, golang-migrate. Go workspace (`go.work`) unifies 4 se
 
 **Pre-commit hook**: Husky + lint-staged runs ESLint fix + Prettier on staged `.ts/.tsx` files.
 
-**PSP provider**: Configured via `PSP_PROVIDER` env var (`stripe` or `mercadopago`). Payment-service abstracts both behind the same API surface.
+**PSP provider**: Configured via `PSP_PROVIDER` env var (`stripe`, `mercadopago`, or `appmax`). Payment-service abstracts all three behind the same `psp.Gateway` interface (`internal/psp/`). Appmax is order-centric (customer→order→payment) and unsigned-webhook — see `docs/appmax-integration.md`.
 
 ## Project structure
 

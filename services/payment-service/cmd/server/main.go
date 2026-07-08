@@ -19,6 +19,7 @@ import (
 	"github.com/utilar/payment-service/internal/orderclient"
 	"github.com/utilar/payment-service/internal/outbox"
 	"github.com/utilar/payment-service/internal/psp"
+	appmaxgateway "github.com/utilar/payment-service/internal/psp/appmax"
 	mpgateway "github.com/utilar/payment-service/internal/psp/mercadopago"
 	stripegateway "github.com/utilar/payment-service/internal/psp/stripe"
 	"github.com/utilar/pkg/idempotency"
@@ -54,6 +55,8 @@ func main() {
 		gateway = stripegateway.New(cfg.StripeSecretKey, cfg.StripeWebhookSecret)
 	case "mercadopago":
 		gateway = mpgateway.New(cfg.MPAccessToken, cfg.MPWebhookSecret)
+	case "appmax":
+		gateway = appmaxgateway.New(cfg.AppmaxAccessToken, cfg.AppmaxWebhookSecret)
 	default:
 		slog.Error("unknown PSP_PROVIDER", "provider", cfg.PSPProvider)
 		os.Exit(1)

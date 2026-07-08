@@ -97,3 +97,32 @@ func TestLoad_RejectsInvalidPSPProvider(t *testing.T) {
 		t.Fatal("expected error for invalid PSP_PROVIDER, got nil")
 	}
 }
+
+func TestLoad_AppmaxRequiresAccessTokenInProd(t *testing.T) {
+	setBaseEnv(t)
+	t.Setenv("PSP_PROVIDER", "appmax")
+	t.Setenv("APPMAX_ACCESS_TOKEN", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for missing APPMAX_ACCESS_TOKEN in prod, got nil")
+	}
+}
+
+// A Appmax não assina postbacks (sem HMAC), então — diferente de Stripe/MP — não
+// exigimos webhook secret em prod. A integridade vem da re-consulta GetPayment (C3).
+func TestLoad_AppmaxAcceptsWithoutWebhookSecretInProd(t *testing.T) {
+	setBaseEnv(t)
+	t.Setenv("PSP_PROVIDER", "appmax")
+	t.Setenv("APPMAX_ACCESS_TOKEN", "appmax_test_token")
+	t.Setenv("APPMAX_WEBHOOK_SECRET", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.PSPProvider != "appmax" {
+		t.Errorf("expected provider=appmax, got %q", cfg.PSPProvider)
+	}
+	if cfg.AppmaxAccessToken != "appmax_test_token" {
+		t.Errorf("expected access token to be loaded")
+	}
+}

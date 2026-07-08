@@ -27,14 +27,22 @@ type Config struct {
 	PSPProvider string
 
 	// Stripe (usado quando PSPProvider=stripe)
-	StripeSecretKey     string
+	StripeSecretKey      string
 	StripePublishableKey string
-	StripeWebhookSecret string
+	StripeWebhookSecret  string
 
 	// Mercado Pago (usado quando PSPProvider=mercadopago)
 	MPAccessToken   string
 	MPPublicKey     string
 	MPWebhookSecret string
+
+	// Appmax (usado quando PSPProvider=appmax) — sub-adquirente BR.
+	// AppmaxAccessToken é a credencial da API (vai no corpo de cada request).
+	// AppmaxWebhookSecret é OPCIONAL: a Appmax não assina postbacks, a integridade
+	// vem da re-consulta via GetPayment (audit C3). Se setado, exigimos header
+	// X-Appmax-Token no webhook.
+	AppmaxAccessToken   string
+	AppmaxWebhookSecret string
 
 	// Redis (rate limit + idempotency). Vazio em dev = features desabilitadas.
 	RedisURL string
@@ -80,6 +88,9 @@ func Load() (*Config, error) {
 		MPPublicKey:     os.Getenv("MP_PUBLIC_KEY"),
 		MPWebhookSecret: os.Getenv("MP_WEBHOOK_SECRET"),
 
+		AppmaxAccessToken:   os.Getenv("APPMAX_ACCESS_TOKEN"),
+		AppmaxWebhookSecret: os.Getenv("APPMAX_WEBHOOK_SECRET"),
+
 		RedisURL: os.Getenv("REDIS_URL"),
 	}
 
@@ -99,8 +110,16 @@ func Load() (*Config, error) {
 		if !devMode && cfg.MPWebhookSecret == "" {
 			return nil, fmt.Errorf("MP_WEBHOOK_SECRET is required in non-dev mode (audit C5: fail-closed)")
 		}
+	case "appmax":
+		if cfg.AppmaxAccessToken == "" {
+			return nil, fmt.Errorf("APPMAX_ACCESS_TOKEN is required when PSP_PROVIDER=appmax")
+		}
+		// Nota: a Appmax não assina postbacks (sem HMAC), então não há webhook
+		// secret obrigatório. A integridade do webhook é garantida pela
+		// re-consulta via GetPayment no handler (audit C3). APPMAX_WEBHOOK_SECRET
+		// é opcional (defesa em profundidade via header X-Appmax-Token).
 	default:
-		return nil, fmt.Errorf("invalid PSP_PROVIDER=%q (expected: stripe | mercadopago)", cfg.PSPProvider)
+		return nil, fmt.Errorf("invalid PSP_PROVIDER=%q (expected: stripe | mercadopago | appmax)", cfg.PSPProvider)
 	}
 
 	return cfg, nil
