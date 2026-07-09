@@ -180,6 +180,15 @@ test:
 test-watch:
 	cd $(APP_DIR) && npm run test
 
+e2e:            ## Testes E2E Playwright (SPA em modo mock, sobe server sozinho)
+	cd $(APP_DIR) && npm run test:e2e
+
+e2e-ui:         ## Playwright em modo UI interativo
+	cd $(APP_DIR) && npm run test:e2e:ui
+
+e2e-report:     ## Abre o último relatório HTML do Playwright
+	cd $(APP_DIR) && npm run test:e2e:report
+
 # ── infra ─────────────────────────────────────────────────────────────────────
 infra-up:
 	docker compose up -d
