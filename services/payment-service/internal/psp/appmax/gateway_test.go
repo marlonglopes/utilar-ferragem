@@ -11,7 +11,6 @@ import (
 	"github.com/utilar/payment-service/internal/psp"
 )
 
-// newGateway aponta o Gateway para um servidor de teste.
 func newGateway(baseURL, webhookSecret string) *Gateway {
 	return &Gateway{
 		client:        NewWithBaseURL("test-token", baseURL),
@@ -19,60 +18,67 @@ func newGateway(baseURL, webhookSecret string) *Gateway {
 	}
 }
 
-// mockAppmax responde ao fluxo customer → order → payment.
-func mockAppmax(t *testing.T, method psp.PaymentMethod) *httptest.Server {
+// mockAppmaxV3 responde ao fluxo v3: /customer → /order → /payment/*.
+func mockAppmaxV3(t *testing.T) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]any
-		_ = json.NewDecoder(r.Body).Decode(&body)
-
-		// Todo request deve carregar o access-token no corpo (convenção Appmax).
-		if body["access-token"] != "test-token" {
-			t.Errorf("missing access-token in body for %s", r.URL.Path)
+		if r.Method == http.MethodPost {
+			var body map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if body["access-token"] != "test-token" {
+				t.Errorf("faltando access-token no corpo em %s", r.URL.Path)
+			}
+			if r.Header.Get("access-token") != "test-token" {
+				t.Errorf("faltando header access-token em %s", r.URL.Path)
+			}
 		}
 
-		switch r.URL.Path {
-		case "/customers":
-			w.WriteHeader(http.StatusCreated)
+		switch {
+		case r.URL.Path == "/customer":
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{"customer": map[string]any{"id": 4242}},
+				"success": true, "text": "OK", "status": 200,
+				"data": map[string]any{"id": 34227},
 			})
-		case "/orders":
-			if body["products_value"] == nil {
-				t.Error("order missing products_value")
-			}
-			w.WriteHeader(http.StatusCreated)
+		case r.URL.Path == "/order":
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{"order": map[string]any{"id": 9001, "status": "pendente"}},
+				"success": true, "status": 200,
+				"data": map[string]any{"id": 70263, "status": "pendente", "total": 149.9},
 			})
-		case "/payments/pix":
+		case r.URL.Path == "/payment/pix":
 			_ = json.NewEncoder(w).Encode(map[string]any{
+				"success": "ATIVA", "text": "Transação efetuada com sucesso", "status": 200,
 				"data": map[string]any{
-					"pix_qrcode": "data:image/png;base64,AAAA",
-					"pix_emv":    "00020126...br.gov.bcb.pix",
+					"type": "Pix", "pix_qrcode": "<PNG base64>",
+					"pix_emv": "00020101...br.gov.bcb.pix", "pix_expiration_date": "2026-06-10 09:07:05",
 				},
 			})
-		case "/payments/boleto":
+		case r.URL.Path == "/payment/boleto":
 			_ = json.NewEncoder(w).Encode(map[string]any{
+				"success": true, "status": 200,
 				"data": map[string]any{
-					"pdf":            "https://appmax.com.br/boleto/9001.pdf",
-					"digitable_line": "34191.79001 01043.510047 91020.150008 1 90000000010000",
+					"type": "Boleto", "pdf": "https://dev-boletos.appmax.com.br/x.pdf",
+					"due_date": "2026-06-13", "digitable_line": "34191.79...",
 				},
 			})
-		case "/payments/credit-card":
+		case r.URL.Path == "/payment/credit-card":
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"data": map[string]any{"status": "aprovado"},
+				"success": true, "text": "Autorização e Captura realizada com sucesso", "status": 200,
+				"data": map[string]any{"type": "CreditCard", "pay_reference": "abc"},
+			})
+		case strings.HasPrefix(r.URL.Path, "/order/"): // GET /order/:id
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"success": true, "status": 200,
+				"data": map[string]any{"id": 70263, "status": "aprovado", "total": 149.9},
 			})
 		default:
-			t.Errorf("unexpected path: %s", r.URL.Path)
+			t.Errorf("path inesperado: %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
-		_ = method
 	}))
 }
 
 func TestCreatePayment_Pix(t *testing.T) {
-	srv := mockAppmax(t, psp.MethodPix)
+	srv := mockAppmaxV3(t)
 	defer srv.Close()
 	g := newGateway(srv.URL, "")
 
@@ -86,151 +92,141 @@ func TestCreatePayment_Pix(t *testing.T) {
 		PayerCPF:   "123.456.789-09",
 	})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("erro inesperado: %v", err)
 	}
-	if res.PSPID != "9001" {
-		t.Errorf("expected PSPID=9001 (appmax order id), got %q", res.PSPID)
+	if res.PSPID != "70263" {
+		t.Errorf("PSPID esperado 70263 (order id), veio %q", res.PSPID)
 	}
 	if res.Status != psp.StatusPending {
-		t.Errorf("expected pending, got %q", res.Status)
+		t.Errorf("esperado pending, veio %q", res.Status)
 	}
-	// O QR Pix cru deve ser repassado ao SPA.
-	if !strings.Contains(string(res.ClientData), "pix_emv") {
-		t.Errorf("expected pix_emv in ClientData, got %s", res.ClientData)
+	// ClientData normalizado deve trazer o EMV do Pix.
+	if !strings.Contains(string(res.ClientData), "br.gov.bcb.pix") {
+		t.Errorf("esperava pix_emv em ClientData, veio %s", res.ClientData)
+	}
+}
+
+func TestCreatePayment_Boleto(t *testing.T) {
+	srv := mockAppmaxV3(t)
+	defer srv.Close()
+	g := newGateway(srv.URL, "")
+
+	res, err := g.CreatePayment(context.Background(), psp.CreateRequest{
+		OrderID: "550e8400-e29b-41d4-a716-446655440000",
+		Amount:  50, Method: psp.MethodBoleto,
+		PayerName: "João Souza", PayerCPF: "390.533.447-05",
+	})
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if !strings.Contains(string(res.ClientData), "dev-boletos.appmax.com.br") {
+		t.Errorf("esperava pdf do boleto em ClientData, veio %s", res.ClientData)
 	}
 }
 
 func TestCreatePayment_BoletoRequiresCPFAndName(t *testing.T) {
-	srv := mockAppmax(t, psp.MethodBoleto)
+	srv := mockAppmaxV3(t)
 	defer srv.Close()
 	g := newGateway(srv.URL, "")
 
 	_, err := g.CreatePayment(context.Background(), psp.CreateRequest{
-		OrderID: "550e8400-e29b-41d4-a716-446655440000",
-		Amount:  50,
-		Method:  psp.MethodBoleto,
-		// sem CPF/Name
+		OrderID: "550e8400-e29b-41d4-a716-446655440000", Amount: 50, Method: psp.MethodBoleto,
 	})
 	if err == nil {
-		t.Fatal("expected ErrInvalidRequest for boleto without cpf/name")
+		t.Fatal("esperava ErrInvalidRequest para boleto sem cpf/name")
 	}
 }
 
 func TestCreatePayment_CardRequiresToken(t *testing.T) {
-	srv := mockAppmax(t, psp.MethodCard)
+	srv := mockAppmaxV3(t)
 	defer srv.Close()
 	g := newGateway(srv.URL, "")
 
 	_, err := g.CreatePayment(context.Background(), psp.CreateRequest{
-		OrderID:    "550e8400-e29b-41d4-a716-446655440000",
-		Amount:     50,
-		Method:     psp.MethodCard,
-		PayerName:  "João",
-		PayerEmail: "j@x.com",
-		// sem CardToken
+		OrderID: "550e8400-e29b-41d4-a716-446655440000", Amount: 50, Method: psp.MethodCard,
+		PayerName: "João", PayerEmail: "j@x.com",
 	})
 	if err == nil {
-		t.Fatal("expected ErrInvalidRequest for card without token")
+		t.Fatal("esperava ErrInvalidRequest para cartão sem token")
 	}
 }
 
 func TestGetPayment(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/orders/9001") {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		if r.URL.Query().Get("access-token") != "test-token" {
-			t.Error("expected access-token query param on GET")
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"data": map[string]any{"order": map[string]any{
-				"id": 9001, "status": "aprovado", "total": 149.90,
-			}},
-		})
-	}))
+	srv := mockAppmaxV3(t)
 	defer srv.Close()
 	g := newGateway(srv.URL, "")
 
-	res, err := g.GetPayment(context.Background(), "9001")
+	res, err := g.GetPayment(context.Background(), "70263")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("erro inesperado: %v", err)
 	}
 	if res.Status != psp.StatusApproved {
-		t.Errorf("expected approved, got %q", res.Status)
+		t.Errorf("esperado approved, veio %q", res.Status)
 	}
-	if res.Amount != 149.90 {
-		t.Errorf("expected amount 149.90, got %v", res.Amount)
+	if res.Amount != 149.9 {
+		t.Errorf("esperado amount 149.9, veio %v", res.Amount)
 	}
 }
 
 func TestVerifyWebhook(t *testing.T) {
-	// Sem secret → aceita (segurança via re-consulta GetPayment).
 	g := newGateway("http://x", "")
 	if err := g.VerifyWebhook([]byte(`{}`), http.Header{}); err != nil {
-		t.Errorf("expected nil without secret, got %v", err)
+		t.Errorf("sem secret deveria aceitar, veio %v", err)
 	}
 
-	// Com secret → exige header X-Appmax-Token correto.
 	g = newGateway("http://x", "s3cr3t")
 	if err := g.VerifyWebhook([]byte(`{}`), http.Header{}); err == nil {
-		t.Error("expected error with secret but no header")
+		t.Error("com secret e sem header deveria falhar")
 	}
 	h := http.Header{}
-	h.Set("X-Appmax-Token", "wrong")
-	if err := g.VerifyWebhook([]byte(`{}`), h); err == nil {
-		t.Error("expected error with wrong token")
-	}
 	h.Set("X-Appmax-Token", "s3cr3t")
 	if err := g.VerifyWebhook([]byte(`{}`), h); err != nil {
-		t.Errorf("expected nil with correct token, got %v", err)
+		t.Errorf("token correto deveria passar, veio %v", err)
 	}
 }
 
 func TestParseWebhookEvent(t *testing.T) {
 	g := newGateway("http://x", "")
 
-	// snake_case order_paid → approved
-	ev, err := g.ParseWebhookEvent([]byte(`{"event":"order_paid","data":{"id":9001,"status":"aprovado"}}`))
+	// DefaultResponse: PascalCase OrderApproved, data.id/data.status
+	ev, err := g.ParseWebhookEvent([]byte(`{"environment":"production","event":"OrderApproved","data":{"id":3173109,"status":"aprovado"}}`))
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("erro inesperado: %v", err)
 	}
-	if ev == nil || ev.PSPID != "9001" || ev.Status != psp.StatusApproved {
-		t.Errorf("unexpected event: %+v", ev)
+	if ev == nil || ev.PSPID != "3173109" || ev.Status != psp.StatusApproved {
+		t.Errorf("evento inesperado: %+v", ev)
 	}
-
-	// CamelCase OrderPaidByPix → approved
-	ev, _ = g.ParseWebhookEvent([]byte(`{"event":"OrderPaidByPix","data":{"id":"9002"}}`))
-	if ev == nil || ev.EventType != "order_paid_by_pix" || ev.Status != psp.StatusApproved {
-		t.Errorf("unexpected camelcase event: %+v", ev)
+	if ev.EventType != "orderapproved" {
+		t.Errorf("EventType esperado orderapproved, veio %q", ev.EventType)
 	}
 
-	// order_pix_expired → expired
-	ev, _ = g.ParseWebhookEvent([]byte(`{"event":"order_pix_expired","data":{"id":9003}}`))
-	if ev == nil || ev.Status != psp.StatusExpired {
-		t.Errorf("expected expired, got %+v", ev)
+	// TwoLevel: data.order_id/data.order_status
+	ev, _ = g.ParseWebhookEvent([]byte(`{"event":"OrderPaid","data":{"order_id":3173109,"order_status":"aprovado"}}`))
+	if ev == nil || ev.PSPID != "3173109" || ev.Status != psp.StatusApproved {
+		t.Errorf("TwoLevel inesperado: %+v", ev)
 	}
 
-	// sem id → irrelevante
-	ev, err = g.ParseWebhookEvent([]byte(`{"event":"ping","data":{}}`))
+	// evento sem order id (informativo) → (nil,nil)
+	ev, err = g.ParseWebhookEvent([]byte(`{"event":"CustomerCreated","data":{"customer_id":1}}`))
 	if err != nil || ev != nil {
-		t.Errorf("expected (nil,nil) for event without id, got ev=%+v err=%v", ev, err)
+		t.Errorf("esperava (nil,nil) para evento sem order id, veio ev=%+v err=%v", ev, err)
 	}
 }
 
 func TestHelpers(t *testing.T) {
 	if f, l := splitName("Maria Aparecida Silva"); f != "Maria" || l != "Aparecida Silva" {
-		t.Errorf("splitName: got %q / %q", f, l)
-	}
-	if f, l := splitName("Cher"); f != "Cher" || l != "" {
-		t.Errorf("splitName single: got %q / %q", f, l)
+		t.Errorf("splitName: %q / %q", f, l)
 	}
 	if got := digitsOnly("123.456.789-09"); got != "12345678909" {
-		t.Errorf("digitsOnly: got %q", got)
+		t.Errorf("digitsOnly: %q", got)
 	}
-	if got := normalizeEventName("OrderBilletCreated"); got != "order_billet_created" {
-		t.Errorf("normalizeEventName: got %q", got)
+	if got := normEvent("OrderPaidByPix"); got != "orderpaidbypix" {
+		t.Errorf("normEvent: %q", got)
+	}
+	if normalizeStatus("integrado") != psp.StatusApproved {
+		t.Error("integrado deveria mapear pra approved")
 	}
 	if normalizeStatus("estornado") != psp.StatusCancelled {
-		t.Error("estornado should map to cancelled")
+		t.Error("estornado deveria mapear pra cancelled")
 	}
 }

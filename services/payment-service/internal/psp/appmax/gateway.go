@@ -12,114 +12,82 @@ import (
 	"github.com/utilar/payment-service/internal/psp"
 )
 
-// Gateway é a implementação Appmax do psp.Gateway.
+// Gateway é a implementação Appmax (v3) do psp.Gateway.
 type Gateway struct {
 	client *Client
-	// webhookSecret é opcional. A Appmax NÃO assina postbacks com HMAC, então a
-	// segurança primária do webhook é a re-consulta via GetPayment (o handler
-	// compara o amount autoritativo do PSP com o nosso DB). Se um secret for
-	// configurado, exigimos que o header X-Appmax-Token bata — camada extra.
+	// webhookSecret é opcional. A Appmax NÃO assina postbacks (sem HMAC), então a
+	// segurança primária vem da re-consulta via GetPayment (o handler compara o
+	// amount autoritativo do PSP com o nosso DB). Se um secret for configurado,
+	// exigimos que o header X-Appmax-Token bata — camada extra.
 	webhookSecret string
 }
 
-// New cria um Gateway Appmax. webhookSecret pode ser vazio (validação por
-// re-consulta apenas — ver nota em VerifyWebhook).
+// New cria um Gateway Appmax v3. O base URL vem de APPMAX_BASE_URL (env) —
+// aponte pro sandbox (homolog.sandboxappmax.com.br/api/v3) em dev.
 func New(accessToken, webhookSecret string) *Gateway {
 	return &Gateway{
 		client:        NewClient(accessToken),
-		webhookSecret: webhookSecret,
+		webhookSecret: cleanEnv(webhookSecret),
 	}
 }
 
 func (g *Gateway) Name() string { return "appmax" }
 
-// CreatePayment orquestra o fluxo order-centric da Appmax: customer → order →
-// payment. Retorna o payload cru da cobrança em ClientData (QR Pix, linha
-// digitável do boleto, etc) e usa o ID do PEDIDO Appmax como PSPID — é ele que
-// GetPayment e o webhook usam pra reconciliar.
+// CreatePayment orquestra o fluxo v3: customer → order → payment. Devolve o
+// display cru (QR Pix / PDF boleto) em ClientData e usa o ID do PEDIDO Appmax
+// como PSPID — é ele que GetPayment e o webhook usam pra reconciliar.
 func (g *Gateway) CreatePayment(ctx context.Context, req psp.CreateRequest) (*psp.CreateResult, error) {
-	// 1. Customer
-	firstName, lastName := splitName(req.PayerName)
-	custRaw, err := g.client.CreateCustomer(ctx, map[string]any{
-		"first_name":      firstName,
-		"last_name":       lastName,
-		"email":           req.PayerEmail,
-		"document_number": digitsOnly(req.PayerCPF),
-		// TODO(appmax): coletar telefone no checkout. A Appmax marca phone como
-		// obrigatório; enquanto não coletamos, mandamos vazio e o antifraude pode
-		// pedir revisão. Rastreado em docs/appmax-integration.md.
-		"phone": "",
+	// 1. Customer (CPF vai no pagamento, não aqui — convenção v3).
+	first, last := splitName(req.PayerName)
+	customerID, _, err := g.client.CreateCustomer(ctx, CustomerInput{
+		FirstName: first,
+		LastName:  last,
+		Email:     req.PayerEmail,
+		// TODO(appmax): coletar telefone + endereço no checkout. A Appmax exige
+		// endereço p/ boleto e recomenda p/ antifraude. Ver docs/appmax-integration.md.
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: create customer: %v", psp.ErrUpstream, err)
 	}
-	customerID, err := extractNestedID(custRaw, "customer")
-	if err != nil {
-		return nil, fmt.Errorf("%w: parse customer id: %v", psp.ErrUpstream, err)
-	}
 
-	// 2. Order — um único line item sintético a partir do amount autoritativo.
-	// (o handler já derivou req.Amount do order-service, audit C1). A Appmax
-	// valida que products_value == soma dos itens.
-	orderRaw, err := g.client.CreateOrder(ctx, map[string]any{
-		"customer_id": customerID,
-		"products": []map[string]any{{
-			"sku":        "UTILAR-" + shortRef(req.OrderID),
-			"name":       "Pedido UtiLar Ferragem",
-			"quantity":   1,
-			"unit_value": req.Amount,
-			"type":       "physical",
+	// 2. Order — um único line item sintético a partir do amount autoritativo
+	// (o handler já derivou req.Amount do order-service, audit C1). Reais.
+	orderID, _, err := g.client.CreateOrder(ctx, OrderInput{
+		Total:      req.Amount,
+		CustomerID: customerID,
+		Products: []OrderProduct{{
+			SKU:   "UTILAR-" + shortRef(req.OrderID),
+			Name:  "Pedido UtiLar Ferragem",
+			Qty:   1,
+			Price: req.Amount,
 		}},
-		"products_value":     req.Amount,
-		"shipping_value":     0,
-		"discount_value":     0,
-		"external_reference": req.OrderID, // nosso UUID pra reconciliar
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: create order: %v", psp.ErrUpstream, err)
 	}
-	appmaxOrderID, err := extractNestedID(orderRaw, "order")
-	if err != nil {
-		return nil, fmt.Errorf("%w: parse order id: %v", psp.ErrUpstream, err)
-	}
 
 	// 3. Payment — roteia pelo método.
-	var payRaw json.RawMessage
+	var od *OrderData
+	cpf := digitsOnly(req.PayerCPF)
 	switch req.Method {
 	case psp.MethodPix:
-		payRaw, err = g.client.PayPix(ctx, map[string]any{
-			"order_id": appmaxOrderID,
-			"payment_data": map[string]any{
-				"pix": map[string]any{"document_number": digitsOnly(req.PayerCPF)},
-			},
-		})
+		od, err = g.client.PayPix(ctx, orderID, customerID, cpf)
 	case psp.MethodBoleto:
-		if req.PayerCPF == "" || req.PayerName == "" {
+		if cpf == "" || req.PayerName == "" {
 			return nil, fmt.Errorf("%w: boleto requires payer_cpf and payer_name", psp.ErrInvalidRequest)
 		}
-		payRaw, err = g.client.PayBoleto(ctx, map[string]any{
-			"order_id": appmaxOrderID,
-			"payment_data": map[string]any{
-				"boleto": map[string]any{"document_number": digitsOnly(req.PayerCPF)},
-			},
-		})
+		od, err = g.client.PayBoleto(ctx, orderID, customerID, cpf)
 	case psp.MethodCard:
-		// A Appmax exige o cartão tokenizado (Appmax.js no browser) — nunca
-		// trafegamos PAN pelo backend (PCI SAQ-A). O frontend precisa mandar o
-		// token via CardToken. Integração de tokenização do SPA pendente.
+		// O cartão é tokenizado no browser (Appmax JS) — nunca trafegamos PAN pelo
+		// backend (PCI SAQ-A). O token chega via CardToken.
 		if req.CardToken == "" {
 			return nil, fmt.Errorf("%w: card via appmax requires a tokenized card (CardToken); frontend tokenization pending", psp.ErrInvalidRequest)
 		}
-		payRaw, err = g.client.PayCard(ctx, map[string]any{
-			"order_id":    appmaxOrderID,
-			"customer_id": customerID,
-			"payment_data": map[string]any{
-				"credit_card": map[string]any{
-					"token":           req.CardToken,
-					"installments":    1,
-					"soft_descriptor": "UTILAR",
-				},
-			},
+		od, err = g.client.PayCard(ctx, orderID, customerID, CardInput{
+			Token:          req.CardToken,
+			DocumentNumber: cpf,
+			Installments:   1,
+			SoftDescriptor: "UTILAR",
 		})
 	default:
 		return nil, fmt.Errorf("%w: unsupported method %q", psp.ErrInvalidRequest, req.Method)
@@ -128,55 +96,54 @@ func (g *Gateway) CreatePayment(ctx context.Context, req psp.CreateRequest) (*ps
 		return nil, fmt.Errorf("%w: %v", psp.ErrUpstream, err)
 	}
 
-	// Status inicial: a cobrança recém-criada normalmente volta pendente
-	// (Pix/boleto aguardam pagamento; cartão pode aprovar na hora). Preferimos o
-	// status do pedido, se vier no payload.
 	status := psp.StatusPending
-	if s := extractOrderStatus(payRaw); s != "" {
-		status = normalizeStatus(s)
+	if od.Status != "" {
+		status = normalizeStatus(od.Status)
 	}
 
 	return &psp.CreateResult{
-		PSPID:      strconv.FormatInt(appmaxOrderID, 10),
+		PSPID:      strconv.FormatInt(orderID, 10),
 		Status:     status,
-		ClientData: payRaw, // QR Pix / linha digitável / etc — repassado ao SPA
-		RawPayload: payRaw,
+		ClientData: clientData(od),
+		RawPayload: od.Raw,
 	}, nil
 }
 
+// clientData normaliza o display de pagamento pro frontend (QR Pix / boleto).
+func clientData(od *OrderData) json.RawMessage {
+	b, _ := json.Marshal(map[string]any{
+		"provider":       "appmax",
+		"pix_qrcode":     od.PixQrCode,
+		"pix_emv":        od.PixEmv,
+		"pix_expires_at": od.PixExpiresAt,
+		"boleto_url":     od.BoletoURL,
+		"boleto_line":    od.BoletoLine,
+	})
+	return b
+}
+
 // GetPayment consulta o pedido Appmax (pspID == id do pedido) e devolve status +
-// total autoritativos. É o pilar da validação anti-fraude do webhook (audit C3).
+// total autoritativos. Pilar da validação anti-fraude do webhook (audit C3).
 func (g *Gateway) GetPayment(ctx context.Context, pspID string) (*psp.GetResult, error) {
-	raw, err := g.client.GetOrder(ctx, pspID)
+	od, err := g.client.GetOrder(ctx, pspID)
 	if err != nil {
 		if strings.Contains(err.Error(), "404") {
 			return nil, psp.ErrNotFound
 		}
 		return nil, fmt.Errorf("%w: %v", psp.ErrUpstream, err)
 	}
-
-	order, err := unwrapOrder(raw)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", psp.ErrUpstream, err)
-	}
-
 	return &psp.GetResult{
 		PSPID:      pspID,
-		Status:     normalizeStatus(order.Status),
-		Amount:     order.total(),
+		Status:     normalizeStatus(od.Status),
+		Amount:     od.Total,
 		Currency:   "BRL",
-		RawPayload: raw,
+		RawPayload: od.Raw,
 	}, nil
 }
 
-// VerifyWebhook — a Appmax não assina postbacks (sem HMAC). A garantia real de
-// integridade vem da re-consulta via GetPayment no handler, que compara o amount
-// autoritativo do PSP contra o nosso DB antes de confirmar qualquer pagamento
-// (audit C3). Se um secret compartilhado estiver configurado, exigimos que o
-// header X-Appmax-Token bata (defesa em profundidade). Sem secret, aceitamos e
-// deixamos a re-consulta ser o gate.
-//
-// Ver docs/appmax-integration.md para o modelo de confiança completo.
+// VerifyWebhook — a Appmax não assina postbacks. A integridade real vem da
+// re-consulta via GetPayment no handler (audit C3). Se um secret compartilhado
+// estiver configurado, exigimos o header X-Appmax-Token (defesa em profundidade).
 func (g *Gateway) VerifyWebhook(body []byte, headers http.Header) error {
 	if g.webhookSecret == "" {
 		return nil
@@ -188,103 +155,127 @@ func (g *Gateway) VerifyWebhook(body []byte, headers http.Header) error {
 	return nil
 }
 
-// ParseWebhookEvent extrai o evento normalizado do postback Appmax.
-// Payload esperado: {"environment":"...","event":"order_paid","data":{"id":123,"status":"..."}}.
-// Aceita event em snake_case (order_paid) ou CamelCase (OrderPaid).
+// ParseWebhookEvent extrai o evento normalizado do postback Appmax v3.
+// Payload: {"environment":"...","event":"OrderApproved","data":{...}}.
+// Tolera os DOIS formatos: DefaultResponse (data.id/data.status) e TwoLevel
+// (data.order_id/data.order_status), além de data.order.* aninhado. Eventos em
+// PascalCase (OrderPaid) ou snake_case (order_paid).
 func (g *Gateway) ParseWebhookEvent(body []byte) (*psp.WebhookEvent, error) {
 	var payload struct {
 		Event string `json:"event"`
 		Data  struct {
-			ID     json.Number `json:"id"`
-			Status string      `json:"status"`
+			ID          json.Number `json:"id"`
+			OrderID     json.Number `json:"order_id"`
+			Status      string      `json:"status"`
+			OrderStatus string      `json:"order_status"`
+			Total       float64     `json:"total"`
+			Order       *struct {
+				ID     json.Number `json:"id"`
+				Status string      `json:"status"`
+				Total  float64     `json:"total"`
+			} `json:"order"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return nil, fmt.Errorf("%w: %v", psp.ErrInvalidRequest, err)
 	}
 
-	orderID := payload.Data.ID.String()
+	orderID := firstNonEmpty(payload.Data.ID.String(), payload.Data.OrderID.String())
+	if orderID == "" && payload.Data.Order != nil {
+		orderID = payload.Data.Order.ID.String()
+	}
 	if orderID == "" || orderID == "0" {
-		return nil, nil // sem order id → irrelevante (ex: ping)
+		return nil, nil // evento informativo (customer_*, sem order id) — Ack 200.
 	}
 
-	event := normalizeEventName(payload.Event)
+	orderStatus := firstNonEmpty(payload.Data.Status, payload.Data.OrderStatus)
+	if orderStatus == "" && payload.Data.Order != nil {
+		orderStatus = payload.Data.Order.Status
+	}
+
+	event := normEvent(payload.Event)
+	status := statusFromEvent(event)
+	if status == psp.StatusPending && orderStatus != "" {
+		// evento não conclusivo → cai pro status do pedido.
+		status = normalizeStatus(orderStatus)
+	}
+
 	return &psp.WebhookEvent{
 		EventType: event,
 		PSPID:     orderID,
-		Status:    statusFromEvent(event),
+		Status:    status,
 		RawBody:   body,
 	}, nil
 }
 
 // -- helpers ----------------------------------------------------------------
 
-// normalizeStatus mapeia o status de PEDIDO da Appmax pro vocabulário normalizado.
+// normalizeStatus mapeia o status de PEDIDO da Appmax v3 → vocabulário normalizado.
+// Ref: docs.appmax.com.br/status + gifthy appmax-integration.md.
 func normalizeStatus(s string) psp.PaymentStatus {
 	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "aprovado", "pago", "paid", "approved", "integrado", "integrated":
+	case "aprovado", "integrado", "pendente_integracao", "pago", "paid":
 		return psp.StatusApproved
 	case "autorizado", "authorized":
 		return psp.StatusAuthorized
-	case "cancelado", "cancelled", "canceled", "estornado", "reembolsado", "refunded", "chargeback":
+	case "cancelado", "estornado", "reembolsado", "chargeback_perdido":
 		return psp.StatusCancelled
-	case "expirado", "vencido", "expired", "overdue":
-		return psp.StatusExpired
-	case "recusado", "rejeitado", "rejected", "não autorizado", "nao autorizado":
+	case "recusado_por_risco", "recusado", "rejeitado":
 		return psp.StatusRejected
+	case "expirado", "vencido":
+		return psp.StatusExpired
 	default:
+		// pendente, análise antifraude, pendente_integracao_em_analise, disputas.
 		return psp.StatusPending
 	}
 }
 
-// normalizeEventName lowercases e converte CamelCase (OrderPaid) em snake_case
-// (order_paid) pra comparação estável.
-func normalizeEventName(e string) string {
-	e = strings.TrimSpace(e)
-	if e == "" {
-		return ""
-	}
-	// Se já tem underscore, só lowercase.
-	if strings.Contains(e, "_") {
-		return strings.ToLower(e)
-	}
+// normEvent normaliza o nome do evento (case/separador-insensitive):
+// "OrderPaid", "order_paid", "ORDER-PAID" → "orderpaid".
+func normEvent(s string) string {
 	var b strings.Builder
-	for i, r := range e {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			b.WriteByte('_')
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
 		}
-		b.WriteRune(r)
 	}
-	return strings.ToLower(b.String())
+	return b.String()
 }
 
-// statusFromEvent mapeia o nome do evento Appmax pro status normalizado.
+// statusFromEvent mapeia o evento Appmax (já normalizado por normEvent) → status.
 func statusFromEvent(event string) psp.PaymentStatus {
 	switch event {
-	case "order_approved", "order_paid", "order_paid_by_pix", "order_integrated":
+	case "orderapproved", "orderpaid", "orderpaidbypix", "orderintegrated":
 		return psp.StatusApproved
-	case "order_authorized", "order_authorized_with_delay":
+	case "orderauthorized", "orderauthorizedwithdelay":
 		return psp.StatusAuthorized
-	case "order_refund", "order_chargeback_in_treatment":
+	case "orderrefund":
 		return psp.StatusCancelled
-	case "order_pix_expired", "order_billet_overdue":
-		return psp.StatusExpired
-	case "payment_not_authorized":
+	case "orderpixexpired", "orderbilletoverdue", "paymentnotauthorized", "paymentnotauthorizedwithdelay":
 		return psp.StatusRejected
 	default:
-		// order_pix_created, order_billet_created, order_pix_updated, etc → aguardando.
+		// orderpixcreated, orderbilletcreated, customercreated, etc. → aguardando.
 		return psp.StatusPending
 	}
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" && v != "0" {
+			return v
+		}
+	}
+	return ""
 }
 
 func splitName(full string) (first, last string) {
 	full = strings.TrimSpace(full)
 	if full == "" {
-		return "", ""
+		return "Cliente", "UtiLar"
 	}
 	parts := strings.Fields(full)
 	if len(parts) == 1 {
-		return parts[0], ""
+		return parts[0], parts[0]
 	}
 	return parts[0], strings.Join(parts[1:], " ")
 }
@@ -299,85 +290,12 @@ func digitsOnly(s string) string {
 	return b.String()
 }
 
-// shortRef pega os primeiros 8 chars de um UUID pra compor um SKU legível.
 func shortRef(orderID string) string {
 	orderID = strings.ReplaceAll(orderID, "-", "")
 	if len(orderID) > 8 {
 		return orderID[:8]
 	}
 	return orderID
-}
-
-// extractNestedID pega data.<key>.id de respostas {data:{customer|order:{id}}}.
-// O id da Appmax é numérico.
-func extractNestedID(raw json.RawMessage, key string) (int64, error) {
-	var env struct {
-		Data map[string]struct {
-			ID json.Number `json:"id"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(raw, &env); err != nil {
-		return 0, err
-	}
-	node, ok := env.Data[key]
-	if !ok || node.ID.String() == "" {
-		return 0, fmt.Errorf("missing data.%s.id in appmax response", key)
-	}
-	return node.ID.Int64()
-}
-
-// appmaxOrder é a visão que precisamos do objeto order da Appmax.
-type appmaxOrder struct {
-	ID            json.Number `json:"id"`
-	Status        string      `json:"status"`
-	Total         json.Number `json:"total"`
-	ProductsValue json.Number `json:"products_value"`
-}
-
-func (o appmaxOrder) total() float64 {
-	if v, err := o.Total.Float64(); err == nil && v > 0 {
-		return v
-	}
-	if v, err := o.ProductsValue.Float64(); err == nil {
-		return v
-	}
-	return 0
-}
-
-// unwrapOrder extrai o objeto order de {data:{order:{...}}}.
-func unwrapOrder(raw json.RawMessage) (appmaxOrder, error) {
-	var env struct {
-		Data struct {
-			Order appmaxOrder `json:"order"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(raw, &env); err != nil {
-		return appmaxOrder{}, err
-	}
-	if env.Data.Order.ID.String() == "" {
-		return appmaxOrder{}, fmt.Errorf("missing data.order in appmax response")
-	}
-	return env.Data.Order, nil
-}
-
-// extractOrderStatus tenta achar um status de pedido no payload de cobrança,
-// que a Appmax às vezes aninha em data.order.status ou data.status.
-func extractOrderStatus(raw json.RawMessage) string {
-	var env struct {
-		Data struct {
-			Status string `json:"status"`
-			Order  struct {
-				Status string `json:"status"`
-			} `json:"order"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(raw, &env); err != nil {
-		return ""
-	}
-	if env.Data.Order.Status != "" {
-		return env.Data.Order.Status
-	}
-	return env.Data.Status
 }
 
 // Compile-time assertion que Gateway implementa psp.Gateway.
