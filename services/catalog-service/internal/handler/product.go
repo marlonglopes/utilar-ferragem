@@ -34,7 +34,7 @@ func NewProductHandler(db *sql.DB) *ProductHandler { return &ProductHandler{db: 
 func (h *ProductHandler) List(c *gin.Context) {
 	params := parseProductsQuery(c)
 
-	where := []string{"1=1"}
+	where := []string{"p.status = 'published'"}
 	args := []any{}
 	idx := 1
 
@@ -156,7 +156,7 @@ func (h *ProductHandler) GetBySlug(c *gin.Context) {
 		  p.description, p.specs, p.created_at, p.updated_at
 		FROM products p
 		JOIN sellers s ON s.id = p.seller_id
-		WHERE p.slug = $1
+		WHERE p.slug = $1 AND p.status = 'published'
 	`, slug)
 	p, err := scanProduct(row)
 	if err == sql.ErrNoRows {
@@ -243,7 +243,7 @@ func (h *ProductHandler) GetByID(c *gin.Context) {
 func (h *ProductHandler) Facets(c *gin.Context) {
 	params := parseProductsQuery(c)
 
-	where := []string{"1=1"}
+	where := []string{"p.status = 'published'"}
 	args := []any{}
 	idx := 1
 
@@ -317,6 +317,7 @@ func (h *ProductHandler) Related(c *gin.Context) {
 		JOIN sellers s ON s.id = p.seller_id
 		WHERE p.category_id = (SELECT category_id FROM products WHERE slug = $1 LIMIT 1)
 		  AND p.slug != $1
+		  AND p.status = 'published'
 		ORDER BY p.rating DESC, p.review_count DESC
 		LIMIT $2
 	`, slug, limit)

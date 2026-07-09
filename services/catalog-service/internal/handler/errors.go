@@ -29,9 +29,17 @@ func Respond(c *gin.Context, status int, code, msg string) {
 }
 
 // Shortcuts para os erros mais comuns.
-func BadRequest(c *gin.Context, msg string)     { Respond(c, http.StatusBadRequest, "bad_request", msg) }
-func NotFound(c *gin.Context, msg string)       { Respond(c, http.StatusNotFound, "not_found", msg) }
-func InternalError(c *gin.Context, msg string)  { Respond(c, http.StatusInternalServerError, "internal", msg) }
+func BadRequest(c *gin.Context, msg string) { Respond(c, http.StatusBadRequest, "bad_request", msg) }
+func NotFound(c *gin.Context, msg string)   { Respond(c, http.StatusNotFound, "not_found", msg) }
+func Unauthorized(c *gin.Context, msg string) {
+	Respond(c, http.StatusUnauthorized, "unauthorized", msg)
+}
+func Forbidden(c *gin.Context, msg string) { Respond(c, http.StatusForbidden, "forbidden", msg) }
+func Conflict(c *gin.Context, msg string)  { Respond(c, http.StatusConflict, "conflict", msg) }
+func InternalError(c *gin.Context, msg string) {
+	Respond(c, http.StatusInternalServerError, "internal", msg)
+}
+
 // DBError loga internamente, responde genérico (audit CT1-C2).
 func DBError(c *gin.Context, err error) {
 	slog.Error("db.error",

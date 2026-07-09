@@ -39,6 +39,11 @@ func main() {
 	productH := handler.NewProductHandler(database)
 	categoryH := handler.NewCategoryHandler(database)
 	sellerH := handler.NewSellerHandler(database)
+	adminProductH := handler.NewAdminProductHandler(database)
+
+	if cfg.JWTSecret == "" && !cfg.DevMode {
+		slog.Warn("JWT_SECRET not set — /admin routes reject all requests (set JWT_SECRET, or DEV_MODE=true for local)")
+	}
 
 	// CT1-H1: rate limit em /products (search). 100/min/IP. Outros endpoints
 	// (categories, sellers, by-id) têm tráfego baixo e são alvos pouco
@@ -86,6 +91,17 @@ func main() {
 		api.GET("/products/:slug/related", listCache, productH.Related)
 	}
 
+	// Rotas de escrita (ingestão) — protegidas por role=admin.
+	admin := r.Group("/api/v1/admin", handler.RequireAdmin(cfg.JWTSecret, cfg.DevMode))
+	{
+		admin.POST("/products", adminProductH.Create)
+		admin.PATCH("/products/by-id/:id", adminProductH.Patch)
+		admin.DELETE("/products/by-id/:id", adminProductH.Delete)
+		admin.POST("/products/by-id/:id/images", adminProductH.AddImage)
+		admin.DELETE("/products/by-id/:id/images/:imageId", adminProductH.DeleteImage)
+		admin.POST("/products/import", adminProductH.Import)
+	}
+
 	r.GET("/health", func(c *gin.Context) {
 		if err := database.Ping(); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"db": "down"})
@@ -118,4 +134,3 @@ func main() {
 	defer cancel()
 	srv.Shutdown(shutdownCtx)
 }
-

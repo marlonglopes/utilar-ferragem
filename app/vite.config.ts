@@ -13,6 +13,8 @@ export default defineConfig({
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
+    // e2e/ é do Playwright (API própria) — o vitest não deve tentar rodar esses specs.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
     // Force mock mode em testes — testes legacy (useOrders, OrdersTab, OrderDetailPage,
     // LoginPage, RegisterPage) assumem `is*Enabled === false`. Sem esse override,
     // valores presentes no .env.local vazariam pra dentro do test e quebrariam o
