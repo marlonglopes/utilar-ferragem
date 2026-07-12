@@ -1,0 +1,20 @@
+# Mantém o contexto de build enxuto — só o código Go importa pras imagens.
+.git
+.github
+.githooks
+.husky
+node_modules
+**/node_modules
+app/dist
+app/playwright-report
+app/test-results
+app/coverage
+mockups
+docs
+loadtest
+*.md
+.env
+.env.local
+.creds
+.claude
+scripts/deploy.sh
