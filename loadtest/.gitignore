@@ -1,0 +1,5 @@
+# resultados de execução do k6 (JSON/summary) — não versionar
+results/
+*.json
+!k6/**/*.json
+bin/
