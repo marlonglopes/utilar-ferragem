@@ -24,6 +24,7 @@ export default defineConfig({
       VITE_CATALOG_URL: '',
       VITE_ORDER_URL: '',
       VITE_AUTH_URL: '',
+      VITE_ASSISTANT_URL: '',
       VITE_STRIPE_PUBLISHABLE_KEY: '',
     },
   },

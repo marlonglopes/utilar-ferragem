@@ -59,6 +59,18 @@ services:
       APPMAX_WEBHOOK_SECRET: ${APPMAX_WEBHOOK_SECRET:-}
     depends_on: [redis, redpanda, order, auth]
 
+  assistant:
+    <<: *svc-common
+    build: { context: ., args: { SERVICE: assistant-service } }
+    image: ${ECR_REGISTRY:-utilar}/assistant:${TAG:-latest}
+    environment:
+      <<: *svc-env
+      CATALOG_SERVICE_URL: http://catalog:8091
+      # Vazio = Lara em MODO MOCK (regras + busca real). Com chave = Claude.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LARA_MODEL: ${LARA_MODEL:-claude-opus-4-8}
+    depends_on: [catalog]
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -91,7 +103,7 @@ services:
     volumes:
       - ./deploy/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
       - ./deploy/proxy.inc:/etc/nginx/proxy.inc:ro
-    depends_on: [catalog, order, auth, payment]
+    depends_on: [catalog, order, auth, payment, assistant]
 
 networks:
   utilar:

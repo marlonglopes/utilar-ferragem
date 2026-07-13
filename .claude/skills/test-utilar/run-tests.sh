@@ -44,10 +44,11 @@ backend() {
     echo "⚠️  Postgres :5436 indisponível — testes de integração vão SKIPar."
     echo "    Rode 'make infra-up' (+ *-db-reset) para cobertura completa."
   fi
-  go_svc catalog services/catalog-service
-  go_svc order   services/order-service
-  go_svc auth    services/auth-service
-  go_svc payment services/payment-service
+  go_svc catalog   services/catalog-service
+  go_svc order     services/order-service
+  go_svc auth      services/auth-service
+  go_svc payment   services/payment-service
+  go_svc assistant services/assistant-service
 }
 
 frontend() { run "frontend: vitest" bash -c "cd app && npm run test:run 2>&1"; }
@@ -58,10 +59,11 @@ case "$TARGET" in
   backend)  backend ;;
   frontend|unit) frontend ;;
   e2e)      e2e ;;
-  catalog)  go_svc catalog services/catalog-service ;;
-  order)    go_svc order services/order-service ;;
-  auth)     go_svc auth services/auth-service ;;
-  payment)  go_svc payment services/payment-service ;;
+  catalog)   go_svc catalog services/catalog-service ;;
+  order)     go_svc order services/order-service ;;
+  auth)      go_svc auth services/auth-service ;;
+  payment)   go_svc payment services/payment-service ;;
+  assistant) go_svc assistant services/assistant-service ;;
   *) echo "alvo desconhecido: $TARGET"; exit 2 ;;
 esac
 

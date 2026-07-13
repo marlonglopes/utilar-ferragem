@@ -19,6 +19,7 @@ WORKDIR /src
 # Cache de dependências: copia só os arquivos de módulo primeiro.
 COPY go.work go.work.sum ./
 COPY pkg/go.mod pkg/go.sum ./pkg/
+COPY services/assistant-service/go.mod services/assistant-service/go.sum ./services/assistant-service/
 COPY services/auth-service/go.mod services/auth-service/go.sum ./services/auth-service/
 COPY services/catalog-service/go.mod services/catalog-service/go.sum ./services/catalog-service/
 COPY services/order-service/go.mod services/order-service/go.sum ./services/order-service/

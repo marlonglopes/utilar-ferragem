@@ -3,6 +3,7 @@ import { Topbar } from './Topbar'
 import { Navbar } from './Navbar'
 import { CategoryRail } from './CategoryRail'
 import { Footer } from './Footer'
+import { LaraBubble } from '@/components/assistant/LaraBubble'
 
 export function PublicLayout() {
   return (
@@ -14,6 +15,7 @@ export function PublicLayout() {
         <Outlet />
       </main>
       <Footer />
+      <LaraBubble />
     </div>
   )
 }

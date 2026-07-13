@@ -1,0 +1,1 @@
+# assistant-service não usa banco/migrations (mantém o Dockerfile genérico feliz)

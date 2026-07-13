@@ -3,10 +3,12 @@ SVC_DIR      := services/payment-service
 CATALOG_DIR  := services/catalog-service
 ORDER_DIR    := services/order-service
 AUTH_DIR     := services/auth-service
-API_URL      ?= http://localhost:8090
-CATALOG_URL  ?= http://localhost:8091
-ORDER_URL    ?= http://localhost:8092
-AUTH_URL     ?= http://localhost:8093
+ASSISTANT_DIR := services/assistant-service
+API_URL       ?= http://localhost:8090
+CATALOG_URL   ?= http://localhost:8091
+ORDER_URL     ?= http://localhost:8092
+AUTH_URL      ?= http://localhost:8093
+ASSISTANT_URL ?= http://localhost:8094
 
 # ── Postgres (payment-service) ────────────────────────────────────────────────
 PG_CONTAINER := utilar_payment_db
@@ -164,15 +166,16 @@ dev-catalog:
 dev-full:
 	@$(MAKE) infra-up
 	@echo ""
-	@echo "→ subindo payment + catalog + order + auth + SPA (Ctrl-C encerra todos)"
-	@trap 'echo; echo "Encerrando..."; kill $$SVC_PID $$CAT_PID $$ORD_PID $$AUTH_PID 2>/dev/null; wait 2>/dev/null; exit 0' INT TERM; \
+	@echo "→ subindo payment + catalog + order + auth + assistant(Lara) + SPA (Ctrl-C encerra todos)"
+	@trap 'echo; echo "Encerrando..."; kill $$SVC_PID $$CAT_PID $$ORD_PID $$AUTH_PID $$LARA_PID 2>/dev/null; wait 2>/dev/null; exit 0' INT TERM; \
 	$(MAKE) -C $(SVC_DIR) run & SVC_PID=$$!; \
 	$(MAKE) -C $(CATALOG_DIR) run & CAT_PID=$$!; \
 	$(MAKE) -C $(ORDER_DIR) run & ORD_PID=$$!; \
 	$(MAKE) -C $(AUTH_DIR) run & AUTH_PID=$$!; \
+	$(MAKE) assistant-run & LARA_PID=$$!; \
 	sleep 2; \
-	cd $(APP_DIR) && VITE_API_URL=$(API_URL) VITE_CATALOG_URL=$(CATALOG_URL) VITE_ORDER_URL=$(ORDER_URL) VITE_AUTH_URL=$(AUTH_URL) npm run dev; \
-	kill $$SVC_PID $$CAT_PID $$ORD_PID $$AUTH_PID 2>/dev/null; wait 2>/dev/null
+	cd $(APP_DIR) && VITE_API_URL=$(API_URL) VITE_CATALOG_URL=$(CATALOG_URL) VITE_ORDER_URL=$(ORDER_URL) VITE_AUTH_URL=$(AUTH_URL) VITE_ASSISTANT_URL=$(ASSISTANT_URL) npm run dev; \
+	kill $$SVC_PID $$CAT_PID $$ORD_PID $$AUTH_PID $$LARA_PID 2>/dev/null; wait 2>/dev/null
 
 test:
 	cd $(APP_DIR) && npm run test:run
@@ -478,6 +481,12 @@ auth-build:
 
 auth-test:
 	$(MAKE) -C $(AUTH_DIR) test
+
+assistant-test:   ## Testes Go do assistant-service (Lara)
+	cd $(ASSISTANT_DIR) && go test ./...
+
+assistant-run:    ## Sobe a Lara (mock sem ANTHROPIC_API_KEY; catálogo em :8091)
+	cd $(ASSISTANT_DIR) && CATALOG_SERVICE_URL=http://localhost:8091 go run ./cmd/server
 
 define _require_auth_pg
 	@docker ps --filter "name=$(AUTH_CONTAINER)" --filter "status=running" --format '{{.Names}}' \

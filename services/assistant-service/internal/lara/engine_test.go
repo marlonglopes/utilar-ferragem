@@ -1,0 +1,91 @@
+package lara_test
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/utilar/assistant-service/internal/catalog"
+	"github.com/utilar/assistant-service/internal/lara"
+	"github.com/utilar/assistant-service/internal/llm"
+)
+
+// catálogo fake que devolve produtos pra busca.
+func fakeCatalog(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/v1/products") && r.URL.Query().Get("q") != "" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
+					{"id": "1", "slug": "furadeira-bosch", "name": "Furadeira Bosch GSB 13", "price": 299.9, "stock": 15, "category": "ferramentas", "rating": 4.6},
+					{"id": "2", "slug": "furadeira-makita", "name": "Furadeira Makita", "price": 459.0, "stock": 4, "category": "ferramentas", "rating": 4.8},
+				},
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": []any{}})
+	}))
+}
+
+func TestChat_MockUsesToolAndSurfacesProducts(t *testing.T) {
+	srv := fakeCatalog(t)
+	defer srv.Close()
+
+	eng := lara.New(llm.NewMock(), catalog.New(srv.URL))
+	res, err := eng.Chat(context.Background(), nil, "procuro uma furadeira")
+	if err != nil {
+		t.Fatalf("erro: %v", err)
+	}
+	if len(res.Products) != 2 {
+		t.Fatalf("esperava 2 produtos citados, veio %d", len(res.Products))
+	}
+	if res.Products[0].Slug != "furadeira-bosch" {
+		t.Errorf("produto inesperado: %+v", res.Products[0])
+	}
+	if res.Reply == "" {
+		t.Error("Lara deveria responder um texto")
+	}
+	if res.Model != "mock" {
+		t.Errorf("model esperado mock, veio %q", res.Model)
+	}
+}
+
+func TestChat_GreetingNoTool(t *testing.T) {
+	srv := fakeCatalog(t)
+	defer srv.Close()
+
+	eng := lara.New(llm.NewMock(), catalog.New(srv.URL))
+	res, err := eng.Chat(context.Background(), nil, "oi, quem é você?")
+	if err != nil {
+		t.Fatalf("erro: %v", err)
+	}
+	if len(res.Products) != 0 {
+		t.Errorf("saudação não deveria buscar produtos, veio %d", len(res.Products))
+	}
+	if !strings.Contains(res.Reply, "Lara") {
+		t.Errorf("saudação deveria se apresentar como Lara; veio %q", res.Reply)
+	}
+}
+
+func TestChat_NoResults(t *testing.T) {
+	// catálogo que sempre devolve vazio
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": []any{}})
+	}))
+	defer srv.Close()
+
+	eng := lara.New(llm.NewMock(), catalog.New(srv.URL))
+	res, err := eng.Chat(context.Background(), nil, "procuro um item-que-nao-existe-zzz")
+	if err != nil {
+		t.Fatalf("erro: %v", err)
+	}
+	if len(res.Products) != 0 {
+		t.Errorf("esperava 0 produtos, veio %d", len(res.Products))
+	}
+	if !strings.Contains(strings.ToLower(res.Reply), "não encontrei") {
+		t.Errorf("esperava resposta honesta de 'não encontrei'; veio %q", res.Reply)
+	}
+}

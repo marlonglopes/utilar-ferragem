@@ -19,7 +19,7 @@ REGION="${AWS_REGION:-sa-east-1}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-SERVICES=(catalog order auth payment)
+SERVICES=(catalog order auth payment assistant)
 
 echo "▶ Login no ECR ($REGION)…"
 aws ecr get-login-password --region "$REGION" \
