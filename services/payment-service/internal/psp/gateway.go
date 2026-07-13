@@ -35,13 +35,13 @@ const (
 // PaymentStatus is the normalized lifecycle across providers.
 // Maps:
 //   - Stripe PaymentIntent:   requires_payment_method/requires_confirmation/requires_action → pending
-//                             processing → pending
-//                             succeeded → approved
-//                             canceled → cancelled
-//                             requires_capture → authorized (raro em BR)
+//     processing → pending
+//     succeeded → approved
+//     canceled → cancelled
+//     requires_capture → authorized (raro em BR)
 //   - Mercado Pago:           pending/in_process/in_mediation → pending
-//                             approved/authorized → approved
-//                             rejected/cancelled/refunded/charged_back → failed/cancelled
+//     approved/authorized → approved
+//     rejected/cancelled/refunded/charged_back → failed/cancelled
 type PaymentStatus string
 
 const (
@@ -65,6 +65,7 @@ type CreateRequest struct {
 	PayerEmail string
 	PayerName  string // obrigatório pra boleto no MP
 	PayerCPF   string // obrigatório pra boleto (ambos PSPs)
+	PayerPhone string // celular — OBRIGATÓRIO no customer da Appmax (validado ao vivo)
 
 	// CardToken é opcional e só usado com Method=card em certos fluxos.
 	// Stripe: client-side `stripe.confirmPayment` costuma ser suficiente
@@ -90,7 +91,7 @@ type CreateResult struct {
 type GetResult struct {
 	PSPID      string
 	Status     PaymentStatus
-	Amount     float64         // em reais (convertido do centavos do PSP)
+	Amount     float64 // em reais (convertido do centavos do PSP)
 	Currency   string
 	RawPayload json.RawMessage // resposta crua — útil pra comparar com o que temos
 }
@@ -108,9 +109,9 @@ type WebhookEvent struct {
 // Errors normalizados que podem ser retornados por qualquer Gateway.
 // O handler traduz para HTTP status (bad gateway, not found, etc).
 var (
-	ErrNotFound       = errors.New("psp: payment not found")
-	ErrInvalidRequest = errors.New("psp: invalid request")
-	ErrUpstream       = errors.New("psp: upstream error")
+	ErrNotFound         = errors.New("psp: payment not found")
+	ErrInvalidRequest   = errors.New("psp: invalid request")
+	ErrUpstream         = errors.New("psp: upstream error")
 	ErrInvalidSignature = errors.New("psp: invalid webhook signature")
 )
 

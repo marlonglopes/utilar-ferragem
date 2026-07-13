@@ -43,8 +43,9 @@ func (g *Gateway) CreatePayment(ctx context.Context, req psp.CreateRequest) (*ps
 		FirstName: first,
 		LastName:  last,
 		Email:     req.PayerEmail,
-		// TODO(appmax): coletar telefone + endereço no checkout. A Appmax exige
-		// endereço p/ boleto e recomenda p/ antifraude. Ver docs/appmax-integration.md.
+		Telephone: digitsOnly(req.PayerPhone), // celular obrigatório (validado ao vivo)
+		// TODO(appmax): endereço ainda pendente — a Appmax exige p/ boleto e
+		// recomenda p/ antifraude. Ver docs/appmax-integration.md.
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: create customer: %v", psp.ErrUpstream, err)

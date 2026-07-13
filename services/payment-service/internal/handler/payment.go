@@ -205,6 +205,7 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		PayerEmail:     userEmail,
 		PayerName:      payerName,
 		PayerCPF:       payerCPF,
+		PayerPhone:     req.PayerPhone,
 		IdempotencyKey: c.GetString("request_id"),
 	}
 	result, pspErr := h.gateway.CreatePayment(c.Request.Context(), pspReq)

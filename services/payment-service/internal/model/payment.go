@@ -48,6 +48,8 @@ type CreatePaymentRequest struct {
 	// Sprint 8.5 troca por propagação JWT → auth-service para evitar tamper.
 	PayerCPF  string `json:"payer_cpf,omitempty"`
 	PayerName string `json:"payer_name,omitempty"`
+	// PayerPhone (celular) — obrigatório no customer da Appmax (validado ao vivo).
+	PayerPhone string `json:"payer_phone,omitempty"`
 }
 
 // PSPPayload is the response sent back to the SPA per payment method

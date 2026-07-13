@@ -1,8 +1,12 @@
 # Integração Appmax (payment-service) — API v3
 
-Status: **backend implementado na API v3, espelhando a integração de produção do
-gifthy** (validada contra o sandbox real). Aguardando `APPMAX_ACCESS_TOKEN` da
-conta da Utilar para validação E2E.
+Status: **✅ VALIDADO AO VIVO contra o sandbox da Appmax v3 (2026-07-13).** O
+fluxo completo customer → order → payment/pix + GetOrder roda ponta a ponta com o
+client/gateway do Utilar. Testes de integração em
+`internal/psp/appmax/integration_test.go` (gated por `APPMAX_ACCESS_TOKEN` — só
+rodam com token; skipam em CI). Espelha a integração de produção do gifthy.
+
+> Rodar ao vivo: `APPMAX_ACCESS_TOKEN=... APPMAX_BASE_URL=https://homolog.sandboxappmax.com.br/api/v3 go test ./services/payment-service/internal/psp/appmax/ -run Integration -v`
 
 > **Por que v3?** Existem duas APIs Appmax. A **v1** (appmax.readme.io) usa OAuth2
 > e valores em centavos; a **v3 oficial** (docs.appmax.com.br) usa `access-token`
@@ -88,9 +92,11 @@ pagamento fica pendente. `APPMAX_WEBHOOK_SECRET` é **opcional** (header
 
 ## Lacunas conhecidas (a resolver antes de produção)
 
-1. **Endereço + telefone do cliente**: a Appmax exige endereço pra **boleto** e
-   recomenda pra antifraude; hoje o `CreatePayment` não recebe esses dados.
-   → Coletar telefone + endereço no `CheckoutPage` e propagar via `psp.CreateRequest`.
+1. **Telefone** ✅ resolvido: `psp.CreateRequest.PayerPhone` → `CustomerInput.Telephone`.
+   A Appmax **exige** o celular no customer (403 "O campo Celular é obrigatório" —
+   descoberto ao vivo). Falta só o `CheckoutPage` **coletar** o telefone e mandar
+   `payer_phone` no POST /payments. **Endereço** ainda pendente: a Appmax exige p/
+   **boleto** (Pix passou no sandbox sem endereço) — coletar no checkout depois.
 2. **Cartão de crédito**: exige o cartão **tokenizado no browser** (Appmax JS) —
    nunca trafegamos PAN pelo backend (PCI SAQ-A). O gateway aceita `CardToken`,
    mas o SPA ainda não gera esse token (falta a URL do SDK + credencial pública).
