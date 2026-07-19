@@ -1,3 +1,4 @@
+import { refreshAccessToken } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 import type {
   AccountingSummary,
@@ -88,12 +89,38 @@ function qs(params: Record<string, string | number | undefined | null>): string 
   return s ? `?${s}` : ''
 }
 
-async function adminGet<T>(base: string, path: string): Promise<T> {
-  const token = useAuthStore.getState().user?.token ?? null
-  const res = await fetch(`${base}${path}`, {
+/**
+ * Executa a requisição e, em caso de 401, RENOVA o token e tenta uma vez.
+ *
+ * PORQUÊ: o access token dura 15 minutos. O `lib/api.ts` já renovava em 401,
+ * mas o cliente de admin não — ele mandava o token e desistia. Resultado: o
+ * painel expirava sozinho no meio do uso, e clicar num produto devolvia
+ * "Sua sessão expirou" mesmo com a aba aberta e o login válido.
+ *
+ * Uma tentativa só: se o 401 persistir depois de renovar, a sessão acabou de
+ * verdade e insistir viraria laço.
+ */
+async function adminFetch(base: string, path: string, init?: RequestInit): Promise<Response> {
+  const comToken = (t: string | null): RequestInit => ({
+    ...init,
     cache: 'no-store',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {
+      ...(init?.headers ?? {}),
+      ...(t ? { Authorization: `Bearer ${t}` } : {}),
+    },
   })
+
+  const token = useAuthStore.getState().user?.token ?? null
+  const res = await fetch(`${base}${path}`, comToken(token))
+  if (res.status !== 401) return res
+
+  const novo = await refreshAccessToken()
+  if (!novo) return res
+  return fetch(`${base}${path}`, comToken(novo))
+}
+
+async function adminGet<T>(base: string, path: string): Promise<T> {
+  const res = await adminFetch(base, path)
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
     if (res.status === 403) {

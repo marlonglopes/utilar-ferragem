@@ -82,6 +82,22 @@ export function configureAuthHooks(hooks: AuthHooks) {
 // simultâneas, só um refresh acontece e os outros aguardam o mesmo Promise.
 let inflightRefresh: Promise<string | null> | null = null
 
+/**
+ * Renova o access token usando o refresh token, uma vez por vez.
+ *
+ * Exportada porque o cliente de admin (`adminApi.ts`) precisa da MESMA
+ * renovação: o access token dura 15 minutos, e sem isso o painel expirava
+ * sozinho no meio do uso — "Sua sessão expirou" ao clicar num produto, mesmo
+ * com a aba aberta e o login válido.
+ *
+ * `inflightRefresh` garante uma renovação só mesmo com várias chamadas
+ * paralelas (o painel dispara 3-4 de uma vez): sem isso, a primeira resposta
+ * invalidaria o refresh token que as outras ainda estão usando.
+ */
+export async function refreshAccessToken(): Promise<string | null> {
+  return tryRefreshToken()
+}
+
 async function tryRefreshToken(): Promise<string | null> {
   if (!authHooks) return null
   if (inflightRefresh) return inflightRefresh

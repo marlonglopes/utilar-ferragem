@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { useAuthStore } from '@/store/authStore'
+import { NavLink, useLocation , useNavigate } from 'react-router-dom'
 import {
   Activity,
   BookOpenCheck,
@@ -10,6 +11,7 @@ import {
   Upload,
   Users,
   X,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { isAdminApiEnabled } from '@/lib/adminApi'
@@ -50,6 +52,9 @@ export function AdminShell({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const user = useAuthStore((st) => st.user)
+  const logout = useAuthStore((st) => st.logout)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -111,6 +116,31 @@ export function AdminShell({
               )
             })}
           </ul>
+
+          {/* Sair — não existia em lugar nenhum do app. Num painel que mostra
+              custo, margem e receita, num terminal possivelmente compartilhado
+              na loja, sair tem que ser um clique visível, não limpar o
+              navegador. */}
+          <div className="ml-auto flex items-center gap-2 pl-2">
+            {user?.email && (
+              <span className="hidden truncate text-xs text-gray-500 lg:inline" title={user.email}>
+                {user.email}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                logout()
+                navigate('/entrar', { replace: true })
+              }}
+              className="flex min-h-[36px] items-center gap-1.5 rounded-lg px-2.5 text-sm
+                         font-medium text-gray-600 transition-colors hover:bg-gray-100
+                         hover:text-gray-900"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Sair</span>
+            </button>
+          </div>
         </nav>
       </header>
 
