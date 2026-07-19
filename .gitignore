@@ -37,3 +37,6 @@ app/coverage/
 
 # DB dumps (dev only)
 backups/
+# Docs de infra do gifthy — não pertencem a este repo (docs/SEPARATION-utilar-vs-gifthy.md)
+AWS-INFRA.md
+AWS-SUBACCOUNT-PLAN.md

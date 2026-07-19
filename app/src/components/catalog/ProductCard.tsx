@@ -30,8 +30,11 @@ function Stars({ rating, count }: { rating: number; count: number }) {
 export function ProductCard({ product, className }: ProductCardProps) {
   const {
     slug, name, icon, seller, price, originalPrice, rating, reviewCount,
-    cashbackAmount, badge, badgeLabel, installments, stock,
+    cashbackAmount, badge, badgeLabel, installments, stock, images,
   } = product
+
+  // A listagem devolve só a capa (ver loadThumbnails no catalog-service).
+  const capa = images?.[0]
 
   const discount = originalPrice
     ? Math.round(((originalPrice - price) / originalPrice) * 100)
@@ -46,8 +49,31 @@ export function ProductCard({ product, className }: ProductCardProps) {
         className
       )}
     >
-      <div className="relative bg-gray-50 flex items-center justify-center text-5xl h-40 select-none">
-        {icon}
+      <div className="relative bg-gray-50 flex items-center justify-center text-5xl h-40 select-none overflow-hidden">
+        {/*
+          Foto real quando existe; o emoji da categoria vira fallback.
+          Antes o card mostrava SEMPRE o emoji, mesmo com foto no banco —
+          ninguém compra uma furadeira de R$ 429 olhando "⚒".
+
+          object-contain (e não cover): foto de produto tem enquadramento
+          imprevisível, e cover cortaria a ponta da ferramenta. lazy + async
+          para a vitrine não bloquear o scroll no celular.
+        */}
+        {capa ? (
+          <img
+            src={capa.url}
+            alt={capa.alt || name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-105"
+            onError={(e) => {
+              // URL quebrada volta pro emoji em vez de deixar o card vazio.
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+        ) : (
+          icon
+        )}
         {badge && badgeLabel && (
           <span
             className={cn(
