@@ -27,7 +27,14 @@ type Product struct {
 	ID    string  `json:"id"`
 	Name  string  `json:"name"`
 	Price float64 `json:"price"`
-	Stock int     `json:"stock"`
+
+	// Stock é float64, não int: a migration 005 do catalog trocou
+	// products.stock para NUMERIC(14,3) pra permitir venda fracionada (2,5 m
+	// de cabo, 1,5 m³ de areia). Decodificar em int faz json.Unmarshal recusar
+	// qualquer produto com saldo fracionado, e o erro sai como falha genérica
+	// de criação de pedido — sem dizer que o problema é o estoque.
+	// Coberto por stockdecimal_test.go.
+	Stock float64 `json:"stock"`
 }
 
 var (

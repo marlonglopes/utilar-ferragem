@@ -30,7 +30,10 @@ var ErrInsufficientStock = errors.New("catalogclient: insufficient stock")
 type Shortage struct {
 	ProductID string `json:"productId"`
 	Requested int    `json:"requested"`
-	Available int    `json:"available"`
+	// Available é float64 pelo mesmo motivo de Product.Stock: o saldo do
+	// catalog é NUMERIC e pode vir fracionado. Se o decode falhar aqui, o
+	// cliente perde justamente a informação útil — quanto ainda tem.
+	Available float64 `json:"available"`
 }
 
 // StockError embrulha ErrInsufficientStock com o detalhe do item que faltou.
@@ -39,7 +42,7 @@ type StockError struct {
 }
 
 func (e *StockError) Error() string {
-	return fmt.Sprintf("insufficient stock for product %s: requested %d, available %d",
+	return fmt.Sprintf("insufficient stock for product %s: requested %d, available %g",
 		e.Shortage.ProductID, e.Shortage.Requested, e.Shortage.Available)
 }
 

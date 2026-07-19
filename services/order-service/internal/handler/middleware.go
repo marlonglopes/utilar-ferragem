@@ -93,14 +93,14 @@ func RequireUser(jwtSecret string, devMode bool) gin.HandlerFunc {
 		// 1) JWT (caminho de produção)
 		if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
 			tokenStr := strings.TrimPrefix(auth, "Bearer ")
-			sub, err := parseJWTSubject(tokenStr, jwtSecret)
+			id, err := parseJWTIdentity(tokenStr, jwtSecret)
 			if err != nil {
 				slog.Warn("invalid jwt", "error", err.Error(), "request_id", c.GetString("request_id"))
 				Unauthorized(c, "invalid token")
 				c.Abort()
 				return
 			}
-			c.Set("user_id", sub)
+			setIdentity(c, id)
 			c.Set("auth_source", "jwt")
 			c.Next()
 			return
@@ -108,7 +108,12 @@ func RequireUser(jwtSecret string, devMode bool) gin.HandlerFunc {
 		// 2) X-User-Id fallback — só em dev
 		if devMode {
 			if userID := c.GetHeader("X-User-Id"); userID != "" {
-				c.Set("user_id", userID)
+				setIdentity(c, identity{
+					Sub:        userID,
+					Role:       c.GetHeader("X-User-Role"),
+					StoreID:    c.GetHeader("X-Store-Id"),
+					StoreLevel: c.GetHeader("X-Store-Level"),
+				})
 				c.Set("auth_source", "x-user-id")
 				c.Next()
 				return
@@ -194,9 +199,28 @@ func parseJWTSubjectRole(tokenStr, secret string) (sub, role string, err error) 
 	return sub, role, nil
 }
 
-// parseJWTSubject extrai a claim `sub` do JWT HS256 (compatível com auth-service.Claims).
-// A16-M7: lock estrito no algoritmo HS256.
-func parseJWTSubject(tokenStr, secret string) (string, error) {
+// identity é o que o order-service extrai do token.
+//
+// StoreID/StoreLevel são HINT DE ESCOPO do operador de balcão — nunca de valor.
+// O teto de desconto (que é dinheiro) não está aqui de propósito: vem do
+// auth-service no momento da decisão. Ver internal/authclient.
+type identity struct {
+	Sub        string
+	Role       string
+	StoreID    string
+	StoreLevel string
+}
+
+func setIdentity(c *gin.Context, id identity) {
+	c.Set("user_id", id.Sub)
+	c.Set("user_role", id.Role)
+	c.Set("store_id", id.StoreID)
+	c.Set("store_level", id.StoreLevel)
+}
+
+// parseJWTIdentity extrai sub/role/store do JWT HS256 (compatível com
+// auth-service.Claims). A16-M7: lock estrito no algoritmo HS256.
+func parseJWTIdentity(tokenStr, secret string) (identity, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
 		if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 			return nil, errors.New("unexpected signing method")
@@ -207,16 +231,24 @@ func parseJWTSubject(tokenStr, secret string) (string, error) {
 		if err == nil {
 			err = errors.New("invalid token")
 		}
-		return "", err
+		return identity{}, err
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", errors.New("invalid claims")
+		return identity{}, errors.New("invalid claims")
 	}
 	sub, ok := claims["sub"].(string)
 	if !ok || sub == "" {
-		return "", errors.New("missing sub claim")
+		return identity{}, errors.New("missing sub claim")
 	}
-	return sub, nil
+	role, _ := claims["role"].(string)
+	storeID, _ := claims["store_id"].(string)
+	storeLevel, _ := claims["store_level"].(string)
+	return identity{Sub: sub, Role: role, StoreID: storeID, StoreLevel: storeLevel}, nil
 }
 
+// parseJWTSubject continua existindo para os call sites que só querem o `sub`.
+func parseJWTSubject(tokenStr, secret string) (string, error) {
+	id, err := parseJWTIdentity(tokenStr, secret)
+	return id.Sub, err
+}

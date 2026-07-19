@@ -20,6 +20,15 @@ const (
 	MethodCard   PaymentMethod = "card"
 )
 
+// Canal de venda. Default 'web' em todo lugar: nenhum pedido histórico e
+// nenhum request antigo (sem o campo) vira balcão por acidente.
+type OrderChannel string
+
+const (
+	ChannelWeb    OrderChannel = "web"
+	ChannelBalcao OrderChannel = "balcao"
+)
+
 // OrderItem é o item de um pedido. Validação de binding é OBRIGATÓRIA aqui pra
 // evitar tamper de preço/quantidade pelo cliente (audit O1-C1):
 //   - Quantity > 0 e <= 999 (limites razoáveis pra hardware/ferramentas)
@@ -58,28 +67,46 @@ type TrackingEvent struct {
 }
 
 type Order struct {
-	ID              string          `json:"id"`
-	Number          string          `json:"number"`
-	UserID          string          `json:"userId"`
-	Status          OrderStatus     `json:"status"`
-	PaymentMethod   PaymentMethod   `json:"paymentMethod"`
-	PaymentID       *string         `json:"paymentId,omitempty"`
-	PaymentInfo     *string         `json:"paymentInfo,omitempty"`
-	Items           []OrderItem     `json:"items"`
-	Subtotal        float64         `json:"subtotal"`
-	ShippingCost    float64         `json:"shippingCost"`
-	ShippingService string          `json:"shippingService"`
-	Total           float64         `json:"total"`
-	Address         OrderAddress    `json:"address"`
-	TrackingCode    *string         `json:"trackingCode,omitempty"`
-	TrackingEvents  []TrackingEvent `json:"trackingEvents,omitempty"`
-	CreatedAt       time.Time       `json:"createdAt"`
-	PaidAt          *time.Time      `json:"paidAt,omitempty"`
-	PickedAt        *time.Time      `json:"pickedAt,omitempty"`
-	ShippedAt       *time.Time      `json:"shippedAt,omitempty"`
-	DeliveredAt     *time.Time      `json:"deliveredAt,omitempty"`
-	CancelledAt     *time.Time      `json:"cancelledAt,omitempty"`
-	UpdatedAt       time.Time       `json:"updatedAt"`
+	ID              string        `json:"id"`
+	Number          string        `json:"number"`
+	UserID          string        `json:"userId"`
+	Status          OrderStatus   `json:"status"`
+	PaymentMethod   PaymentMethod `json:"paymentMethod"`
+	PaymentID       *string       `json:"paymentId,omitempty"`
+	PaymentInfo     *string       `json:"paymentInfo,omitempty"`
+	Items           []OrderItem   `json:"items"`
+	Subtotal        float64       `json:"subtotal"`
+	ShippingCost    float64       `json:"shippingCost"`
+	ShippingService string        `json:"shippingService"`
+	Total           float64       `json:"total"`
+	// Ponteiro porque venda de balcão é retirada no ato: não existe endereço.
+	// Para pedido web o JSON continua idêntico ao de antes.
+	Address      *OrderAddress `json:"address,omitempty"`
+	TrackingCode *string       `json:"trackingCode,omitempty"`
+
+	// -- balcão --------------------------------------------------------------
+	// Todos omitempty: a resposta de um pedido web não muda de forma.
+	Channel          OrderChannel    `json:"channel"`
+	StoreID          *string         `json:"storeId,omitempty"`
+	OperatorID       *string         `json:"operatorId,omitempty"`
+	CustomerID       *string         `json:"customerId,omitempty"`
+	CustomerName     *string         `json:"customerName,omitempty"`
+	CustomerDocument *string         `json:"customerDocument,omitempty"`
+	CustomerPhone    *string         `json:"customerPhone,omitempty"`
+	DiscountPct      float64         `json:"discountPct"`
+	DiscountAmount   float64         `json:"discountAmount"`
+	ApprovalStatus   string          `json:"approvalStatus"`
+	ApprovedBy       *string         `json:"approvedBy,omitempty"`
+	ApprovedAt       *time.Time      `json:"approvedAt,omitempty"`
+	ApprovalNote     *string         `json:"approvalNote,omitempty"`
+	TrackingEvents   []TrackingEvent `json:"trackingEvents,omitempty"`
+	CreatedAt        time.Time       `json:"createdAt"`
+	PaidAt           *time.Time      `json:"paidAt,omitempty"`
+	PickedAt         *time.Time      `json:"pickedAt,omitempty"`
+	ShippedAt        *time.Time      `json:"shippedAt,omitempty"`
+	DeliveredAt      *time.Time      `json:"deliveredAt,omitempty"`
+	CancelledAt      *time.Time      `json:"cancelledAt,omitempty"`
+	UpdatedAt        time.Time       `json:"updatedAt"`
 }
 
 // CreateOrderRequest — payload de POST /api/v1/orders.
@@ -90,12 +117,50 @@ type Order struct {
 // contrato só pra detectar divergência (frontend com tabela velha, ou tentativa
 // de tamper) e logar — remover o campo quebraria o app hoje em produção.
 // O cliente escolhe QUAL serviço quer via ShippingService; o preço é do servidor.
+//
+// BALCÃO — o que muda no contrato:
+//
+//	Channel  ausente ou "web" = comportamento idêntico ao de sempre.
+//	Address  virou ponteiro e a obrigatoriedade saiu do binding para o handler,
+//	         que exige endereço quando o canal é `web` e o proíbe quando é
+//	         `balcao`. Antes, o PDV mandava um endereço falso ("Retirada no
+//	         balcão", CEP 00000-000) só para passar no `binding:"required"` —
+//	         e esse endereço falso ia parar na etiqueta de entrega e na cotação
+//	         de frete.
+//	Discount o cliente manda a PORCENTAGEM pretendida; o valor em reais é
+//	         sempre derivado no servidor (balcao.ResolveDiscount). Não existe
+//	         campo para o cliente informar o valor do desconto — de propósito.
 type CreateOrderRequest struct {
 	PaymentMethod   PaymentMethod `json:"paymentMethod" binding:"required,oneof=pix boleto card"`
 	Items           []OrderItem   `json:"items" binding:"required,min=1,max=100,dive"`
 	ShippingCost    float64       `json:"shippingCost" binding:"gte=0,lte=99999.99"`
 	ShippingService string        `json:"shippingService" binding:"omitempty,oneof=standard express"`
-	Address         OrderAddress  `json:"address" binding:"required"`
+	Address         *OrderAddress `json:"address" binding:"omitempty"`
+
+	// -- balcão --------------------------------------------------------------
+	Channel OrderChannel `json:"channel" binding:"omitempty,oneof=web balcao"`
+	// StoreID é opcional e serve só para admin escolher a filial: para o
+	// operador, a loja vem do vínculo, nunca do request (ver
+	// balcao.CanCreateBalcaoOrder).
+	StoreID string `json:"storeId" binding:"omitempty,max=64"`
+	// DiscountPct é INTENÇÃO. O servidor recalcula o valor e compara com o teto
+	// do cargo — mesma política já aplicada a preço de item e a frete.
+	DiscountPct float64 `json:"discountPct" binding:"omitempty,gte=0,lte=100"`
+	// Customer identifica para QUEM é a venda. Pode ser um cadastro leve
+	// existente (CustomerID) e/ou o snapshot dos dados no ato.
+	CustomerID       string `json:"customerId" binding:"omitempty,max=64"`
+	CustomerName     string `json:"customerName" binding:"omitempty,max=120"`
+	CustomerDocument string `json:"customerDocument" binding:"omitempty,max=18"`
+	// Telefone é exigido pela Appmax na cobrança; validado no handler para
+	// pedidos de balcão.
+	CustomerPhone string `json:"customerPhone" binding:"omitempty,max=20"`
+}
+
+// ApprovalRequest — payload de aprovar/recusar desconto.
+// Recusa exige justificativa: "recusado" sem motivo obriga o vendedor a voltar
+// ao gerente para saber o que fazer, e não deixa rastro do porquê na auditoria.
+type ApprovalRequest struct {
+	Note *string `json:"note" binding:"omitempty,max=500"`
 }
 
 // ShippingQuoteRequest — payload de POST /api/v1/shipping/quote.

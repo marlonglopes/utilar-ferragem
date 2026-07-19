@@ -10,10 +10,13 @@ type Config struct {
 	Port              string
 	DatabaseURL       string
 	JWTSecret         string
-	DevMode           bool   // habilita X-User-Id fallback (audit O1-C3)
+	DevMode           bool // habilita X-User-Id fallback (audit O1-C3)
 	AllowedOrigins    []string
 	CatalogServiceURL string // base URL do catalog-service pra validação de price (O2-H5)
-	RedisURL          string // O3-M3: vazio = rate limit desabilitado
+	// AuthServiceURL — de onde vem o contexto autoritativo do operador de
+	// balcão (loja, cargo e teto de desconto). Ver internal/authclient.
+	AuthServiceURL string
+	RedisURL       string // O3-M3: vazio = rate limit desabilitado
 	// KafkaBrokers — brokers do Redpanda onde o payment-service publica os
 	// eventos do outbox. Vazio desliga o consumer (e o pedido nunca vira 'paid'
 	// automaticamente), então logamos alto no boot.
@@ -48,6 +51,7 @@ func Load() (*Config, error) {
 		DevMode:           devMode,
 		AllowedOrigins:    parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		CatalogServiceURL: env("CATALOG_SERVICE_URL", "http://localhost:8091"),
+		AuthServiceURL:    env("AUTH_SERVICE_URL", "http://localhost:8093"),
 		RedisURL:          os.Getenv("REDIS_URL"),
 		KafkaBrokers:      parseOrigins(os.Getenv("KAFKA_BROKERS")),
 	}, nil

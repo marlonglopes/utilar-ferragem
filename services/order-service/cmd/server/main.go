@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/utilar/order-service/internal/authclient"
 	"github.com/utilar/order-service/internal/catalogclient"
 	"github.com/utilar/order-service/internal/config"
 	"github.com/utilar/order-service/internal/consumer"
@@ -51,9 +52,15 @@ func main() {
 	catalog := catalogclient.NewWithSecret(cfg.CatalogServiceURL, cfg.JWTSecret)
 	rates := shipping.NewStore(database)
 
+	// authclient: de onde sai o TETO DE DESCONTO autoritativo do operador de
+	// balcão. Sem ele o balcão opera fail-closed (teto 0 → todo desconto vai
+	// para a fila do gerente), nunca fail-open.
+	authc := authclient.New(cfg.AuthServiceURL, cfg.JWTSecret)
+
 	orderH := handler.NewOrderHandler(database, catalog, cfg.DevMode).
 		WithStock(catalog).
-		WithShipping(rates)
+		WithShipping(rates).
+		WithOperators(authc)
 	shippingH := handler.NewShippingHandler(rates)
 
 	// Consumer dos eventos de pagamento — é ele que faz o pedido virar 'paid'.
@@ -126,6 +133,18 @@ func main() {
 		// Cotação de frete — o carrinho chama com o CEP antes do checkout.
 		// Contrato em docs/shipping-api.md.
 		api.POST("/shipping/quote", shippingH.Quote)
+	}
+
+	// PDV de balcão. Fica sob RequireUser (não RequireRole) porque a decisão de
+	// papel/loja/cargo é por recurso, não por rota: quem autoriza é
+	// internal/balcao, com o teto de desconto resolvido no auth-service.
+	// Uma lista de papéis na rota daria a falsa sensação de que a autorização
+	// já foi feita.
+	bal := r.Group("/api/v1/balcao", handler.RequireUser(cfg.JWTSecret, cfg.DevMode))
+	{
+		bal.GET("/approvals", orderH.ListPendingApprovals)
+		bal.PATCH("/orders/:id/approve", orderH.Approve)
+		bal.PATCH("/orders/:id/reject", orderH.Reject)
 	}
 
 	// Rotas de operação (separação, despacho, entrega). role=admin ou operator:

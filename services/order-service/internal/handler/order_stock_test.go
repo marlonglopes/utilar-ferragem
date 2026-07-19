@@ -18,7 +18,7 @@ func item(productID string, qty int) model.OrderItem {
 	}
 }
 
-func catalogWith(stock map[string]int) map[string]*catalogclient.Product {
+func catalogWith(stock map[string]float64) map[string]*catalogclient.Product {
 	out := make(map[string]*catalogclient.Product, len(stock))
 	for id, s := range stock {
 		out[id] = &catalogclient.Product{ID: id, Name: "Produto", Price: 10, Stock: s}
@@ -29,7 +29,7 @@ func catalogWith(stock map[string]int) map[string]*catalogclient.Product {
 func TestCheckStock_AllowsWithinStock(t *testing.T) {
 	got := checkStock(
 		[]model.OrderItem{item("p1", 3), item("p2", 1)},
-		catalogWith(map[string]int{"p1": 5, "p2": 1}),
+		catalogWith(map[string]float64{"p1": 5, "p2": 1}),
 	)
 	if got != nil {
 		t.Errorf("pedido dentro do estoque não deveria falhar: %+v", got)
@@ -42,7 +42,7 @@ func TestCheckStock_AllowsWithinStock(t *testing.T) {
 func TestCheckStock_RejectsOrderAboveStock(t *testing.T) {
 	got := checkStock(
 		[]model.OrderItem{item("p1", 999)}, // 999 = teto do binding de Quantity
-		catalogWith(map[string]int{"p1": 1}),
+		catalogWith(map[string]float64{"p1": 1}),
 	)
 	if got == nil {
 		t.Fatal("pedir 999 de um produto com estoque 1 tem que ser rejeitado")
@@ -54,13 +54,13 @@ func TestCheckStock_RejectsOrderAboveStock(t *testing.T) {
 
 // Estoque exato passa — rejeitar aqui impediria vender a última unidade.
 func TestCheckStock_AllowsExactStock(t *testing.T) {
-	if got := checkStock([]model.OrderItem{item("p1", 4)}, catalogWith(map[string]int{"p1": 4})); got != nil {
+	if got := checkStock([]model.OrderItem{item("p1", 4)}, catalogWith(map[string]float64{"p1": 4})); got != nil {
 		t.Errorf("pedir exatamente o estoque disponível deveria passar: %+v", got)
 	}
 }
 
 func TestCheckStock_RejectsZeroStock(t *testing.T) {
-	if got := checkStock([]model.OrderItem{item("p1", 1)}, catalogWith(map[string]int{"p1": 0})); got == nil {
+	if got := checkStock([]model.OrderItem{item("p1", 1)}, catalogWith(map[string]float64{"p1": 0})); got == nil {
 		t.Fatal("produto esgotado deveria ser rejeitado")
 	}
 }
@@ -71,7 +71,7 @@ func TestCheckStock_RejectsZeroStock(t *testing.T) {
 func TestCheckStock_SumsDuplicateLines(t *testing.T) {
 	got := checkStock(
 		[]model.OrderItem{item("p1", 1), item("p1", 1)},
-		catalogWith(map[string]int{"p1": 1}),
+		catalogWith(map[string]float64{"p1": 1}),
 	)
 	if got == nil {
 		t.Fatal("duas linhas de 1 unidade num produto com estoque 1 deveria falhar")
@@ -85,7 +85,7 @@ func TestCheckStock_SumsDuplicateLines(t *testing.T) {
 func TestCheckStock_ReportsOffendingItemNotFirst(t *testing.T) {
 	got := checkStock(
 		[]model.OrderItem{item("p1", 1), item("p2", 50), item("p3", 1)},
-		catalogWith(map[string]int{"p1": 10, "p2": 2, "p3": 10}),
+		catalogWith(map[string]float64{"p1": 10, "p2": 2, "p3": 10}),
 	)
 	if got == nil || got.ProductID != "p2" {
 		t.Fatalf("deveria apontar p2 como o item sem saldo, veio %+v", got)

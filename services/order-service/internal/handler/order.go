@@ -9,9 +9,12 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/utilar/order-service/internal/authclient"
+	"github.com/utilar/order-service/internal/balcao"
 	"github.com/utilar/order-service/internal/catalogclient"
 	"github.com/utilar/order-service/internal/fulfillment"
 	"github.com/utilar/order-service/internal/model"
@@ -43,11 +46,19 @@ type ShippingRates interface {
 	Rates(ctx context.Context) ([]shipping.Rate, error)
 }
 
+// OperatorLookup é o contrato mínimo pro order-service resolver o contexto
+// autoritativo de um operador de balcão (loja, cargo e — o que importa — o teto
+// de desconto). Interface pequena para o handler ser testável com stub.
+type OperatorLookup interface {
+	GetOperator(ctx context.Context, userID string) (*authclient.Operator, error)
+}
+
 type OrderHandler struct {
 	db      *sql.DB
 	catalog CatalogLookup
 	stock   StockReserver
 	rates   ShippingRates
+	auth    OperatorLookup
 	devMode bool
 }
 
@@ -74,6 +85,16 @@ func (h *OrderHandler) WithShipping(r ShippingRates) *OrderHandler {
 	return h
 }
 
+// WithOperators liga a consulta do contexto de operador no auth-service.
+// Sem isso o balcão opera FAIL-CLOSED: teto de desconto 0, ou seja, qualquer
+// desconto nasce pendente de aprovação do gerente. Nunca o contrário — cair
+// para "teto infinito" quando o auth-service está fora do ar transformaria uma
+// indisponibilidade em rombo de caixa.
+func (h *OrderHandler) WithOperators(a OperatorLookup) *OrderHandler {
+	h.auth = a
+	return h
+}
+
 // Create POST /api/v1/orders
 // Cria pedido + items + endereço em uma transação.
 // Status inicial: pending_payment. Total calculado no servidor (nunca confia em cliente).
@@ -92,6 +113,15 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID := c.GetString("user_id")
 	requestID := c.GetString("request_id")
+
+	// BALCÃO: resolve canal, autorização de loja e teto de desconto ANTES de
+	// qualquer escrita. Se o operador não pode vender ali, não vale gastar
+	// chamada de catálogo nem reserva de estoque.
+	sale, err := h.resolveSaleContext(c, &req)
+	if err != nil {
+		respondSaleError(c, err)
+		return
+	}
 
 	// O2-H5: resolve price autoritativo via catalog-service. Mutates req.Items
 	// in-place pra que o INSERT abaixo use os valores corretos. Devolve também
@@ -126,23 +156,39 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		itemCount += it.Quantity
 	}
 
+	// DESCONTO SERVER-SIDE: o cliente do PDV manda a porcentagem pretendida; o
+	// valor em reais sai daqui, do subtotal autoritativo, e é comparado com o
+	// teto do cargo do operador. Mesma política de preço e frete.
+	discount := balcao.ResolveDiscount(subtotal, sale.RequestedDiscountPct, sale.DiscountCeilingPct)
+	if discount.Capped {
+		slog.Warn("create order: discount out of range (stale frontend or tamper)",
+			"requested_pct", sale.RequestedDiscountPct, "applied_pct", discount.Pct,
+			"user_id", userID, "request_id", requestID)
+	}
+
 	// FRETE SERVER-SIDE: o valor do request é ignorado. Antes daqui o total era
 	// `subtotal + req.ShippingCost` e mandar shippingCost:0 funcionava.
-	shipCost, shipService, err := h.resolveShipping(ctx, req, subtotal, itemCount, requestID)
-	if err != nil {
-		switch {
-		case errors.Is(err, shipping.ErrInvalidCEP):
-			BadRequest(c, err.Error())
-		case errors.Is(err, shipping.ErrNoCoverage):
-			Respond(c, http.StatusUnprocessableEntity, "no_shipping_coverage",
-				"não entregamos neste CEP: "+req.Address.CEP)
-		default:
-			slog.Error("create order: shipping", "error", err, "request_id", requestID)
-			InternalError(c, "could not calculate shipping")
+	//
+	// Balcão é retirada no ato: frete zero, sem consultar tabela e sem CEP. Não
+	// é "frete grátis" — é a ausência de entrega.
+	shipCost, shipService := 0.0, "pickup"
+	if sale.Channel == model.ChannelWeb {
+		shipCost, shipService, err = h.resolveShipping(ctx, req, discount.NetSubtotal, itemCount, requestID)
+		if err != nil {
+			switch {
+			case errors.Is(err, shipping.ErrInvalidCEP):
+				BadRequest(c, err.Error())
+			case errors.Is(err, shipping.ErrNoCoverage):
+				Respond(c, http.StatusUnprocessableEntity, "no_shipping_coverage",
+					"não entregamos neste CEP: "+req.Address.CEP)
+			default:
+				slog.Error("create order: shipping", "error", err, "request_id", requestID)
+				InternalError(c, "could not calculate shipping")
+			}
+			return
 		}
-		return
 	}
-	total := round2(subtotal + shipCost)
+	total := round2(discount.NetSubtotal + shipCost)
 
 	// ID gerado aqui (em vez do DEFAULT do banco) porque a reserva de estoque
 	// precisa acontecer ANTES do INSERT: se reservássemos depois do commit e a
@@ -209,10 +255,21 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	// número de pedido = ano + 8 chars base32 de crypto/rand (não enumerável)
 	orderNumber := generateOrderNumber(time.Now().Year())
 
+	// `user_id` continua sendo o DONO do pedido para efeito de leitura pelo
+	// cliente. No balcão, quem cria é o operador — e o dono é o operador
+	// também, salvo quando o cliente identificado tem conta no site
+	// (sale.OwnerUserID). O que NÃO fazemos é gravar user_id do cliente sem
+	// conta: isso criaria um pedido cujo dono não pode existir.
 	_, err = tx.Exec(`
-		INSERT INTO orders (id, number, user_id, payment_method, subtotal, shipping_cost, shipping_service, total, stock_reserved)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, orderID, orderNumber, userID, req.PaymentMethod, subtotal, shipCost, shipService, total, stockReserved)
+		INSERT INTO orders (
+			id, number, user_id, payment_method, subtotal, shipping_cost, shipping_service, total, stock_reserved,
+			channel, store_id, operator_id, customer_id, customer_name, customer_document, customer_phone,
+			discount_pct, discount_amount, approval_status
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+	`, orderID, orderNumber, sale.OwnerUserID, req.PaymentMethod, subtotal, shipCost, shipService, total, stockReserved,
+		string(sale.Channel), sale.StoreID, sale.OperatorID, sale.CustomerID,
+		sale.CustomerName, sale.CustomerDocument, sale.CustomerPhone,
+		discount.Pct, discount.Amount, discount.ApprovalStatus)
 	if err != nil {
 		DBError(c, err)
 		return
@@ -230,25 +287,76 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		}
 	}
 
-	// endereço
-	a := req.Address
+	// endereço — ausente em venda de balcão (retirada no ato). A tabela é 1-1
+	// opcional, então "sem endereço" é simplesmente não inserir a linha.
+	if a := req.Address; a != nil {
+		_, err = tx.Exec(`
+			INSERT INTO shipping_addresses (order_id, street, number, complement, neighborhood, city, state, cep)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`, orderID, a.Street, a.Number, a.Complement, a.Neighborhood, a.City, a.State, a.CEP)
+		if err != nil {
+			DBError(c, err)
+			return
+		}
+	}
+
+	// tracking event inicial
+	trackingDesc := "Pedido criado. Aguardando pagamento."
+	if sale.Channel == model.ChannelBalcao {
+		trackingDesc = "Venda registrada no balcão. Aguardando pagamento."
+	}
 	_, err = tx.Exec(`
-		INSERT INTO shipping_addresses (order_id, street, number, complement, neighborhood, city, state, cep)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, orderID, a.Street, a.Number, a.Complement, a.Neighborhood, a.City, a.State, a.CEP)
+		INSERT INTO tracking_events (order_id, status, description)
+		VALUES ($1, 'pending_payment', $2)
+	`, orderID, trackingDesc)
 	if err != nil {
 		DBError(c, err)
 		return
 	}
 
-	// tracking event inicial
-	_, err = tx.Exec(`
-		INSERT INTO tracking_events (order_id, status, description)
-		VALUES ($1, 'pending_payment', 'Pedido criado. Aguardando pagamento.')
-	`, orderID)
-	if err != nil {
-		DBError(c, err)
-		return
+	// AUDITORIA — na MESMA transação do pedido, e não depois do commit:
+	// desconto é dinheiro saindo, e um pedido com desconto cuja linha de
+	// auditoria falhou em gravar é exatamente o registro que não pode existir.
+	// A auditoria administrativa (auth-service) falha aberto porque lá o dado
+	// é secundário; aqui ela é parte do fato.
+	if sale.Channel == model.ChannelBalcao {
+		if err := auditTx(tx, c, balcaoEvent{
+			OrderID:  &orderID,
+			Action:   "order.created",
+			StoreID:  sale.StoreID,
+			Amount:   &total,
+			NewValue: map[string]any{"total": total, "items": itemCount, "customerId": sale.CustomerID},
+		}); err != nil {
+			DBError(c, err)
+			return
+		}
+		if discount.Pct > 0 {
+			action := "discount.applied"
+			if discount.ApprovalStatus == balcao.ApprovalPending {
+				// Nome diferente para a busca do dono ser direta: "me mostra
+				// todo desconto que passou do teto no mês".
+				action = "discount.over_ceiling"
+			}
+			if err := auditTx(tx, c, balcaoEvent{
+				OrderID: &orderID,
+				Action:  action,
+				StoreID: sale.StoreID,
+				Amount:  &discount.Amount,
+				OldValue: map[string]any{
+					"subtotal": subtotal, "discountPct": 0,
+				},
+				NewValue: map[string]any{
+					"discountPct":    discount.Pct,
+					"discountAmount": discount.Amount,
+					"ceilingPct":     sale.DiscountCeilingPct,
+					"requestedPct":   sale.RequestedDiscountPct,
+					"approvalStatus": discount.ApprovalStatus,
+				},
+			}); err != nil {
+				DBError(c, err)
+				return
+			}
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -257,8 +365,10 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	}
 	committed = true // desarma a compensação de estoque do defer
 
-	// retorna o pedido completo
-	order, err := h.loadOrder(orderID, userID)
+	// Sem filtro de dono: o pedido acabou de ser criado por este request e a
+	// autorização já aconteceu lá em cima. Filtrar por user_id aqui devolveria
+	// 500 numa venda de balcão em que o dono é outro.
+	order, err := h.loadOrder(orderID, "")
 	if err != nil {
 		DBError(c, err)
 		return
@@ -280,8 +390,32 @@ func (h *OrderHandler) List(c *gin.Context) {
 		perPage = 20
 	}
 
+	// Escopo padrão INALTERADO: os pedidos do próprio usuário. O balcão não
+	// alarga o que ninguém já via por default — quem quer a visão da loja pede
+	// `scope=store` explicitamente, e só operador/admin recebe.
 	where := "user_id = $1"
 	args := []any{userID}
+	if c.Query("scope") == "store" {
+		actor := h.actorFromContext(c)
+		switch {
+		case actor.Role == balcao.RoleAdmin:
+			if storeID := c.Query("storeId"); storeID != "" {
+				args = []any{storeID}
+				where = "channel = 'balcao' AND store_id = $1"
+			} else {
+				where = "channel = 'balcao'"
+				args = []any{}
+			}
+		case actor.Role == balcao.RoleStoreOperator && actor.StoreID != "":
+			// A loja vem do VÍNCULO, nunca do query param: aceitar `storeId` do
+			// cliente aqui seria entregar de bandeja a listagem de outra filial.
+			args = []any{actor.StoreID}
+			where = "channel = 'balcao' AND store_id = $1"
+		default:
+			Forbidden(c, "store scope requires an active store operator")
+			return
+		}
+	}
 	switch filter {
 	case "active":
 		where += " AND status IN ('pending_payment', 'paid', 'picking', 'shipped')"
@@ -289,26 +423,45 @@ func (h *OrderHandler) List(c *gin.Context) {
 		where += " AND status IN ('delivered', 'cancelled')"
 	}
 
+	// Os placeholders de LIMIT/OFFSET são numerados a partir do tamanho de
+	// `args`, e não fixos em $2/$3: com o escopo de loja o WHERE pode ter zero
+	// ou um parâmetro, e placeholder hardcoded quebraria silenciosamente
+	// (LIMIT lendo o store_id).
+	countArgs := append([]any{}, args...)
 	offset := (page - 1) * perPage
+	limitPH := len(args) + 1
+	offsetPH := len(args) + 2
 	args = append(args, perPage, offset)
 
-	rows, err := h.db.Query(`
-		SELECT id FROM orders WHERE `+where+` ORDER BY created_at DESC LIMIT $2 OFFSET $3
-	`, args...)
+	rows, err := h.db.Query(fmt.Sprintf(
+		`SELECT id FROM orders WHERE %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d`,
+		where, limitPH, offsetPH), args...)
 	if err != nil {
 		DBError(c, err)
 		return
 	}
 	defer rows.Close()
 
-	orders := make([]model.Order, 0)
+	ids := make([]string, 0, perPage)
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
 			DBError(c, err)
 			return
 		}
-		o, err := h.loadOrder(id, userID)
+		ids = append(ids, id)
+	}
+	// Sem rows.Err() um erro no meio da paginação viraria "você não tem
+	// pedidos" — o cliente acharia que perdeu a compra.
+	if err := rows.Err(); err != nil {
+		DBError(c, err)
+		return
+	}
+	// loadOrder só depois de fechar o cursor: fazer as consultas de itens e
+	// tracking com o cursor aberto prende duas conexões do pool por pedido.
+	orders := make([]model.Order, 0, len(ids))
+	for _, id := range ids {
+		o, err := h.loadOrder(id, "")
 		if err != nil {
 			DBError(c, err)
 			return
@@ -318,7 +471,10 @@ func (h *OrderHandler) List(c *gin.Context) {
 
 	// count total
 	var total int
-	h.db.QueryRow("SELECT count(*) FROM orders WHERE "+where, args[:len(args)-2]...).Scan(&total)
+	if err := h.db.QueryRow("SELECT count(*) FROM orders WHERE "+where, countArgs...).Scan(&total); err != nil {
+		DBError(c, err)
+		return
+	}
 	totalPages := (total + perPage - 1) / perPage
 
 	c.JSON(http.StatusOK, gin.H{
@@ -328,17 +484,38 @@ func (h *OrderHandler) List(c *gin.Context) {
 }
 
 // Get GET /api/v1/orders/:id
+//
+// SEGURANÇA — a proteção contra IDOR mudou de FORMA aqui, e essa é a parte
+// delicada da introdução do balcão. Antes, o escopo era a query
+// (`WHERE user_id = $2`): quem não fosse dono recebia sql.ErrNoRows. Com pedido
+// criado por terceiro, a query não pode mais carregar essa regra sozinha — um
+// operador precisa ler pedidos cujo user_id não é dele.
+//
+// Então o pedido é carregado sem filtro e a decisão passa por
+// balcao.CanViewOrder, que mantém o cliente comum EXATAMENTE no escopo antigo
+// (só os pedidos dele) e concede a leitura de loja apenas a operador/admin. As
+// três regras têm teste de regressão em internal/balcao/authz_test.go.
+//
+// Negativa responde 404, não 403: 403 confirmaria que o pedido existe, o que
+// transforma a rota num oráculo de enumeração de IDs.
 func (h *OrderHandler) Get(c *gin.Context) {
-	userID := c.GetString("user_id")
 	id := c.Param("id")
 
-	order, err := h.loadOrder(id, userID)
+	order, err := h.loadOrder(id, "")
 	if err == sql.ErrNoRows {
 		NotFound(c, "order not found")
 		return
 	}
 	if err != nil {
 		DBError(c, err)
+		return
+	}
+
+	if err := balcao.CanViewOrder(h.actorFromContext(c), orderRefOf(order)); err != nil {
+		slog.Warn("order read denied",
+			"order_id", id, "user_id", c.GetString("user_id"),
+			"reason", err.Error(), "request_id", c.GetString("request_id"))
+		NotFound(c, "order not found")
 		return
 	}
 	c.JSON(http.StatusOK, order)
@@ -367,9 +544,12 @@ func (h *OrderHandler) Cancel(c *gin.Context) {
 	// A regra de quais status podem virar 'cancelled' agora mora na máquina de
 	// estados (model.CanTransition), não numa lista escrita à mão aqui.
 	var hadReservation bool
+	var cancelChannel string
+	var cancelStore sql.NullString
+	var cancelTotal float64
 	if err := tx.QueryRow(
-		`SELECT stock_reserved FROM orders WHERE id=$1 AND user_id=$2`, id, userID,
-	).Scan(&hadReservation); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		`SELECT stock_reserved, channel::text, store_id, total FROM orders WHERE id=$1 AND user_id=$2`, id, userID,
+	).Scan(&hadReservation, &cancelChannel, &cancelStore, &cancelTotal); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		DBError(c, err)
 		return
 	}
@@ -390,6 +570,24 @@ func (h *OrderHandler) Cancel(c *gin.Context) {
 		}
 		DBError(c, err)
 		return
+	}
+
+	// Cancelar uma venda de balcão é ato de operador sobre dinheiro que já foi
+	// negociado — entra na trilha junto com a criação e o desconto, senão o
+	// histórico contaria só metade da história.
+	if cancelChannel == string(model.ChannelBalcao) {
+		store := cancelStore.String
+		if err := auditTx(tx, c, balcaoEvent{
+			OrderID:  &id,
+			Action:   "order.cancelled",
+			StoreID:  &store,
+			Amount:   &cancelTotal,
+			OldValue: map[string]any{"status": "active"},
+			NewValue: map[string]any{"status": string(model.StatusCancelled)},
+		}); err != nil {
+			DBError(c, err)
+			return
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -491,7 +689,7 @@ func checkStock(items []model.OrderItem, products map[string]*catalogclient.Prod
 		if !ok {
 			continue
 		}
-		if requested[id] > p.Stock {
+		if float64(requested[id]) > p.Stock {
 			return &catalogclient.Shortage{
 				ProductID: id,
 				Requested: requested[id],
@@ -504,9 +702,20 @@ func checkStock(items []model.OrderItem, products map[string]*catalogclient.Prod
 
 // insufficientStock responde 409 com o envelope padrão + `details` dizendo qual
 // item faltou e quanto há. O frontend usa isso pra ajustar o carrinho sozinho.
+// formatQty formata quantidade de estoque pra leitura humana em pt-BR.
+//
+// O estoque virou NUMERIC(14,3) pra permitir venda fracionada, então esta
+// mensagem precisa mostrar "1,5" e não "1.5" nem "1" — e precisa mostrar "200"
+// e não "200,000" pro caso comum de produto vendido por unidade. Sem isso a
+// mensagem que o cliente lê no carrinho sai errada ou confusa.
+func formatQty(q float64) string {
+	s := strconv.FormatFloat(q, 'f', -1, 64) // -1 = casas mínimas necessárias
+	return strings.Replace(s, ".", ",", 1)
+}
+
 func insufficientStock(c *gin.Context, s catalogclient.Shortage) {
-	msg := fmt.Sprintf("estoque insuficiente para o produto %s: pedido %d, disponível %d",
-		s.ProductID, s.Requested, s.Available)
+	msg := fmt.Sprintf("estoque insuficiente para o produto %s: pedido %d, disponível %s",
+		s.ProductID, s.Requested, formatQty(s.Available))
 	slog.Warn("handler.error",
 		"request_id", c.GetString("request_id"),
 		"code", "insufficient_stock",
@@ -614,19 +823,27 @@ func (h *OrderHandler) loadOrder(id, userID string) (*model.Order, error) {
 	}
 
 	var o model.Order
+	var channel string
 	err := h.db.QueryRow(`
 		SELECT
 		  id, number, user_id, status, payment_method, payment_id, payment_info,
 		  subtotal, shipping_cost, shipping_service, total, tracking_code,
-		  created_at, paid_at, picked_at, shipped_at, delivered_at, cancelled_at, updated_at
+		  created_at, paid_at, picked_at, shipped_at, delivered_at, cancelled_at, updated_at,
+		  channel::text, store_id, operator_id, customer_id,
+		  customer_name, customer_document, customer_phone,
+		  discount_pct, discount_amount, approval_status::text, approved_by, approved_at, approval_note
 		FROM orders WHERE `+where, args...).Scan(
 		&o.ID, &o.Number, &o.UserID, &o.Status, &o.PaymentMethod, &o.PaymentID, &o.PaymentInfo,
 		&o.Subtotal, &o.ShippingCost, &o.ShippingService, &o.Total, &o.TrackingCode,
 		&o.CreatedAt, &o.PaidAt, &o.PickedAt, &o.ShippedAt, &o.DeliveredAt, &o.CancelledAt, &o.UpdatedAt,
+		&channel, &o.StoreID, &o.OperatorID, &o.CustomerID,
+		&o.CustomerName, &o.CustomerDocument, &o.CustomerPhone,
+		&o.DiscountPct, &o.DiscountAmount, &o.ApprovalStatus, &o.ApprovedBy, &o.ApprovedAt, &o.ApprovalNote,
 	)
 	if err != nil {
 		return nil, err
 	}
+	o.Channel = model.OrderChannel(channel)
 
 	// items
 	rows, err := h.db.Query(`
@@ -651,13 +868,21 @@ func (h *OrderHandler) loadOrder(id, userID string) (*model.Order, error) {
 		return nil, err
 	}
 
-	// address
+	// address — ausente em venda de balcão. Fica nil e sai omitido do JSON, em
+	// vez de virar um endereço com todos os campos vazios (que o app renderiza
+	// como uma etiqueta em branco).
+	var addr model.OrderAddress
 	err = h.db.QueryRow(`
 		SELECT street, number, complement, neighborhood, city, state, cep
 		FROM shipping_addresses WHERE order_id = $1
-	`, id).Scan(&o.Address.Street, &o.Address.Number, &o.Address.Complement,
-		&o.Address.Neighborhood, &o.Address.City, &o.Address.State, &o.Address.CEP)
-	if err != nil && err != sql.ErrNoRows {
+	`, id).Scan(&addr.Street, &addr.Number, &addr.Complement,
+		&addr.Neighborhood, &addr.City, &addr.State, &addr.CEP)
+	switch {
+	case err == nil:
+		o.Address = &addr
+	case errors.Is(err, sql.ErrNoRows):
+		// pedido de balcão: sem endereço, por definição
+	default:
 		return nil, err
 	}
 

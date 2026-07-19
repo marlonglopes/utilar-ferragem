@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: utilar
       POSTGRES_DB: payment_service
     ports:
-      - "5435:5432"
+      - "127.0.0.1:5435:5432"
     volumes:
       - payment_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +24,7 @@ services:
       POSTGRES_PASSWORD: utilar
       POSTGRES_DB: catalog_service
     ports:
-      - "5436:5432"
+      - "127.0.0.1:5436:5432"
     volumes:
       - catalog_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -41,7 +41,7 @@ services:
       POSTGRES_PASSWORD: utilar
       POSTGRES_DB: order_service
     ports:
-      - "5437:5432"
+      - "127.0.0.1:5437:5432"
     volumes:
       - order_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -58,7 +58,7 @@ services:
       POSTGRES_PASSWORD: utilar
       POSTGRES_DB: auth_service
     ports:
-      - "5438:5432"
+      - "127.0.0.1:5438:5432"
     volumes:
       - auth_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -72,7 +72,7 @@ services:
     container_name: utilar_redis
     command: ["redis-server", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -96,9 +96,9 @@ services:
       - --smp 1
       - --default-log-level=warn
     ports:
-      - "19092:19092"
-      - "18082:18082"
-      - "18081:18081"
+      - "127.0.0.1:19092:19092"
+      - "127.0.0.1:18082:18082"
+      - "127.0.0.1:18081:18081"
     volumes:
       - redpanda_data:/var/lib/redpanda/data
     healthcheck:
@@ -114,7 +114,7 @@ services:
       redpanda:
         condition: service_healthy
     ports:
-      - "8085:8080"
+      - "127.0.0.1:8085:8080"
     environment:
       CONFIG_FILEPATH: /tmp/config.yml
     volumes:
