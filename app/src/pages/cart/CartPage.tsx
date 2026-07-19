@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react'
 import { useCartStore, type CartItem } from '@/store/cartStore'
 import { formatCurrency } from '@/lib/format'
+import { ShippingEstimate } from '@/components/cart/ShippingEstimate'
+import type { ShippingOption } from '@/hooks/useShippingQuote'
 
 function QtyControl({ item }: { item: CartItem }) {
   const { updateQuantity } = useCartStore()
@@ -37,6 +40,7 @@ export default function CartPage() {
 
   const total = items.reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0)
   const totalCount = items.reduce((sum, i) => sum + i.quantity, 0)
+  const [frete, setFrete] = useState<ShippingOption | null>(null)
 
   // Group items by seller
   const bySeller = items.reduce<Record<string, CartItem[]>>((acc, item) => {
@@ -132,15 +136,28 @@ export default function CartPage() {
               <span className="text-gray-500">{t('cartPage.subtotal')}</span>
               <span className="font-medium text-gray-900">{formatCurrency(total)}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-500">{t('cartPage.shippingEstimate')}</span>
-              <span className="text-gray-400 text-xs">Calculado no checkout</span>
-            </div>
           </div>
+
+          <ShippingEstimate
+            subtotal={total}
+            itemCount={totalCount}
+            onSelect={setFrete}
+          />
+
+          {frete && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">{t('cartPage.shippingEstimate')}</span>
+              <span className={frete.free ? 'text-green-700 font-medium' : 'font-medium text-gray-900'}>
+                {frete.free ? 'Grátis' : formatCurrency(frete.cost)}
+              </span>
+            </div>
+          )}
 
           <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
             <span className="font-semibold text-gray-900">{t('cartPage.total')}</span>
-            <span className="font-bold text-xl text-gray-900">{formatCurrency(total)}</span>
+            <span className="font-bold text-xl text-gray-900">
+              {formatCurrency(total + (frete?.cost ?? 0))}
+            </span>
           </div>
 
           <Link

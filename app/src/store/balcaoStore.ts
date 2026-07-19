@@ -19,33 +19,84 @@ import { persist } from 'zustand/middleware'
 // ---------------------------------------------------------------------------
 
 /**
- * Papel do operador de loja física.
+ * Cargo do operador dentro da loja — espelha `store_operator_levels.level` do
+ * auth-service (`operator | supervisor | manager`).
  *
- * ATENÇÃO: isto NÃO é o `role` do auth-service. O enum do backend é
- * `customer | seller | admin`, onde `seller` = lojista do marketplace (quem
- * vende no site), semanticamente diferente de "vendedor de balcão". Enquanto o
- * backend não tiver um papel próprio, este valor é local ao PDV.
- *
- * TODO(backend): adicionar `store_operator` (e opcionalmente `store_manager`)
- * ao enum de roles do auth-service + claim no JWT.
+ * O cargo é rótulo; quem manda no quanto de desconto é
+ * {@link BalcaoOperator.discountCeilingPct}, que vem RESOLVIDO do backend
+ * (override individual, se houver, senão o teto do cargo). O front nunca deriva
+ * teto a partir do cargo — foi exatamente esse hardcode que saiu daqui.
  */
-export type BalcaoRole = 'operator' | 'supervisor' | 'manager'
+export type BalcaoLevel = 'operator' | 'supervisor' | 'manager'
 
-/** Teto de desconto (%) que cada cargo concede sem aprovação do gerente. */
-export const DISCOUNT_CEILING_BY_ROLE: Record<BalcaoRole, number> = {
-  operator: 12,
-  supervisor: 20,
-  manager: 100,
+/**
+ * Contexto de loja do operador logado — resposta de `GET /api/v1/store/me`
+ * (auth-service, `model.StoreOperator`).
+ */
+export interface BalcaoOperator {
+  userId: string
+  name: string
+  storeId: string
+  storeCode: string
+  storeName: string
+  level: BalcaoLevel
+  /** Teto de desconto (%) sem aprovação. Autoritativo, vem do banco. */
+  discountCeilingPct: number
+  /** O cargo homologa desconto de terceiros. */
+  canApproveDiscount: boolean
+  /**
+   * `false` = este contexto NÃO veio do backend (modo mock, ou falha na
+   * consulta). A UI precisa saber para não apresentar número de demonstração
+   * como se fosse a regra da loja.
+   */
+  fromBackend: boolean
+}
+
+/**
+ * Contexto de demonstração: usado só quando o auth-service não está configurado
+ * (modo mock), para o PDV continuar demonstrável sem backend. Os números aqui
+ * são plausíveis, não autoritativos — `fromBackend: false` marca isso.
+ */
+export const MOCK_OPERATOR: BalcaoOperator = {
+  userId: 'mock-operator',
+  name: 'Vendedor (demonstração)',
+  storeId: 'mock-store',
+  storeCode: 'CTR',
+  storeName: 'Loja Centro',
+  level: 'operator',
+  discountCeilingPct: 12,
+  canApproveDiscount: false,
+  fromBackend: false,
+}
+
+/**
+ * Contexto usado quando o backend ESTÁ configurado mas a consulta falhou (rede,
+ * 403, vínculo revogado). Teto 0 = todo desconto cai na fila do gerente.
+ *
+ * É a mesma política fail-closed do order-service (`actorFromContext`): teto
+ * otimista durante uma indisponibilidade transforma incidente de infra em rombo
+ * de caixa.
+ */
+export const FAIL_CLOSED_OPERATOR: BalcaoOperator = {
+  userId: '',
+  name: '',
+  storeId: '',
+  storeCode: '',
+  storeName: '',
+  level: 'operator',
+  discountCeilingPct: 0,
+  canApproveDiscount: false,
+  fromBackend: false,
 }
 
 /** Abaixo desta margem (%) a barra vira âmbar — venda "apertada". */
 export const HEALTHY_MARGIN_PCT = 15
 
 /**
- * TODO(backend): o catalog-service não expõe custo do produto. Enquanto isso, o
- * custo é estimado como uma fração do preço de venda para que a barra de margem
- * tenha o que mostrar. Substituir por `product.cost` real assim que existir —
- * ver `deriveUnitCost()` em `src/hooks/useBalcaoProducts.ts`.
+ * Custo estimado como fração do preço, usado APENAS quando o custo real não
+ * chega do catálogo — ver `deriveUnitCost()` em `src/hooks/useBalcaoProducts.ts`.
+ * Toda linha estimada carrega `costIsEstimated: true` e a UI rotula a margem
+ * como estimada.
  */
 export const ASSUMED_COST_RATIO = 0.72
 
@@ -59,6 +110,8 @@ export interface BalcaoItem {
   unit: string
   unitPrice: number
   unitCost: number
+  /** `true` = `unitCost` é chute (preço × ratio), não custo real do catálogo. */
+  costIsEstimated: boolean
   quantity: number
   stock: number
   addedAt: string
@@ -101,12 +154,18 @@ function clamp(value: number, min: number, max: number): number {
 
 export type MarginStatus = 'healthy' | 'warning' | 'negative'
 
-export type PricedLine = Pick<BalcaoItem, 'unitPrice' | 'unitCost' | 'quantity'>
+export type PricedLine = Pick<BalcaoItem, 'unitPrice' | 'unitCost' | 'quantity'> &
+  Partial<Pick<BalcaoItem, 'costIsEstimated'>>
 
 export interface PricingInput {
   items: PricedLine[]
   discountPct: number
-  role?: BalcaoRole
+  /**
+   * Teto de desconto (%) do operador — vem de `GET /api/v1/store/me`.
+   * OBRIGATÓRIO de propósito: sem default, ninguém calcula margem contra um
+   * teto inventado pelo front.
+   */
+  ceilingPct: number
 }
 
 export interface BalcaoPricing {
@@ -127,6 +186,12 @@ export interface BalcaoPricing {
   marginPct: number
   /** Margem antes de qualquer desconto (%), para referência na barra. */
   baseMarginPct: number
+  /**
+   * Alguma linha usa custo ESTIMADO — logo `cost`, `grossProfit` e `marginPct`
+   * são aproximações. A UI é obrigada a rotular isso: margem apresentada como
+   * fato quando é chute é pior que margem assumidamente estimada.
+   */
+  costEstimated: boolean
   status: MarginStatus
   /** Desconto levou o total abaixo do custo — alerta bloqueante. */
   belowCost: boolean
@@ -145,22 +210,26 @@ export interface BalcaoPricing {
  * Regras:
  * - `marginPct` é margem SOBRE A VENDA: (total - custo) / total.
  * - abaixo de {@link HEALTHY_MARGIN_PCT} → 'warning'; lucro negativo → 'negative'.
- * - desconto acima do teto do cargo NÃO bloqueia: marca `requiresApproval`.
+ * - desconto acima do teto do operador NÃO bloqueia: marca `requiresApproval`.
+ *   (o servidor decide de fato — aqui é só a previsão que o vendedor vê).
  * - desconto que leva o total abaixo do custo bloqueia (`blocked`).
  */
 export function computeBalcaoPricing(input: PricingInput): BalcaoPricing {
-  const role = input.role ?? 'operator'
-  const ceilingPct = DISCOUNT_CEILING_BY_ROLE[role]
+  const ceilingPct = Math.max(0, input.ceilingPct)
   const discountPct = round2(clamp(input.discountPct, 0, 100))
 
   let subtotal = 0
   let cost = 0
   let itemCount = 0
+  let costEstimated = false
   for (const line of input.items) {
     const qty = Math.max(0, line.quantity)
     subtotal += line.unitPrice * qty
     cost += line.unitCost * qty
     itemCount += qty
+    // Uma única linha estimada já contamina o total: a margem do pedido inteiro
+    // passa a ser aproximada.
+    if (line.costIsEstimated) costEstimated = true
   }
   subtotal = round2(subtotal)
   cost = round2(cost)
@@ -194,6 +263,7 @@ export function computeBalcaoPricing(input: PricingInput): BalcaoPricing {
     grossProfit,
     marginPct,
     baseMarginPct,
+    costEstimated,
     status,
     belowCost,
     ceilingPct,
@@ -218,11 +288,6 @@ export function maxDiscountPctBeforeCost(items: PricedLine[]): number {
   if (subtotal <= 0) return 0
   if (cost >= subtotal) return 0
   return round2(((subtotal - cost) / subtotal) * 100)
-}
-
-/** Teto de desconto do cargo. */
-export function discountCeilingFor(role: BalcaoRole): number {
-  return DISCOUNT_CEILING_BY_ROLE[role]
 }
 
 /** Documento é CNPJ (14 dígitos) em vez de CPF (11)? */
@@ -257,8 +322,11 @@ export type NewBalcaoItem = Omit<BalcaoItem, 'addedAt'>
 interface BalcaoState {
   comandas: Comanda[]
   activeId: string
-  /** Papel local do operador — ver TODO(backend) em {@link BalcaoRole}. */
-  role: BalcaoRole
+  /**
+   * Contexto de loja do operador logado. Preenchido por `useBalcaoOperator`
+   * a partir de `GET /api/v1/store/me`; NUNCA persistido (ver `partialize`).
+   */
+  operator: BalcaoOperator
 
   // comandas
   openComanda: () => string
@@ -275,7 +343,8 @@ interface BalcaoState {
   // negociação / cliente
   setDiscountPct: (pct: number) => void
   setCustomer: (customer: BalcaoCustomer | null) => void
-  setRole: (role: BalcaoRole) => void
+  /** `null` = falha ao resolver o contexto → fail-closed (teto 0). */
+  setOperator: (operator: BalcaoOperator | null) => void
 
   clearComanda: () => void
 }
@@ -298,7 +367,8 @@ export const useBalcaoStore = create<BalcaoState>()(
       return {
         comandas: [INITIAL],
         activeId: INITIAL.id,
-        role: 'operator',
+        // Nasce fail-closed: até `useBalcaoOperator` responder, teto 0.
+        operator: FAIL_CLOSED_OPERATOR,
 
         openComanda: () => {
           const created = createComanda()
@@ -387,7 +457,7 @@ export const useBalcaoStore = create<BalcaoState>()(
 
         setCustomer: (customer) => patchActive((c) => ({ ...c, customer })),
 
-        setRole: (role) => set({ role }),
+        setOperator: (operator) => set({ operator: operator ?? FAIL_CLOSED_OPERATOR }),
 
         clearComanda: () =>
           patchActive((c) => ({ ...c, items: [], discountPct: 0, customer: null })),
@@ -395,7 +465,16 @@ export const useBalcaoStore = create<BalcaoState>()(
     },
     {
       name: 'utilar-balcao',
-      version: 1,
+      version: 2,
+      /**
+       * O CONTEXTO DO OPERADOR NÃO É PERSISTIDO — de propósito.
+       *
+       * Teto de desconto em localStorage é o hardcode de volta, só que pior:
+       * sobreviveria a um rebaixamento de cargo e viajaria entre turnos no mesmo
+       * tablet. Ele é rebuscado a cada carga do PDV; enquanto não chega, vale o
+       * FAIL_CLOSED_OPERATOR.
+       */
+      partialize: (state) => ({ comandas: state.comandas, activeId: state.activeId }),
       // Reidratação defensiva: um localStorage antigo/corrompido não pode deixar
       // o PDV sem comanda ativa (tela branca no tablet).
       merge: (persisted, current) => {
@@ -436,12 +515,12 @@ export function selectActiveComanda(
  * Em componente, chame `computeBalcaoPricing` dentro de um `useMemo`.
  */
 export function balcaoPricingOf(
-  state: Pick<BalcaoState, 'comandas' | 'activeId' | 'role'>
+  state: Pick<BalcaoState, 'comandas' | 'activeId' | 'operator'>
 ): BalcaoPricing {
   const comanda = activeComandaOf(state)
   return computeBalcaoPricing({
     items: comanda.items,
     discountPct: comanda.discountPct,
-    role: state.role,
+    ceilingPct: state.operator.discountCeilingPct,
   })
 }
