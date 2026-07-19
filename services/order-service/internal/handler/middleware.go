@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/utilar/pkg/requestid"
+	"github.com/utilar/pkg/servicetoken"
 )
 
 const RequestIDHeader = "X-Request-Id"
@@ -100,6 +101,17 @@ func RequireUser(jwtSecret string, devMode bool) gin.HandlerFunc {
 				c.Abort()
 				return
 			}
+			// A1 (auditoria 2026-07-18): identidade de SERVIÇO não passa por
+			// rota de usuário. O order-service não expõe nenhuma rota interna,
+			// então um token role=service aqui só pode ser tentativa de usar o
+			// JWT_SECRET de usuário como se fosse o de serviço.
+			if id.Role == servicetoken.Role {
+				slog.Warn("token role=service recusado em rota de usuário",
+					"sub", id.Sub, "request_id", c.GetString("request_id"))
+				Unauthorized(c, "invalid token")
+				c.Abort()
+				return
+			}
 			setIdentity(c, id)
 			c.Set("auth_source", "jwt")
 			c.Next()
@@ -142,6 +154,15 @@ func RequireRole(jwtSecret string, devMode bool, roles ...string) gin.HandlerFun
 			sub, role, err := parseJWTSubjectRole(strings.TrimPrefix(auth, "Bearer "), jwtSecret)
 			if err != nil {
 				slog.Warn("invalid jwt", "error", err.Error(), "request_id", c.GetString("request_id"))
+				Unauthorized(c, "invalid token")
+				c.Abort()
+				return
+			}
+			// A1: mesma recusa do RequireUser — `role=service` assinado com o
+			// segredo de usuário nunca vale.
+			if role == servicetoken.Role {
+				slog.Warn("token role=service recusado em rota de papel",
+					"sub", sub, "request_id", c.GetString("request_id"))
 				Unauthorized(c, "invalid token")
 				c.Abort()
 				return

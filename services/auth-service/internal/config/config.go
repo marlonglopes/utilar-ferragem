@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/utilar/pkg/devguard"
+	"github.com/utilar/pkg/servicetoken"
 	"time"
 )
 
@@ -20,6 +21,15 @@ type Config struct {
 	EmailVerifyTTL   time.Duration
 	PasswordResetTTL time.Duration
 	RedisURL         string // ex: redis://localhost:6379. Vazio desabilita rate limit.
+
+	// ServiceJWTSecret valida os tokens `role=service` das rotas
+	// /api/v1/internal (contexto de operador de balcão), emitidos pelo
+	// order-service.
+	//
+	// A1 (auditoria 2026-07-18): distinto do JWTSecret de propósito. O
+	// auth-service EMITE identidade de usuário; a identidade de SERVIÇO vive
+	// noutro segredo, para que ter um não implique poder forjar o outro.
+	ServiceJWTSecret string
 }
 
 // devSecret só é aceito em DEV_MODE=true. Em prod, JWT_SECRET é obrigatório
@@ -58,10 +68,20 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	// A1 (auditoria 2026-07-18): fail-closed. As rotas /api/v1/internal deste
+	// serviço aceitam role=service; sem SERVICE_JWT_SECRET fora de DEV_MODE o
+	// serviço não sobe, em vez de voltar a aceitar role=service assinado com o
+	// segredo de usuário.
+	serviceSecret, err := servicetoken.SecretFromEnv(devMode, jwt)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Port:             env("PORT", "8093"),
 		DatabaseURL:      env("AUTH_DB_URL", "postgres://utilar:utilar@localhost:5438/auth_service?sslmode=disable"),
 		JWTSecret:        jwt,
+		ServiceJWTSecret: serviceSecret,
 		DevMode:          devMode,
 		AllowedOrigins:   parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		AccessTokenTTL:   15 * time.Minute,

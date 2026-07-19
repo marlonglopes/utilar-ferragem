@@ -14,8 +14,13 @@ aquilo que foi desenhado; o desenho é que concentra risco demais num ponto.
 
 ---
 
-## A1 — CRÍTICO · O segredo JWT compartilhado transforma qualquer serviço
-## comprometido em administrador de todo o sistema
+## A1 — CRÍTICO · 🟡 MITIGADO em 19/07/2026 · O segredo JWT compartilhado
+## transforma qualquer serviço comprometido em administrador de todo o sistema
+
+> **Estado: mitigado, não fechado.** A recomendação (1) — segredo separado para
+> tráfego entre serviços — está implementada e coberta por testes. A classe do
+> problema só desaparece com a recomendação (2), assinatura assimétrica, que
+> continua **aberta**. Ver "O que foi feito" no fim desta seção.
 
 **Onde:** todos os 5 serviços compartilham `JWT_SECRET`.
 `services/order-service/internal/catalogclient/reservation.go:54-62` assina um
@@ -59,6 +64,87 @@ variável de ambiente → assina `{"sub":"qualquer","role":"admin"}` → chama
 
 **Recomendação:** fazer (1) agora e planejar (2). O (1) é uma variável de
 ambiente e um `if`.
+
+### O que foi feito (19/07/2026) — mitigação (1)
+
+Passaram a existir **dois segredos com propósitos distintos**:
+
+| Segredo | Identidade | Quem emite | Quem verifica |
+|---|---|---|---|
+| `JWT_SECRET` | usuário (`customer`, `seller`, `admin`, `store_operator`) | auth-service | todos os 5 |
+| `SERVICE_JWT_SECRET` | **serviço** (`role=service`) | order-service | catalog-service, auth-service |
+
+**Distribuição por serviço** — é aqui que mora o valor da mitigação:
+
+| Serviço | `JWT_SECRET` | `SERVICE_JWT_SECRET` | Porquê |
+|---|---|---|---|
+| auth | ✅ | ✅ | emite token de usuário; verifica serviço em `/api/v1/internal` |
+| catalog | ✅ | ✅ | verifica serviço em `/api/v1/internal` (reserva de estoque) |
+| order | ✅ | ✅ | **emite** token de serviço para catalog e auth |
+| payment | ✅ | ❌ | não expõe nem consome rota de serviço |
+| **assistant (Alice)** | ✅ | **❌** | **o ponto principal**: público, sem auth obrigatória, texto livre → LLM. Não precisa emitir token de serviço, então não recebe o poder de emitir |
+
+**Como está implementado:**
+
+- `pkg/servicetoken` — único lugar que emite e verifica token de serviço.
+  Claims `sub`, `role=service`, `iss=utilar-internal`, `iat`, `exp`. Lock de
+  algoritmo HS256 mantido, `exp` **obrigatório** na verificação, e a vida curta
+  de 2 minutos continua (recomendação 3 parcialmente atendida: `iss` entrou e é
+  validado; `aud` por serviço de destino continua pendente).
+- `catalog-service` — `handler.RequireInternal(jwtSecret, serviceSecret, devMode)`
+  protege `/api/v1/internal`. Dois caminhos, dois segredos: token de serviço
+  conferido com o segredo de **serviço**, ou token de **admin humano** conferido
+  com o de usuário (mantido para suporte). Não há terceiro caminho.
+- `auth-service` — `handler.InternalAuth(...)` faz o mesmo em `/api/v1/internal`.
+- `order-service` — `catalogclient` e `authclient` assinam com o
+  `SERVICE_JWT_SECRET`; sem ele, a chamada falha com erro explícito em vez de
+  pular silenciosamente o controle de estoque.
+- **Recusa explícita da claim**: nos 5 serviços, um token verificado com o
+  `JWT_SECRET` de **usuário** que carregue `role=service` é rejeitado com 401 e
+  log de aviso — em catalog (`RequireRole`), order (`RequireUser`/`RequireRole`),
+  auth (`JWTAuth`), payment (`JWTMiddleware`) e assistant (`OptionalAuth`, onde
+  vira anônimo). Defesa em profundidade: nenhuma rota futura herda o furo por
+  descuido.
+- **Fail-closed no boot** (`servicetoken.SecretFromEnv`): fora de `DEV_MODE`, o
+  serviço **não sobe** se `SERVICE_JWT_SECRET` estiver ausente — nem se for
+  **igual** ao `JWT_SECRET`, que é o erro de configuração mais provável e o mais
+  silencioso. Em `DEV_MODE` cai no `JWT_SECRET` com aviso ruidoso, o que é
+  seguro porque o `pkg/devguard` (A2) já recusa `DEV_MODE` em qualquer ambiente
+  com sinal de produção.
+
+**Cobertura de teste** (o que prova a mitigação, não só o que a descreve):
+
+- Token de **usuário** assinado com `JWT_SECRET` e claim `role=service` é
+  **rejeitado** nas rotas internas do catalog e do auth — inclusive quando
+  carrega o `iss` correto. É o teste central.
+- Token de serviço legítimo é aceito; com segredo errado é rejeitado; expirado é
+  rejeitado; `alg: none` é rejeitado; `iss` diferente é rejeitado.
+- Admin humano continua entrando nas rotas internas (suporte não quebrou).
+- Boot falha fora de `DEV_MODE` sem `SERVICE_JWT_SECRET` e com segredos iguais —
+  nos três serviços que precisam dele.
+- Lado emissor: o token que o `order-service` põe na rede valida com o segredo
+  de serviço e **não** valida com o de usuário.
+
+### O que isto NÃO resolve
+
+A mitigação reduz o **raio de explosão**; não elimina a **classe** do problema.
+Continua verdadeiro que um segredo simétrico serve para emitir e para verificar,
+e portanto:
+
+- quem comprometer o **order-service** ainda consegue forjar `role=service`;
+- quem comprometer o **auth-service** ainda consegue forjar qualquer usuário,
+  inclusive `admin`.
+
+O que mudou é que o serviço mais exposto — a Alice — deixou de carregar esse
+poder, e que o comprometimento de um serviço passou a limitar o atacante ao
+escopo daquele serviço em vez de entregar a loja inteira.
+
+**A solução definitiva continua sendo a recomendação (2): assinatura
+assimétrica.** O auth-service assina com chave privada (RS256/EdDSA) e os demais
+serviços carregam **apenas a chave pública** — ficam estruturalmente incapazes
+de emitir qualquer token, e não há mais segredo cuja leitura vire escalação de
+privilégio. Só isso fecha o A1. Enquanto não for feito, o item permanece na
+tabela de prioridade.
 
 ---
 
@@ -219,8 +305,8 @@ balcão.
 | | Achado | Esforço | Quando |
 |---|---|---|---|
 | 1 | A2 — impedir `DEV_MODE` em produção | ~2 h | antes do primeiro deploy |
-| 2 | A1 (mitigação) — segredo separado para serviço | ~4 h | antes do primeiro deploy |
-| 3 | A1 (definitivo) — assinatura assimétrica | ~16 h | antes de escalar a equipe |
+| — | A1 (mitigação) — segredo separado para serviço | ~4 h | ✅ feito (19/07) |
+| 3 | A1 (definitivo) — assinatura assimétrica | ~16 h | antes de escalar a equipe (**segue aberto**) |
 | — | A3 — mascarar IP na trilha | ~3 h | ✅ feito |
 | 4 | A3 (resto) — mascarar IP nas 3 tabelas de auditoria dos serviços | ~2 h | antes do primeiro deploy |
 | 5 | Retenção/expurgo de dado pessoal + redação do `raw_payload` | ~2 d | antes do primeiro deploy |

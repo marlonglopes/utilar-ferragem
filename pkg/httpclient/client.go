@@ -30,8 +30,11 @@ func New(timeout time.Duration) *http.Client {
 		timeout = DefaultTimeout
 	}
 	return &http.Client{
-		Timeout:   timeout,
-		Transport: defaultTransport(),
+		Timeout: timeout,
+		// Propagação de X-Request-Id embutida: todo client service-to-service do
+		// repo passa por aqui, então basta o middleware HTTP colocar o id no
+		// context (requestid.NewContext) pra correlação funcionar ponta a ponta.
+		Transport: WithRequestIDPropagation(defaultTransport()),
 	}
 }
 

@@ -21,6 +21,15 @@ services:
     image: ${ECR_REGISTRY:-utilar}/catalog:${TAG:-latest}
     environment:
       <<: *svc-env
+      # A1 (auditoria 2026-07-18) — SERVICE_JWT_SECRET é DELIBERADAMENTE
+      # entregue só a catalog, order e auth. Ele autentica tráfego máquina-a-
+      # máquina (role=service) e é distinto do JWT_SECRET de usuário. O
+      # assistant (Lara/Alice) e o payment NÃO o recebem: a Lara é o serviço
+      # mais exposto (endpoint público, texto livre → LLM) e não precisa emitir
+      # nem verificar token de serviço. Não mova esta linha para o *svc-env
+      # compartilhado — o valor da mitigação está exatamente na distribuição
+      # restrita.
+      SERVICE_JWT_SECRET: ${SERVICE_JWT_SECRET:?set SERVICE_JWT_SECRET}
       CATALOG_DB_URL: postgres://${DB_USER}:${DB_PASSWORD}@${RDS_HOST}:5432/catalog_service?sslmode=require
     depends_on: [redis]
 
@@ -30,6 +39,15 @@ services:
     image: ${ECR_REGISTRY:-utilar}/order:${TAG:-latest}
     environment:
       <<: *svc-env
+      # A1 (auditoria 2026-07-18) — SERVICE_JWT_SECRET é DELIBERADAMENTE
+      # entregue só a catalog, order e auth. Ele autentica tráfego máquina-a-
+      # máquina (role=service) e é distinto do JWT_SECRET de usuário. O
+      # assistant (Lara/Alice) e o payment NÃO o recebem: a Lara é o serviço
+      # mais exposto (endpoint público, texto livre → LLM) e não precisa emitir
+      # nem verificar token de serviço. Não mova esta linha para o *svc-env
+      # compartilhado — o valor da mitigação está exatamente na distribuição
+      # restrita.
+      SERVICE_JWT_SECRET: ${SERVICE_JWT_SECRET:?set SERVICE_JWT_SECRET}
       ORDER_DB_URL: postgres://${DB_USER}:${DB_PASSWORD}@${RDS_HOST}:5432/order_service?sslmode=require
       CATALOG_SERVICE_URL: http://catalog:8091
       # Sem isto o consumer de pagamento não sobe e o pedido nunca sai de
@@ -43,6 +61,15 @@ services:
     image: ${ECR_REGISTRY:-utilar}/auth:${TAG:-latest}
     environment:
       <<: *svc-env
+      # A1 (auditoria 2026-07-18) — SERVICE_JWT_SECRET é DELIBERADAMENTE
+      # entregue só a catalog, order e auth. Ele autentica tráfego máquina-a-
+      # máquina (role=service) e é distinto do JWT_SECRET de usuário. O
+      # assistant (Lara/Alice) e o payment NÃO o recebem: a Lara é o serviço
+      # mais exposto (endpoint público, texto livre → LLM) e não precisa emitir
+      # nem verificar token de serviço. Não mova esta linha para o *svc-env
+      # compartilhado — o valor da mitigação está exatamente na distribuição
+      # restrita.
+      SERVICE_JWT_SECRET: ${SERVICE_JWT_SECRET:?set SERVICE_JWT_SECRET}
       AUTH_DB_URL: postgres://${DB_USER}:${DB_PASSWORD}@${RDS_HOST}:5432/auth_service?sslmode=require
     depends_on: [redis]
 

@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/utilar/pkg/servicetoken"
 )
 
 // ErrNotOperator — o usuário não tem vínculo ativo de operador de balcão.
@@ -40,9 +40,11 @@ type Operator struct {
 }
 
 type Client struct {
-	baseURL   string
-	http      *http.Client
-	jwtSecret string
+	baseURL string
+	http    *http.Client
+	// serviceSecret é o SERVICE_JWT_SECRET, distinto do JWT_SECRET de usuário
+	// (A1, auditoria 2026-07-18) — ver serviceToken() abaixo.
+	serviceSecret string
 
 	// Cache curto. 30s é o compromisso: elimina a chamada HTTP repetida quando
 	// o operador registra três vendas seguidas, e mantém um rebaixamento
@@ -58,13 +60,15 @@ type cacheEntry struct {
 	exp time.Time
 }
 
-func New(baseURL, jwtSecret string) *Client {
+// New cria o cliente. serviceSecret é o SERVICE_JWT_SECRET — nunca o
+// JWT_SECRET de usuário.
+func New(baseURL, serviceSecret string) *Client {
 	return &Client{
-		baseURL:   strings.TrimRight(baseURL, "/"),
-		http:      &http.Client{Timeout: 5 * time.Second},
-		jwtSecret: jwtSecret,
-		cache:     make(map[string]cacheEntry),
-		ttl:       30 * time.Second,
+		baseURL:       strings.TrimRight(baseURL, "/"),
+		http:          &http.Client{Timeout: 5 * time.Second},
+		serviceSecret: serviceSecret,
+		cache:         make(map[string]cacheEntry),
+		ttl:           30 * time.Second,
 	}
 }
 
@@ -136,18 +140,15 @@ func (c *Client) store(userID string, op *Operator) {
 }
 
 // serviceToken assina um JWT HS256 com role=service, válido por 2 minutos —
-// mesmo padrão do catalogclient (os serviços já compartilham o JWT_SECRET, e um
-// token de vida curta que vaze em log expira antes de servir para algo).
+// mesmo padrão do catalogclient.
+//
+// A1 (auditoria 2026-07-18): assinado com o SERVICE_JWT_SECRET. Com o segredo
+// único anterior, qualquer processo que apenas VERIFICA token de usuário também
+// conseguia EMITIR identidade de serviço e de admin. Vida curta mantida: se o
+// token vazar num log, expira antes de servir para algo.
 func (c *Client) serviceToken() (string, error) {
-	if c.jwtSecret == "" {
-		return "", errors.New("authclient: JWT secret not configured for service calls")
+	if c.serviceSecret == "" {
+		return "", errors.New("authclient: SERVICE_JWT_SECRET not configured for service calls")
 	}
-	now := time.Now()
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":  "order-service",
-		"role": "service",
-		"iat":  now.Unix(),
-		"exp":  now.Add(2 * time.Minute).Unix(),
-	})
-	return tok.SignedString([]byte(c.jwtSecret))
+	return servicetoken.Issue(c.serviceSecret, "order-service")
 }

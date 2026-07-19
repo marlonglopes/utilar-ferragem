@@ -1,0 +1,890 @@
+{
+  "_leia_me": [
+    "Materiais de obra: como o item é VENDIDO e como é CONSUMIDO.",
+    "unid_base = unidade em que a obra consome (kg, m3, un, L, m).",
+    "unid_venda + conteudo_venda = embalagem da loja. 3,7 sacos não existem: são 4.",
+    "busca_catalogo = termo que a Alice manda para search_products para achar o produto REAL.",
+    "Nenhum preço aqui. Preço vem SEMPRE do catalog-service via tool use."
+  ],
+  "materiais": [
+    {
+      "id": "cimento-cp2",
+      "nome": "Cimento Portland CP II (saco 50 kg)",
+      "unid_base": "kg",
+      "unid_venda": "saco 50 kg",
+      "conteudo_venda": 50,
+      "busca_catalogo": "cimento",
+      "categoria": "construcao",
+      "cura": "Pega inicial ~1 h, pega final ~10 h. Resistência de projeto aos 28 dias; manter úmido (cura) nos 7 primeiros dias.",
+      "validade": "3 meses a partir da data de fabricação impressa no saco, se bem armazenado.",
+      "armazenagem": "Sobre estrado de madeira, longe de parede e umidade, pilhas de no máximo 10 sacos. Saco empedrado não se usa: perdeu resistência.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 16697",
+        "nota": "Fixa os tipos e requisitos do cimento Portland. A embalagem de 50 kg e a validade de 3 meses são prática consolidada de mercado brasileiro."
+      }
+    },
+    {
+      "id": "cal-hidratada",
+      "nome": "Cal hidratada CH-III (saco 20 kg)",
+      "unid_base": "kg",
+      "unid_venda": "saco 20 kg",
+      "conteudo_venda": 20,
+      "busca_catalogo": "cal hidratada",
+      "categoria": "construcao",
+      "validade": "6 meses em embalagem íntegra.",
+      "armazenagem": "Local seco e coberto. Cal é cáustica: usar luva e óculos ao manusear.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 7175",
+        "nota": "Define requisitos da cal hidratada para argamassas. Embalagem de 20 kg é prática de mercado."
+      }
+    },
+    {
+      "id": "areia-media",
+      "nome": "Areia média lavada",
+      "unid_base": "m3",
+      "unid_venda": "m³",
+      "conteudo_venda": 1,
+      "busca_catalogo": "areia media",
+      "categoria": "construcao",
+      "armazenagem": "A granel, sobre piso limpo. Areia com barro/matéria orgânica compromete a argamassa.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 7211",
+        "nota": "Especifica agregados para concreto e argamassa (granulometria e impurezas). A venda por m³ ou por saco de 20 kg é prática de mercado."
+      }
+    },
+    {
+      "id": "areia-fina",
+      "nome": "Areia fina peneirada",
+      "unid_base": "m3",
+      "unid_venda": "m³",
+      "conteudo_venda": 1,
+      "busca_catalogo": "areia fina",
+      "categoria": "construcao",
+      "armazenagem": "A granel, sobre piso limpo e protegida de chuva.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 7211",
+        "nota": "Especifica agregados miúdos. Areia fina é a indicada para reboco/massa fina."
+      }
+    },
+    {
+      "id": "brita-1",
+      "nome": "Brita 1 (9,5 a 25 mm)",
+      "unid_base": "m3",
+      "unid_venda": "m³",
+      "conteudo_venda": 1,
+      "busca_catalogo": "brita",
+      "categoria": "construcao",
+      "armazenagem": "A granel. Manter separada da areia para não contaminar o traço.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 7211",
+        "nota": "Especifica agregados graúdos e suas faixas granulométricas."
+      }
+    },
+    {
+      "id": "bloco-concreto-14",
+      "nome": "Bloco de concreto vedação 14x19x39 cm",
+      "unid_base": "un",
+      "unid_venda": "unidade",
+      "conteudo_venda": 1,
+      "busca_catalogo": "bloco de concreto",
+      "categoria": "construcao",
+      "armazenagem": "Empilhado sobre estrado, coberto. Bloco molhado na hora de assentar rouba água da argamassa.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 6136",
+        "nota": "Define blocos vazados de concreto simples para alvenaria e suas dimensões nominais."
+      }
+    },
+    {
+      "id": "bloco-concreto-9",
+      "nome": "Bloco de concreto vedação 9x19x39 cm",
+      "unid_base": "un",
+      "unid_venda": "unidade",
+      "conteudo_venda": 1,
+      "busca_catalogo": "bloco de concreto 9",
+      "categoria": "construcao",
+      "armazenagem": "Empilhado sobre estrado, coberto.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 6136",
+        "nota": "Define blocos vazados de concreto simples e dimensões nominais."
+      }
+    },
+    {
+      "id": "bloco-ceramico-9x19x39",
+      "nome": "Bloco cerâmico de vedação 9x19x39 cm",
+      "unid_base": "un",
+      "unid_venda": "unidade",
+      "conteudo_venda": 1,
+      "busca_catalogo": "bloco ceramico",
+      "categoria": "construcao",
+      "armazenagem": "Empilhado sobre estrado. Bloco cerâmico quebra fácil no manuseio: contar perda.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15270-1",
+        "nota": "Define blocos cerâmicos para alvenaria de vedação e suas dimensões."
+      }
+    },
+    {
+      "id": "tijolo-baiano-9x19x19",
+      "nome": "Tijolo baiano cerâmico 9x19x19 cm (8 furos)",
+      "unid_base": "un",
+      "unid_venda": "unidade",
+      "conteudo_venda": 1,
+      "busca_catalogo": "tijolo baiano",
+      "categoria": "construcao",
+      "armazenagem": "Empilhado sobre estrado, protegido de chuva.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15270-1",
+        "nota": "Define componentes cerâmicos de vedação e dimensões nominais."
+      }
+    },
+    {
+      "id": "tijolo-macico",
+      "nome": "Tijolo maciço cerâmico 5x10x20 cm",
+      "unid_base": "un",
+      "unid_venda": "unidade",
+      "conteudo_venda": 1,
+      "busca_catalogo": "tijolo macico",
+      "categoria": "construcao",
+      "armazenagem": "Empilhado sobre estrado.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15270-1",
+        "nota": "Define componentes cerâmicos para alvenaria. Dimensões de 5x10x20 cm são as correntes de mercado."
+      }
+    },
+    {
+      "id": "argamassa-colante-ac1",
+      "nome": "Argamassa colante AC-I (saco 20 kg)",
+      "unid_base": "kg",
+      "unid_venda": "saco 20 kg",
+      "conteudo_venda": 20,
+      "busca_catalogo": "argamassa colante ac1",
+      "categoria": "construcao",
+      "cura": "Tempo em aberto ~15 min. Liberar tráfego leve após 72 h; rejuntar após 24 h.",
+      "validade": "6 meses a partir da fabricação.",
+      "armazenagem": "Seco, sobre estrado, longe de umidade.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 14081",
+        "nota": "Classifica argamassas colantes industrializadas (AC-I, AC-II, AC-III) e seus requisitos de aderência."
+      }
+    },
+    {
+      "id": "argamassa-colante-ac2",
+      "nome": "Argamassa colante AC-II (saco 20 kg)",
+      "unid_base": "kg",
+      "unid_venda": "saco 20 kg",
+      "conteudo_venda": 20,
+      "busca_catalogo": "argamassa colante ac2",
+      "categoria": "construcao",
+      "cura": "Tempo em aberto ~20 min. Rejuntar após 24 h; tráfego pleno após 7 dias.",
+      "validade": "6 meses a partir da fabricação.",
+      "armazenagem": "Seco, sobre estrado, longe de umidade.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 14081",
+        "nota": "Classifica argamassas colantes. AC-II atende áreas internas e externas com solicitação moderada."
+      }
+    },
+    {
+      "id": "argamassa-colante-ac3",
+      "nome": "Argamassa colante AC-III (saco 20 kg)",
+      "unid_base": "kg",
+      "unid_venda": "saco 20 kg",
+      "conteudo_venda": 20,
+      "busca_catalogo": "argamassa colante ac3",
+      "categoria": "construcao",
+      "cura": "Tempo em aberto ~20 min. Rejuntar após 24 h; tráfego pleno após 7 dias.",
+      "validade": "6 meses a partir da fabricação.",
+      "armazenagem": "Seco, sobre estrado, longe de umidade.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 14081",
+        "nota": "Classifica argamassas colantes. AC-III é a de maior aderência, indicada para porcelanato e fachada."
+      }
+    },
+    {
+      "id": "rejunte-cimenticio",
+      "nome": "Rejunte cimentício (caixa 1 kg)",
+      "unid_base": "kg",
+      "unid_venda": "caixa 1 kg",
+      "conteudo_venda": 1,
+      "busca_catalogo": "rejunte",
+      "categoria": "construcao",
+      "cura": "Liberar a área após 24 h. Em box e área molhada, aguardar 72 h antes do uso pesado.",
+      "validade": "12 meses em embalagem íntegra.",
+      "armazenagem": "Seco. Rejunte que empedrou não recupera.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 14992",
+        "nota": "Especifica argamassa à base de cimento para rejuntamento de placas cerâmicas."
+      }
+    },
+    {
+      "id": "espacador-piso",
+      "nome": "Espaçador plástico para piso (pacote 100 un)",
+      "unid_base": "un",
+      "unid_venda": "pacote 100 un",
+      "conteudo_venda": 100,
+      "busca_catalogo": "espacador piso",
+      "categoria": "construcao",
+      "armazenagem": "Sem exigência especial.",
+      "fonte": {
+        "tipo": "mercado",
+        "ref": "prática corrente de assentamento",
+        "nota": "Espaçador define a junta uniforme. Embalagem de 100 unidades é a comum no varejo."
+      }
+    },
+    {
+      "id": "piso-ceramico",
+      "nome": "Piso cerâmico / porcelanato",
+      "unid_base": "m2",
+      "unid_venda": "m²",
+      "conteudo_venda": 1,
+      "busca_catalogo": "piso ceramico",
+      "categoria": "construcao",
+      "armazenagem": "Caixas empilhadas no máximo 8 alturas, na horizontal, local seco.",
+      "cura": "Não aplicável. Conferir tonalidade e calibre iguais em todas as caixas ANTES de assentar.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 13818",
+        "nota": "Especifica placas cerâmicas para revestimento: classificação, ensaios e marcação (PEI, absorção)."
+      }
+    },
+    {
+      "id": "azulejo",
+      "nome": "Azulejo / revestimento de parede",
+      "unid_base": "m2",
+      "unid_venda": "m²",
+      "conteudo_venda": 1,
+      "busca_catalogo": "azulejo",
+      "categoria": "construcao",
+      "armazenagem": "Caixas na horizontal, local seco.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 13818",
+        "nota": "Especifica placas cerâmicas para revestimento e sua classificação."
+      }
+    },
+    {
+      "id": "tinta-latex-acrilica",
+      "nome": "Tinta látex acrílica (lata 18 L)",
+      "unid_base": "L",
+      "unid_venda": "lata 18 L",
+      "conteudo_venda": 18,
+      "busca_catalogo": "tinta acrilica",
+      "categoria": "pintura",
+      "cura": "Intervalo entre demãos ~4 h. Secagem final e resistência à limpeza em ~30 dias.",
+      "validade": "Cerca de 3 anos com a lata fechada.",
+      "armazenagem": "Lata bem fechada, longe de sol e do congelamento. Lata aberta e mal vedada cria película e perde.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15079",
+        "nota": "Fixa requisitos mínimos de desempenho de tintas látex (PVA e acrílica) para alvenaria."
+      }
+    },
+    {
+      "id": "tinta-latex-pva",
+      "nome": "Tinta látex PVA (lata 18 L)",
+      "unid_base": "L",
+      "unid_venda": "lata 18 L",
+      "conteudo_venda": 18,
+      "busca_catalogo": "tinta latex pva",
+      "categoria": "pintura",
+      "cura": "Intervalo entre demãos ~4 h.",
+      "validade": "Cerca de 3 anos com a lata fechada.",
+      "armazenagem": "Lata fechada, ao abrigo do sol. PVA é só para interior — em área externa descasca.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15079",
+        "nota": "Fixa requisitos mínimos de desempenho de tintas látex para alvenaria."
+      }
+    },
+    {
+      "id": "selador-acrilico",
+      "nome": "Selador acrílico (lata 18 L)",
+      "unid_base": "L",
+      "unid_venda": "lata 18 L",
+      "conteudo_venda": 18,
+      "busca_catalogo": "selador acrilico",
+      "categoria": "pintura",
+      "cura": "Aguardar cerca de 4 h antes da primeira demão de tinta.",
+      "validade": "Cerca de 2 anos com a lata fechada.",
+      "armazenagem": "Lata fechada, ao abrigo do sol.",
+      "fonte": {
+        "tipo": "fabricante",
+        "ref": "fichas técnicas de fabricantes de tinta",
+        "nota": "Selador uniformiza a absorção do reboco e reduz o consumo de tinta. Rendimento declarado varia por marca."
+      }
+    },
+    {
+      "id": "massa-corrida-pva",
+      "nome": "Massa corrida PVA (balde 25 kg)",
+      "unid_base": "kg",
+      "unid_venda": "balde 25 kg",
+      "conteudo_venda": 25,
+      "busca_catalogo": "massa corrida",
+      "categoria": "pintura",
+      "cura": "Lixar após ~4 h por demão.",
+      "validade": "Cerca de 12 meses.",
+      "armazenagem": "Balde fechado, local seco. Só interior — em área molhada a massa PVA solta.",
+      "fonte": {
+        "tipo": "fabricante",
+        "ref": "fichas técnicas de fabricantes",
+        "nota": "Massa corrida PVA é de uso interno para nivelar reboco antes da pintura."
+      }
+    },
+    {
+      "id": "massa-acrilica",
+      "nome": "Massa acrílica (balde 25 kg)",
+      "unid_base": "kg",
+      "unid_venda": "balde 25 kg",
+      "conteudo_venda": 25,
+      "busca_catalogo": "massa acrilica",
+      "categoria": "pintura",
+      "cura": "Lixar após ~6 h por demão.",
+      "validade": "Cerca de 12 meses.",
+      "armazenagem": "Balde fechado, local seco.",
+      "fonte": {
+        "tipo": "fabricante",
+        "ref": "fichas técnicas de fabricantes",
+        "nota": "Massa acrílica resiste à umidade; é a indicada para área externa e áreas molhadas."
+      }
+    },
+    {
+      "id": "textura-acrilica",
+      "nome": "Textura acrílica (balde 25 kg)",
+      "unid_base": "kg",
+      "unid_venda": "balde 25 kg",
+      "conteudo_venda": 25,
+      "busca_catalogo": "textura acrilica",
+      "categoria": "pintura",
+      "cura": "Secagem ao toque ~2 h; cura completa em alguns dias.",
+      "validade": "Cerca de 12 meses.",
+      "armazenagem": "Balde fechado, protegido do sol e do frio intenso.",
+      "fonte": {
+        "tipo": "fabricante",
+        "ref": "fichas técnicas de fabricantes",
+        "nota": "Consumo depende muito do efeito e da ferramenta (rolo, desempenadeira, grafiato)."
+      }
+    },
+    {
+      "id": "fundo-preparador",
+      "nome": "Fundo preparador de paredes (lata 18 L)",
+      "unid_base": "L",
+      "unid_venda": "lata 18 L",
+      "conteudo_venda": 18,
+      "busca_catalogo": "fundo preparador",
+      "categoria": "pintura",
+      "cura": "Aguardar cerca de 4 h antes de prosseguir.",
+      "validade": "Cerca de 2 anos.",
+      "armazenagem": "Lata fechada, ao abrigo do sol.",
+      "fonte": {
+        "tipo": "fabricante",
+        "ref": "fichas técnicas de fabricantes",
+        "nota": "Usado em reboco fraco, caiado ou com pó, para dar coesão antes da pintura."
+      }
+    },
+    {
+      "id": "manta-asfaltica",
+      "nome": "Manta asfáltica 3 mm (rolo 10 m²)",
+      "unid_base": "m2",
+      "unid_venda": "rolo 10 m²",
+      "conteudo_venda": 10,
+      "busca_catalogo": "manta asfaltica",
+      "categoria": "construcao",
+      "cura": "Não aplicável. Teste de estanqueidade com lâmina d'água por 72 h antes de cobrir.",
+      "validade": "Cerca de 24 meses.",
+      "armazenagem": "Rolos EM PÉ, nunca deitados — deitado o rolo deforma e não assenta.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 9952",
+        "nota": "Especifica mantas asfálticas para impermeabilização, incluindo espessuras e requisitos."
+      }
+    },
+    {
+      "id": "argamassa-polimerica",
+      "nome": "Argamassa polimérica impermeabilizante (kit 18 kg)",
+      "unid_base": "kg",
+      "unid_venda": "kit 18 kg",
+      "conteudo_venda": 18,
+      "busca_catalogo": "argamassa polimerica impermeabilizante",
+      "categoria": "construcao",
+      "cura": "Intervalo entre demãos 6 a 12 h. Cura completa e teste de estanqueidade após 72 h.",
+      "validade": "Cerca de 12 meses.",
+      "armazenagem": "Seco e fechado. Kit bicomponente: só misturar na hora do uso.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 9575",
+        "nota": "Trata da seleção e projeto de impermeabilização. O consumo por demão é declarado por fabricante."
+      }
+    },
+    {
+      "id": "emulsao-asfaltica",
+      "nome": "Emulsão asfáltica impermeabilizante (balde 18 L)",
+      "unid_base": "L",
+      "unid_venda": "balde 18 L",
+      "conteudo_venda": 18,
+      "busca_catalogo": "emulsao asfaltica",
+      "categoria": "construcao",
+      "cura": "Intervalo entre demãos 4 a 6 h; cura completa em cerca de 72 h.",
+      "validade": "Cerca de 12 meses.",
+      "armazenagem": "Balde fechado, protegido do sol.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 9574",
+        "nota": "Trata da execução de impermeabilização. Consumo por demão é declarado por fabricante."
+      }
+    },
+    {
+      "id": "telha-ceramica-portuguesa",
+      "nome": "Telha cerâmica portuguesa",
+      "unid_base": "un",
+      "unid_venda": "unidade",
+      "conteudo_venda": 1,
+      "busca_catalogo": "telha ceramica portuguesa",
+      "categoria": "construcao",
+      "armazenagem": "Empilhada em pé, apoiada, no máximo 10 peças por pilha.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15310",
+        "nota": "Especifica telhas cerâmicas: requisitos, dimensões e ensaios. O nº de peças por m² é informado pelo fabricante."
+      }
+    },
+    {
+      "id": "telha-ceramica-colonial",
+      "nome": "Telha cerâmica colonial (capa e canal)",
+      "unid_base": "un",
+      "unid_venda": "unidade",
+      "conteudo_venda": 1,
+      "busca_catalogo": "telha colonial",
+      "categoria": "construcao",
+      "armazenagem": "Empilhada em pé, apoiada.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15310",
+        "nota": "Especifica telhas cerâmicas. Colonial usa duas peças (capa e canal), o que dobra a contagem por m²."
+      }
+    },
+    {
+      "id": "telha-fibrocimento-6mm",
+      "nome": "Telha ondulada de fibrocimento 6 mm",
+      "unid_base": "m2",
+      "unid_venda": "m² de telha",
+      "conteudo_venda": 1,
+      "busca_catalogo": "telha fibrocimento",
+      "categoria": "construcao",
+      "armazenagem": "Deitada sobre estrado plano, coberta. Nunca pisar na telha solta.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15210-1",
+        "nota": "Especifica telha ondulada de fibrocimento sem amianto, incluindo dimensões e recobrimentos mínimos."
+      }
+    },
+    {
+      "id": "chapa-drywall-st",
+      "nome": "Chapa de gesso acartonado ST 12,5 mm (1,20 x 1,80 m)",
+      "unid_base": "m2",
+      "unid_venda": "chapa 2,16 m²",
+      "conteudo_venda": 2.16,
+      "busca_catalogo": "chapa drywall",
+      "categoria": "construcao",
+      "armazenagem": "Deitada sobre estrado plano, em local coberto e seco. Chapa em pé empena; chapa molhada não recupera.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 14715-1",
+        "nota": "Especifica chapas de gesso para drywall: tipos (ST, RU, RF), espessuras e dimensões."
+      }
+    },
+    {
+      "id": "montante-48",
+      "nome": "Montante 48 mm (barra 3 m)",
+      "unid_base": "m",
+      "unid_venda": "barra 3 m",
+      "conteudo_venda": 3,
+      "busca_catalogo": "montante drywall 48",
+      "categoria": "construcao",
+      "armazenagem": "Deitado e apoiado em toda a extensão para não entortar.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15217",
+        "nota": "Especifica perfis de aço galvanizado para sistemas de drywall."
+      }
+    },
+    {
+      "id": "guia-48",
+      "nome": "Guia 48 mm (barra 3 m)",
+      "unid_base": "m",
+      "unid_venda": "barra 3 m",
+      "conteudo_venda": 3,
+      "busca_catalogo": "guia drywall 48",
+      "categoria": "construcao",
+      "armazenagem": "Deitado e apoiado.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15217",
+        "nota": "Especifica perfis de aço galvanizado para drywall (guias e montantes)."
+      }
+    },
+    {
+      "id": "parafuso-drywall",
+      "nome": "Parafuso para drywall (caixa 100 un)",
+      "unid_base": "un",
+      "unid_venda": "caixa 100 un",
+      "conteudo_venda": 100,
+      "busca_catalogo": "parafuso drywall",
+      "categoria": "fixacao",
+      "armazenagem": "Seco — parafuso enferrujado mancha a chapa.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15758-1",
+        "nota": "Trata do projeto e execução de sistemas de drywall, incluindo espaçamento de fixação."
+      }
+    },
+    {
+      "id": "fita-papel-drywall",
+      "nome": "Fita de papel microperfurada para juntas (rolo 50 m)",
+      "unid_base": "m",
+      "unid_venda": "rolo 50 m",
+      "conteudo_venda": 50,
+      "busca_catalogo": "fita drywall",
+      "categoria": "construcao",
+      "armazenagem": "Seco.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15758-1",
+        "nota": "Trata do tratamento de juntas em sistemas de drywall."
+      }
+    },
+    {
+      "id": "massa-juntas-drywall",
+      "nome": "Massa para juntas de drywall (saco 20 kg)",
+      "unid_base": "kg",
+      "unid_venda": "saco 20 kg",
+      "conteudo_venda": 20,
+      "busca_catalogo": "massa junta drywall",
+      "categoria": "construcao",
+      "cura": "Três demãos com lixamento; aguardar secagem completa entre elas (4 a 12 h).",
+      "validade": "Cerca de 6 meses.",
+      "armazenagem": "Seco e fechado.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15758-1",
+        "nota": "Trata do tratamento de juntas. O consumo por m² é informado pelo fabricante."
+      }
+    },
+    {
+      "id": "gesso-em-po",
+      "nome": "Gesso em pó para revestimento (saco 40 kg)",
+      "unid_base": "kg",
+      "unid_venda": "saco 40 kg",
+      "conteudo_venda": 40,
+      "busca_catalogo": "gesso",
+      "categoria": "construcao",
+      "cura": "Pega em 15 a 25 min depois de misturado — preparar só o que se aplica na hora.",
+      "validade": "Cerca de 3 meses.",
+      "armazenagem": "Muito sensível à umidade: sobre estrado, em local seco e coberto.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 13207",
+        "nota": "Especifica gesso para construção civil: tipos e requisitos."
+      }
+    },
+    {
+      "id": "tela-soldada-q92",
+      "nome": "Tela soldada Q92 (painel 2,45 x 6,00 m)",
+      "unid_base": "m2",
+      "unid_venda": "painel 14,7 m²",
+      "conteudo_venda": 14.7,
+      "busca_catalogo": "tela soldada",
+      "categoria": "construcao",
+      "armazenagem": "Deitada sobre estrado, protegida de chuva para não oxidar.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 7481",
+        "nota": "Especifica telas de aço soldadas para armadura de concreto e a nomenclatura Q92, Q138 etc."
+      }
+    },
+    {
+      "id": "lona-plastica",
+      "nome": "Lona plástica preta 100 micra (rolo 4 x 50 m)",
+      "unid_base": "m2",
+      "unid_venda": "rolo 200 m²",
+      "conteudo_venda": 200,
+      "busca_catalogo": "lona plastica",
+      "categoria": "construcao",
+      "armazenagem": "Enrolada, longe do sol.",
+      "fonte": {
+        "tipo": "mercado",
+        "ref": "prática corrente de obra",
+        "nota": "Usada como barreira contra umidade sob contrapiso e como proteção na cura do concreto."
+      }
+    },
+    {
+      "id": "cabo-flexivel-1-5",
+      "nome": "Cabo flexível 1,5 mm² 750 V (rolo 100 m)",
+      "unid_base": "m",
+      "unid_venda": "rolo 100 m",
+      "conteudo_venda": 100,
+      "busca_catalogo": "cabo flexivel 1.5",
+      "categoria": "eletrica",
+      "armazenagem": "Seco, longe de fonte de calor.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 5410",
+        "nota": "Fixa 1,5 mm² como seção MÍNIMA para circuitos de iluminação em instalações de baixa tensão. A seção real do circuito depende de carga e percurso e deve ser dimensionada por profissional habilitado."
+      }
+    },
+    {
+      "id": "cabo-flexivel-2-5",
+      "nome": "Cabo flexível 2,5 mm² 750 V (rolo 100 m)",
+      "unid_base": "m",
+      "unid_venda": "rolo 100 m",
+      "conteudo_venda": 100,
+      "busca_catalogo": "cabo flexivel 2.5",
+      "categoria": "eletrica",
+      "armazenagem": "Seco, longe de fonte de calor.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 5410",
+        "nota": "Fixa 2,5 mm² como seção MÍNIMA para circuitos de tomadas de uso geral. A seção real do circuito exige dimensionamento por profissional habilitado."
+      }
+    },
+    {
+      "id": "eletroduto-corrugado-25",
+      "nome": "Eletroduto corrugado flexível 25 mm (rolo 50 m)",
+      "unid_base": "m",
+      "unid_venda": "rolo 50 m",
+      "conteudo_venda": 50,
+      "busca_catalogo": "eletroduto corrugado",
+      "categoria": "eletrica",
+      "armazenagem": "Enrolado, protegido do sol.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 5410",
+        "nota": "Exige condutores em eletroduto embutido e limita a taxa de ocupação do eletroduto."
+      }
+    },
+    {
+      "id": "caixa-luz-4x2",
+      "nome": "Caixa de luz PVC 4x2\"",
+      "unid_base": "un",
+      "unid_venda": "unidade",
+      "conteudo_venda": 1,
+      "busca_catalogo": "caixa de luz 4x2",
+      "categoria": "eletrica",
+      "armazenagem": "Sem exigência especial.",
+      "fonte": {
+        "tipo": "mercado",
+        "ref": "prática corrente de instalação",
+        "nota": "Caixa 4x2\" é o padrão brasileiro para tomadas e interruptores embutidos."
+      }
+    },
+    {
+      "id": "tomada-10a",
+      "nome": "Tomada 2P+T 10 A com placa",
+      "unid_base": "un",
+      "unid_venda": "unidade",
+      "conteudo_venda": 1,
+      "busca_catalogo": "tomada 10a",
+      "categoria": "eletrica",
+      "armazenagem": "Seco.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 14136",
+        "nota": "Define o padrão brasileiro de plugues e tomadas 2P+T de 10 A e 20 A."
+      }
+    },
+    {
+      "id": "interruptor-simples",
+      "nome": "Interruptor simples com placa",
+      "unid_base": "un",
+      "unid_venda": "unidade",
+      "conteudo_venda": 1,
+      "busca_catalogo": "interruptor simples",
+      "categoria": "eletrica",
+      "armazenagem": "Seco.",
+      "fonte": {
+        "tipo": "mercado",
+        "ref": "prática corrente de instalação",
+        "nota": "Item padrão de instalação residencial embutida em caixa 4x2\"."
+      }
+    },
+    {
+      "id": "fita-isolante",
+      "nome": "Fita isolante 19 mm x 20 m",
+      "unid_base": "un",
+      "unid_venda": "rolo",
+      "conteudo_venda": 1,
+      "busca_catalogo": "fita isolante",
+      "categoria": "eletrica",
+      "armazenagem": "Longe do calor — a cola resseca.",
+      "fonte": {
+        "tipo": "mercado",
+        "ref": "prática corrente de instalação",
+        "nota": "Consumível de emendas e isolação em instalação de baixa tensão."
+      }
+    },
+    {
+      "id": "tubo-pvc-soldavel-25",
+      "nome": "Tubo PVC soldável 25 mm (barra 6 m)",
+      "unid_base": "m",
+      "unid_venda": "barra 6 m",
+      "conteudo_venda": 6,
+      "busca_catalogo": "tubo pvc soldavel 25",
+      "categoria": "hidraulica",
+      "armazenagem": "Apoiado em toda a extensão, longe do sol — PVC exposto ao sol fica quebradiço.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 5648",
+        "nota": "Especifica tubos e conexões de PVC-U soldável para água fria predial. Barra de 6 m é o padrão de venda."
+      }
+    },
+    {
+      "id": "tubo-pvc-soldavel-32",
+      "nome": "Tubo PVC soldável 32 mm (barra 6 m)",
+      "unid_base": "m",
+      "unid_venda": "barra 6 m",
+      "conteudo_venda": 6,
+      "busca_catalogo": "tubo pvc soldavel 32",
+      "categoria": "hidraulica",
+      "armazenagem": "Apoiado em toda a extensão, longe do sol.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 5648",
+        "nota": "Especifica tubos e conexões de PVC-U soldável para água fria predial."
+      }
+    },
+    {
+      "id": "tubo-esgoto-40",
+      "nome": "Tubo PVC esgoto 40 mm (barra 6 m)",
+      "unid_base": "m",
+      "unid_venda": "barra 6 m",
+      "conteudo_venda": 6,
+      "busca_catalogo": "tubo esgoto 40",
+      "categoria": "hidraulica",
+      "armazenagem": "Apoiado, longe do sol.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 5688",
+        "nota": "Especifica tubos e conexões de PVC para esgoto predial e ventilação."
+      }
+    },
+    {
+      "id": "tubo-esgoto-100",
+      "nome": "Tubo PVC esgoto 100 mm (barra 6 m)",
+      "unid_base": "m",
+      "unid_venda": "barra 6 m",
+      "conteudo_venda": 6,
+      "busca_catalogo": "tubo esgoto 100",
+      "categoria": "hidraulica",
+      "armazenagem": "Apoiado, longe do sol.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 5688",
+        "nota": "Especifica tubos e conexões de PVC para esgoto predial. 100 mm é o diâmetro usual do ramal de vaso sanitário."
+      }
+    },
+    {
+      "id": "adesivo-pvc",
+      "nome": "Adesivo plástico para PVC (bisnaga 175 g)",
+      "unid_base": "g",
+      "unid_venda": "bisnaga 175 g",
+      "conteudo_venda": 175,
+      "busca_catalogo": "adesivo pvc",
+      "categoria": "hidraulica",
+      "cura": "Aguardar no mínimo 12 h antes de pressurizar a tubulação.",
+      "validade": "Cerca de 24 meses com a bisnaga fechada.",
+      "armazenagem": "Fechado, longe de calor e chama — é inflamável.",
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 5648",
+        "nota": "A junta soldável de PVC depende de lixamento, limpeza e adesivo específico."
+      }
+    },
+    {
+      "id": "fita-veda-rosca",
+      "nome": "Fita veda-rosca 18 mm x 25 m",
+      "unid_base": "un",
+      "unid_venda": "rolo",
+      "conteudo_venda": 1,
+      "busca_catalogo": "fita veda rosca",
+      "categoria": "hidraulica",
+      "armazenagem": "Sem exigência especial.",
+      "fonte": {
+        "tipo": "mercado",
+        "ref": "prática corrente de instalação",
+        "nota": "Vedação de conexões roscáveis. Não substitui adesivo em junta soldável."
+      }
+    },
+    {
+      "id": "impermeabilizante-argamassa",
+      "nome": "Aditivo impermeabilizante para argamassa (galão 3,6 L)",
+      "unid_base": "L",
+      "unid_venda": "galão 3,6 L",
+      "conteudo_venda": 3.6,
+      "busca_catalogo": "impermeabilizante argamassa",
+      "categoria": "construcao",
+      "validade": "Cerca de 24 meses.",
+      "armazenagem": "Fechado, ao abrigo do sol.",
+      "fonte": {
+        "tipo": "fabricante",
+        "ref": "fichas técnicas de fabricantes",
+        "nota": "Aditivo de pega para argamassa de contrapiso e baldrame. Dosagem declarada pelo fabricante."
+      }
+    },
+    {
+      "id": "arame-recozido",
+      "nome": "Arame recozido nº 18 (kg)",
+      "unid_base": "kg",
+      "unid_venda": "kg",
+      "conteudo_venda": 1,
+      "busca_catalogo": "arame recozido",
+      "categoria": "fixacao",
+      "armazenagem": "Seco, para não oxidar.",
+      "fonte": {
+        "tipo": "mercado",
+        "ref": "prática corrente de obra",
+        "nota": "Amarração de armadura e de tela soldada."
+      }
+    },
+    {
+      "id": "prego-com-cabeca",
+      "nome": "Prego com cabeça (kg)",
+      "unid_base": "kg",
+      "unid_venda": "kg",
+      "conteudo_venda": 1,
+      "busca_catalogo": "prego",
+      "categoria": "fixacao",
+      "armazenagem": "Seco.",
+      "fonte": {
+        "tipo": "mercado",
+        "ref": "prática corrente de obra",
+        "nota": "Fôrma de madeira e fixações provisórias. Vendido a granel por quilo."
+      }
+    },
+    {
+      "id": "tabua-pinus",
+      "nome": "Tábua de pinus para fôrma (metro linear)",
+      "unid_base": "m",
+      "unid_venda": "metro linear",
+      "conteudo_venda": 1,
+      "busca_catalogo": "tabua pinus",
+      "categoria": "construcao",
+      "armazenagem": "Empilhada e apoiada, ao abrigo da chuva.",
+      "fonte": {
+        "tipo": "mercado",
+        "ref": "prática corrente de obra",
+        "nota": "Fôrma lateral de calçada e contrapiso. Reutilizável se desmoldada com cuidado."
+      }
+    }
+  ]
+}

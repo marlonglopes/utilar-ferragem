@@ -9,15 +9,57 @@ import (
 
 // Claims é o payload do JWT — compartilhado entre auth-service (emite),
 // payment-service e order-service (consomem via mesmo JWT_SECRET).
+//
+// PDV DE BALCÃO — o que entrou no token e o que NÃO entrou:
+//
+//	store_id    ENTROU. É escopo, não dinheiro: todo request do balcão precisa
+//	            saber de qual loja o operador é, e buscar isso por HTTP em toda
+//	            requisição custaria um round-trip por venda. Um store_id velho
+//	            (operador transferido de filial há menos de 15min, o TTL do
+//	            access token) só permite vender na loja antiga — evento raro,
+//	            reversível e que fica na trilha de auditoria.
+//
+//	store_level ENTROU. Mesma justificativa: é rótulo de cargo, e o serviço
+//	            consumidor usa apenas para decidir SUPERFÍCIE (quem vê a fila de
+//	            aprovação), nunca VALOR.
+//
+//	teto de desconto NÃO ENTROU. Esse número é dinheiro saindo do caixa. Num
+//	            token de 15min, rebaixar um vendedor que estava dando 20% levaria
+//	            até 15 minutos para valer — e nesses 15 minutos ele continuaria
+//	            aprovando sozinho descontos que já não pode dar. O order-service
+//	            resolve o teto no momento da decisão, consultando o auth-service
+//	            (internal/authclient), exatamente como já faz com preço no
+//	            catalog-service: valor autoritativo nunca vem do cliente nem de
+//	            cache de 15 minutos.
+//
+// Claims omitempty: tokens de cliente comum continuam do mesmo tamanho de antes.
 type Claims struct {
 	UserID string `json:"sub"`
 	Email  string `json:"email"`
 	Role   string `json:"role"`
+	// StoreID/StoreLevel só são emitidos para role=store_operator.
+	StoreID    string `json:"store_id,omitempty"`
+	StoreLevel string `json:"store_level,omitempty"`
 	jwt.RegisteredClaims
 }
 
-// GenerateAccessToken emite um JWT HS256 de curta duração.
+// StoreContext são as claims extras de um operador de balcão. nil para
+// qualquer outro papel.
+type StoreContext struct {
+	StoreID string
+	Level   string
+}
+
+// GenerateAccessToken emite um JWT HS256 de curta duração para usuário comum.
+// Mantida com a assinatura original — os call sites de cliente/admin não
+// precisam saber que balcão existe.
 func GenerateAccessToken(userID, email, role, secret string, ttl time.Duration) (string, error) {
+	return GenerateAccessTokenWithStore(userID, email, role, secret, ttl, nil)
+}
+
+// GenerateAccessTokenWithStore emite o token incluindo o contexto de loja
+// quando o usuário é operador de balcão.
+func GenerateAccessTokenWithStore(userID, email, role, secret string, ttl time.Duration, store *StoreContext) (string, error) {
 	claims := Claims{
 		UserID: userID,
 		Email:  email,
@@ -27,6 +69,10 @@ func GenerateAccessToken(userID, email, role, secret string, ttl time.Duration) 
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "utilar-auth",
 		},
+	}
+	if store != nil {
+		claims.StoreID = store.StoreID
+		claims.StoreLevel = store.Level
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return t.SignedString([]byte(secret))

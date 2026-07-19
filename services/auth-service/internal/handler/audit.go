@@ -13,13 +13,13 @@ import (
 type AuthEventType string
 
 const (
-	EventRegister                AuthEventType = "register"
-	EventLoginSuccess            AuthEventType = "login_success"
-	EventLoginFailure            AuthEventType = "login_failure"
-	EventLogout                  AuthEventType = "logout"
-	EventPasswordResetRequested  AuthEventType = "password_reset_requested"
-	EventPasswordChanged         AuthEventType = "password_changed"
-	EventEmailVerified           AuthEventType = "email_verified"
+	EventRegister               AuthEventType = "register"
+	EventLoginSuccess           AuthEventType = "login_success"
+	EventLoginFailure           AuthEventType = "login_failure"
+	EventLogout                 AuthEventType = "logout"
+	EventPasswordResetRequested AuthEventType = "password_reset_requested"
+	EventPasswordChanged        AuthEventType = "password_changed"
+	EventEmailVerified          AuthEventType = "email_verified"
 )
 
 // logAuthEvent insere uma linha em auth_events. Falla aberto: erros viram
@@ -29,11 +29,15 @@ const (
 // userID pode ser vazio (ex: login_failure pra email não cadastrado).
 // metadata é opcional; se nil, vai NULL.
 func logAuthEvent(ctx context.Context, db *sql.DB, c *gin.Context, eventType AuthEventType, userID string, metadata map[string]any) {
-	var metaJSON []byte
+	// STRING, não []byte: lib/pq serializa []byte como bytea em hexadecimal e o
+	// Postgres recusa isso na coluna jsonb ("invalid input syntax for type
+	// json"). Como esta função falha aberto, o sintoma era silencioso — os
+	// eventos COM metadata (login_failure, que é justamente o que se olha num
+	// incidente) sumiam com um warn no log.
+	var metaJSON any
 	if metadata != nil {
-		b, err := json.Marshal(metadata)
-		if err == nil {
-			metaJSON = b
+		if b, err := json.Marshal(metadata); err == nil {
+			metaJSON = string(b)
 		}
 	}
 

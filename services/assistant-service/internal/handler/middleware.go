@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/utilar/pkg/servicetoken"
 )
 
 // MaxRequestBytes — teto do body cru do /chat, antes de qualquer parse.
@@ -80,12 +81,60 @@ func OptionalAuth(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
 		if jwtSecret != "" && strings.HasPrefix(auth, "Bearer ") {
-			if sub, err := parseSubject(strings.TrimPrefix(auth, "Bearer "), jwtSecret); err == nil {
+			if sub, papel, loja, err := parseClaims(strings.TrimPrefix(auth, "Bearer "), jwtSecret); err == nil {
+				// A1 (auditoria 2026-07-18): `role=service` é identidade de
+				// máquina e vive noutro segredo (SERVICE_JWT_SECRET), que a Alice
+				// deliberadamente NÃO recebe — ela é o serviço mais exposto do
+				// conjunto e não precisa emitir nem consumir token de serviço.
+				// Um token com essa claim chegando aqui vira anônimo, nunca um
+				// papel privilegiado.
+				if papel == servicetoken.Role {
+					c.Next()
+					return
+				}
 				c.Set("user_id", sub)
+				// user_role decide o MODO da Alice (cliente vs. balcão) e, com
+				// ele, se custo e margem podem ser vistos. Por isso só é setado
+				// aqui, depois da verificação de assinatura — nunca a partir de
+				// header, query ou corpo, que são entrada do usuário.
+				c.Set("user_role", papel)
+				c.Set("store_id", loja)
 			}
 		}
 		c.Next()
 	}
+}
+
+// parseClaims valida o JWT HS256 e extrai `sub`, `role` e `store_id`.
+//
+// O lock estrito no algoritmo importa ainda mais agora: com o modo vendedor, um
+// token forjado não daria só cota folgada de rate limit — daria acesso ao custo
+// e à margem. Aceitar `alg: none` ou confundir HS256 com RS256 aqui seria
+// entregar a estrutura de custo da loja para qualquer um.
+func parseClaims(tokenStr, secret string) (sub, papel, loja string, err error) {
+	token, e := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
+		if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(secret), nil
+	})
+	if e != nil {
+		return "", "", "", e
+	}
+	if !token.Valid {
+		return "", "", "", errors.New("invalid token")
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", "", "", errors.New("invalid claims")
+	}
+	sub, _ = claims["sub"].(string)
+	if sub == "" {
+		return "", "", "", errors.New("missing sub claim")
+	}
+	papel, _ = claims["role"].(string)
+	loja, _ = claims["store_id"].(string)
+	return sub, papel, loja, nil
 }
 
 // parseSubject valida o JWT HS256 e extrai `sub`. Lock estrito no algoritmo

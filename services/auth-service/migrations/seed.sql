@@ -69,10 +69,55 @@ FROM users u
 WHERE u.email IN ('test1@utilar.com.br','test3@utilar.com.br','test5@utilar.com.br','test7@utilar.com.br','test9@utilar.com.br',
                   'test11@utilar.com.br','test13@utilar.com.br','test15@utilar.com.br','seller1@utilar.com.br','seller2@utilar.com.br');
 
+-- ---------------------------------------------------------------------------
+-- PDV de balcão — 2 lojas e 3 operadores (um de cada cargo)
+-- ---------------------------------------------------------------------------
+-- Dois cargos na MESMA loja e um numa filial diferente: é o mínimo para
+-- exercitar as três regras de autorização em dev (própria loja, loja alheia,
+-- e o gerente que aprova o desconto de outro).
+--
+-- Senha de todos: utilar123 (mesma dos demais usuários de teste).
+INSERT INTO stores (id, code, name, cnpj, street, number, neighborhood, city, state, cep, phone) VALUES
+    ('aaaaaaaa-0000-4000-8000-000000000001', 'MATRIZ',  'Utilar Ferragem - Matriz',  '11222333000181',
+     'Rua da Ferramenta', '100', 'Brás',   'São Paulo', 'SP', '03007000', '1133334444'),
+    ('aaaaaaaa-0000-4000-8000-000000000002', 'FIL-002', 'Utilar Ferragem - Santo André', '11444777000161',
+     'Av. Industrial',    '2200', 'Centro', 'Santo André', 'SP', '09080500', '1144445555')
+ON CONFLICT (code) DO NOTHING;
+
+-- Promove 3 usuários de teste a operadores de balcão.
+--   test14 → operador na matriz     (teto 12%)
+--   test15 → supervisor na matriz   (teto 20%)
+--   test16 → gerente na matriz      (teto 100%, aprova desconto dos outros)
+--   test17 → operador na filial     (para testar bloqueio entre lojas)
+UPDATE users SET role = 'store_operator'
+WHERE email IN ('test14@utilar.com.br','test15@utilar.com.br','test16@utilar.com.br','test17@utilar.com.br');
+
+INSERT INTO store_operators (user_id, store_id, level)
+SELECT u.id,
+       CASE WHEN u.email = 'test17@utilar.com.br'
+            THEN 'aaaaaaaa-0000-4000-8000-000000000002'::uuid
+            ELSE 'aaaaaaaa-0000-4000-8000-000000000001'::uuid END,
+       CASE u.email
+            WHEN 'test15@utilar.com.br' THEN 'supervisor'
+            WHEN 'test16@utilar.com.br' THEN 'manager'
+            ELSE 'operator' END::store_operator_level
+FROM users u
+WHERE u.email IN ('test14@utilar.com.br','test15@utilar.com.br','test16@utilar.com.br','test17@utilar.com.br')
+ON CONFLICT (user_id) DO NOTHING;
+
+-- Um cliente de balcão já cadastrado, para o lookup por documento ter o que achar.
+INSERT INTO store_customers (document, document_type, name, phone, segment, created_store_id)
+VALUES ('52998224725', 'cpf', 'Construtora Exemplo ME', '11987654321', 'construtora',
+        'aaaaaaaa-0000-4000-8000-000000000001')
+ON CONFLICT (document) DO NOTHING;
+
 COMMIT;
 
 SELECT 'users'                     AS table_name, count(*) AS rows FROM users
 UNION ALL SELECT 'addresses',       count(*) FROM addresses
 UNION ALL SELECT 'refresh_tokens',  count(*) FROM refresh_tokens
 UNION ALL SELECT 'email_verification_tokens', count(*) FROM email_verification_tokens
-UNION ALL SELECT 'password_reset_tokens',     count(*) FROM password_reset_tokens;
+UNION ALL SELECT 'password_reset_tokens',     count(*) FROM password_reset_tokens
+UNION ALL SELECT 'stores',           count(*) FROM stores
+UNION ALL SELECT 'store_operators',  count(*) FROM store_operators
+UNION ALL SELECT 'store_customers',  count(*) FROM store_customers;

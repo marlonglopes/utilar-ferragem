@@ -218,12 +218,23 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 			"request_id", c.GetString("request_id"))
 		h.db.Exec(`UPDATE payments SET status='failed', updated_at=now() WHERE id=$1`, paymentID)
 
-		// Mapeia erro normalizado do PSP para HTTP
+		// SEGURANÇA (audit AV1-H5) — NUNCA devolver pspErr.Error() ao cliente.
+		//
+		// Era `BadRequest(c, pspErr.Error())`. Os gateways embutem até 2KB do
+		// CORPO CRU do PSP na mensagem de erro (appmaxv1.httpError), e
+		// `ErrInvalidRequest` cobre 400/401/403/409/422. Consequências reais:
+		//   * um 401 (credencial NOSSA errada/expirada) devolvia o corpo de auth
+		//     da Appmax pro comprador — e virava 400, mandando o cliente
+		//     "corrigir" um problema que é de infra;
+		//   * um 422 de validação devolvia o payload ecoado pelo PSP, que inclui
+		//     CPF, nome, telefone e às vezes bin/last4 — PII de terceiro num
+		//     response body que o front loga e o Sentry indexa.
+		//
+		// O erro completo continua no log acima, correlacionado por request_id:
+		// suporte tem tudo, cliente não recebe nada que não seja dele.
 		switch {
 		case errors.Is(pspErr, psp.ErrInvalidRequest):
-			BadRequest(c, pspErr.Error())
-		case errors.Is(pspErr, psp.ErrUpstream):
-			BadGateway(c, "payment gateway error")
+			BadRequest(c, clientSafePSPMessage(pspErr))
 		default:
 			BadGateway(c, "payment gateway error")
 		}
@@ -244,7 +255,7 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		"provider":     h.gateway.Name(),
 		"psp_id":       result.PSPID,
 		"clientSecret": result.ClientSecret, // Stripe: frontend usa pra stripe.confirmPayment
-		"psp_payload":  result.ClientData,    // MP: QR/barcode/init_point; Stripe: PaymentIntent
+		"psp_payload":  result.ClientData,   // MP: QR/barcode/init_point; Stripe: PaymentIntent
 	})
 }
 

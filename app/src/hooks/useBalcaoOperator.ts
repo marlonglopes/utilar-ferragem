@@ -81,10 +81,16 @@ export function useBalcaoOperator(): UseBalcaoOperatorResult {
     queryFn: async () => toOperator(await authGet<StoreMeResponse>('/api/v1/store/me', token!)),
   })
 
+  // `operator.userId === ''` é o FAIL_CLOSED_OPERATOR intocado — ninguém
+  // resolveu o contexto ainda.
+  const unresolved = operator.userId === ''
+
   useEffect(() => {
     if (!enabled) {
       // Modo mock/demonstração: contexto plausível para o PDV rodar sem backend.
-      setOperator(MOCK_OPERATOR)
+      // Semeia UMA vez: sobrescrever a cada render descartaria um contexto que
+      // alguém já tenha definido (demonstração de outro cargo, teste).
+      if (unresolved) setOperator(MOCK_OPERATOR)
       return
     }
     if (query.data) {
@@ -94,7 +100,7 @@ export function useBalcaoOperator(): UseBalcaoOperatorResult {
     if (query.isError) {
       setOperator(null) // fail-closed: teto 0
     }
-  }, [enabled, query.data, query.isError, setOperator])
+  }, [enabled, unresolved, query.data, query.isError, setOperator])
 
   const rawMessage = query.error instanceof Error ? query.error.message : ''
   // `authGet` normaliza 404 para 'not_found'; 403 chega com a mensagem do

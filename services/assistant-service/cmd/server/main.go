@@ -15,11 +15,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/utilar/assistant-service/internal/alice"
 	"github.com/utilar/assistant-service/internal/catalog"
 	"github.com/utilar/assistant-service/internal/config"
 	"github.com/utilar/assistant-service/internal/handler"
-	"github.com/utilar/assistant-service/internal/alice"
+	"github.com/utilar/assistant-service/internal/knowledge"
 	"github.com/utilar/assistant-service/internal/llm"
+	"github.com/utilar/assistant-service/internal/orders"
 	"github.com/utilar/pkg/ratelimit"
 )
 
@@ -47,7 +49,35 @@ func main() {
 		slog.Warn("alice: ANTHROPIC_API_KEY ausente — MODO MOCK (regras + busca real)")
 	}
 
-	engine := alice.New(model, catalog.New(cfg.CatalogServiceURL))
+	// BASE DE CONHECIMENTO — validada no BOOT.
+	//
+	// Falha aqui DERRUBA o serviço, de propósito. Um coeficiente sem fonte, uma
+	// faixa invertida ou um material órfão significam que a Alice daria número
+	// errado de material — e número errado de material faz o cliente comprar
+	// cimento a menos (obra parada) ou a mais (dinheiro perdido). Subir com a
+	// base quebrada e descobrir em produção é o pior dos mundos.
+	kb, err := knowledge.Load()
+	if err != nil {
+		slog.Error("base de conhecimento inválida — o serviço NÃO sobe", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("base de conhecimento carregada", "servicos", len(kb.Servicos()))
+
+	// Cliente interno do catálogo (custo, margem, estoque por loja) só existe
+	// com token de serviço. Sem ele o balcão roda sem custo — e a Alice diz que
+	// não tem o custo, em vez de inventar um.
+	var catInterno *catalog.Client
+	if cfg.ServiceToken != "" {
+		catInterno = catalog.NewInterno(cfg.CatalogServiceURL, cfg.ServiceToken)
+		slog.Info("modo balcão: catálogo interno habilitado (custo e margem)")
+	} else {
+		slog.Warn("SERVICE_TOKEN ausente — modo balcão roda SEM custo/margem")
+	}
+
+	engine := alice.New(model, catalog.New(cfg.CatalogServiceURL), kb, alice.Opts{
+		CatalogoInterno: catInterno,
+		Pedidos:         orders.New(cfg.OrderServiceURL, cfg.ServiceToken),
+	})
 	chatH := handler.NewChatHandler(engine)
 
 	// Rate limit por IP/usuário via Redis (mesmo padrão e mesmo fail-open do

@@ -9,17 +9,22 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/utilar/pkg/servicetoken"
 )
 
 // ============================================================================
 // Reserva de estoque no catalog-service
 // ----------------------------------------------------------------------------
 // As rotas /api/v1/internal/reservations exigem role=service ou role=admin.
-// Como os serviços já compartilham o JWT_SECRET (auth-service emite, todos
-// validam), o order-service assina o próprio token de serviço em vez de
-// carregar mais um segredo. Token de vida curta (2min) — só precisa sobreviver
-// à chamada HTTP; se vazar num log, expira antes de ser útil.
+//
+// A1 (auditoria 2026-07-18): o token de serviço é assinado com o
+// SERVICE_JWT_SECRET, NÃO com o JWT_SECRET de usuário. Antes era o mesmo
+// segredo, e isso significava que todo processo capaz de verificar token de
+// usuário — inclusive o assistant-service, público e alimentado por texto livre
+// de visitante — também era capaz de EMITIR `role=service` e `role=admin`.
+// Agora o poder de emitir identidade de serviço está só em quem precisa dele.
+// Vida curta (2min) mantida: o token só precisa sobreviver à chamada HTTP; se
+// vazar num log, expira antes de ser útil. Ver pkg/servicetoken.
 // ============================================================================
 
 // ErrInsufficientStock — algum item do pedido não tem saldo. Carrega o detalhe
@@ -54,19 +59,13 @@ type ReservationItem struct {
 	Quantity  int    `json:"quantity"`
 }
 
-// serviceToken assina um JWT HS256 com role=service válido por 2 minutos.
+// serviceToken assina um JWT HS256 com role=service válido por 2 minutos,
+// usando o segredo de SERVIÇO (ver pkg/servicetoken).
 func (c *Client) serviceToken() (string, error) {
-	if c.jwtSecret == "" {
-		return "", errors.New("catalogclient: JWT secret not configured for service calls")
+	if c.serviceSecret == "" {
+		return "", errors.New("catalogclient: SERVICE_JWT_SECRET not configured for service calls")
 	}
-	now := time.Now()
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":  "order-service",
-		"role": "service",
-		"iat":  now.Unix(),
-		"exp":  now.Add(2 * time.Minute).Unix(),
-	})
-	return tok.SignedString([]byte(c.jwtSecret))
+	return servicetoken.Issue(c.serviceSecret, "order-service")
 }
 
 // Reserve reserva os itens de um pedido. All-or-nothing do lado do catalog.

@@ -214,8 +214,8 @@ func TestOrders_CreateAndCancel(t *testing.T) {
 		t.Fatalf("create status = %d body=%s", w.Code, w.Body.String())
 	}
 	var created struct {
-		ID     string `json:"id"`
-		Status string `json:"status"`
+		ID     string  `json:"id"`
+		Status string  `json:"status"`
 		Total  float64 `json:"total"`
 	}
 	json.Unmarshal(w.Body.Bytes(), &created)
@@ -263,7 +263,7 @@ func TestOrders_Create_BadRequest(t *testing.T) {
 	w := do(r, http.MethodPost, "/api/v1/orders", testUserID, map[string]any{
 		"paymentMethod": "pix",
 		"items":         []any{},
-		"address": map[string]any{"street": "X", "number": "1", "neighborhood": "N", "city": "C", "state": "SP", "cep": "00000-000"},
+		"address":       map[string]any{"street": "X", "number": "1", "neighborhood": "N", "city": "C", "state": "SP", "cep": "00000-000"},
 	})
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("status = %d want 400", w.Code)

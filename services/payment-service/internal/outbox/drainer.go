@@ -9,10 +9,33 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
+// Metrics é a fatia de instrumentação que o drainer usa (opcional).
+type Metrics interface {
+	OutboxPublished(eventType, outcome string)
+}
+
 type Drainer struct {
-	db     *sql.DB
-	kafka  *kgo.Client
-	ticker *time.Ticker
+	db      *sql.DB
+	kafka   *kgo.Client
+	ticker  *time.Ticker
+	metrics Metrics
+}
+
+// WithMetrics liga a instrumentação. Nil-safe: sem métricas o drainer roda igual.
+//
+// NOTA: a métrica que detecta "outbox PARADO" NÃO é esta — é o gauge de idade
+// do evento mais antigo não publicado, alimentado por um poller independente
+// (internal/obs.StartDBPolling). Contador incrementado aqui dentro fica
+// congelado justamente quando o drainer morre, que é quando se precisa dele.
+func (d *Drainer) WithMetrics(m Metrics) *Drainer {
+	d.metrics = m
+	return d
+}
+
+func (d *Drainer) mark(eventType, outcome string) {
+	if d.metrics != nil {
+		d.metrics.OutboxPublished(eventType, outcome)
+	}
 }
 
 func NewDrainer(db *sql.DB, brokers []string) (*Drainer, error) {
@@ -93,12 +116,14 @@ func (d *Drainer) drain(ctx context.Context) {
 				SET attempts = attempts + 1, next_attempt_at = now() + $1
 				WHERE id = $2
 			`, next, r.id)
+			d.mark(r.eventType, "failed")
 			continue
 		}
 
 		d.db.ExecContext(ctx, `
 			UPDATE payments_outbox SET published_at = now() WHERE id = $1
 		`, r.id)
+		d.mark(r.eventType, "published")
 		slog.Info("outbox: published", "event", r.eventType, "id", r.id)
 	}
 }

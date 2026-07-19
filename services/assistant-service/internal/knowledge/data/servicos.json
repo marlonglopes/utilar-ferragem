@@ -1,0 +1,1396 @@
+{
+  "_leia_me": [
+    "Serviços de obra que a Alice sabe explicar e orçar.",
+    "",
+    "TODO coeficiente é uma FAIXA (min–max) com fonte. Não existe consumo exato em obra:",
+    "junta, prumo, destreza do pedreiro e perda variam. Publicar um número único seria",
+    "falsa precisão. Mid() é o que vai pro orçamento; a faixa aparece na memória de cálculo.",
+    "",
+    "fonte.tipo:",
+    "  norma      — a NBR/NR citada cobre DIRETAMENTE o que se afirma",
+    "  geometrico — derivado das dimensões nominais (fixadas em norma) + junta/recobrimento",
+    "  fabricante — faixa declarada em ficha técnica; costuma ser otimista, por isso é faixa",
+    "  mercado    — consumo típico de obra, sem respaldo normativo (rótulo honesto do traço)",
+    "",
+    "riscos: estrutural/eletrico/gas disparam encaminhamento OBRIGATÓRIO a profissional",
+    "(ver internal/safety). altura/quimico disparam aviso de EPI e risco.",
+    "",
+    "Para adicionar um serviço novo, veja docs/alice-conhecimento.md."
+  ],
+  "servicos": [
+    {
+      "id": "alvenaria",
+      "nome": "Levantar parede ou muro (alvenaria de vedação)",
+      "aliases": ["parede", "muro", "levantar parede", "levantar muro", "erguer parede", "assentar bloco", "assentar tijolo", "alvenaria de vedacao"],
+      "oque": "Erguer uma parede assentando blocos ou tijolos com argamassa, fiada por fiada, no prumo e no nível.",
+      "quando_usar": "Fechar um vão, dividir um ambiente, fechar um terreno com muro. Vale para parede de VEDAÇÃO, que só se sustenta e fecha o espaço — não para parede que recebe carga da estrutura.",
+      "base": "m2",
+      "calculadora": "linear",
+      "variantes": [
+        { "id": "bloco-concreto-14", "nome": "Bloco de concreto 14x19x39 cm", "comprimento": 0.39, "altura": 0.19, "junta": 0.01, "padrao": true },
+        { "id": "bloco-concreto-9", "nome": "Bloco de concreto 9x19x39 cm", "comprimento": 0.39, "altura": 0.19, "junta": 0.01 },
+        { "id": "bloco-ceramico-9", "nome": "Bloco cerâmico 9x19x39 cm", "comprimento": 0.39, "altura": 0.19, "junta": 0.01 },
+        { "id": "tijolo-baiano", "nome": "Tijolo baiano 9x19x19 cm", "comprimento": 0.19, "altura": 0.19, "junta": 0.01 },
+        { "id": "tijolo-macico", "nome": "Tijolo maciço 5x10x20 cm", "comprimento": 0.20, "altura": 0.05, "junta": 0.01 }
+      ],
+      "consumos": [
+        {
+          "material_id": "bloco-concreto-14",
+          "variante": "bloco-concreto-14",
+          "coef": { "min": 12.3, "max": 12.7, "unid": "bloco/m2", "perda": 0.05,
+            "motivo": "A faixa vem da junta: com 8 mm dá 12,7 blocos/m²; com 12 mm dá 12,3.",
+            "fonte": { "tipo": "geometrico", "ref": "dimensões nominais da ABNT NBR 6136 + junta de 8 a 12 mm", "nota": "A norma fixa as dimensões do bloco (39x19 cm de face); o número por m² é o inverso da área do módulo bloco+junta. A norma não publica consumo." } }
+        },
+        {
+          "material_id": "cimento-cp2",
+          "variante": "bloco-concreto-14",
+          "coef": { "min": 1.5, "max": 1.9, "unid": "kg/m2", "perda": 0.10,
+            "motivo": "Depende da espessura real da junta e de quanta massa cai no chão.",
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 (cimento:cal:areia) sobre 0,010 m³/m² de argamassa de assentamento", "nota": "O volume de argamassa (~0,010 m³/m² para bloco de 14 cm) sai da geometria das juntas; o consumo de cimento por m³ de argamassa 1:2:8 (145 a 180 kg) é valor típico de obra, não normativo." } }
+        },
+        {
+          "material_id": "cal-hidratada",
+          "variante": "bloco-concreto-14",
+          "coef": { "min": 0.9, "max": 1.4, "unid": "kg/m2", "perda": 0.10,
+            "motivo": "Faixa do traço 1:2:8; parte das obras usa argamassa sem cal e compensa com aditivo.",
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,010 m³/m² de argamassa", "nota": "A cal dá plasticidade e retenção de água à argamassa. Consumo típico de obra." } }
+        },
+        {
+          "material_id": "areia-media",
+          "variante": "bloco-concreto-14",
+          "coef": { "min": 0.010, "max": 0.012, "unid": "m3/m2", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,010 m³/m² de argamassa", "nota": "No traço 1:2:8 a areia é praticamente o volume da argamassa produzida (1,0 a 1,1 m³ de areia por m³ de argamassa)." } }
+        },
+
+        {
+          "material_id": "bloco-concreto-9",
+          "variante": "bloco-concreto-9",
+          "coef": { "min": 12.3, "max": 12.7, "unid": "bloco/m2", "perda": 0.05,
+            "motivo": "Mesma face do bloco de 14 cm (39x19); só muda a espessura da parede.",
+            "fonte": { "tipo": "geometrico", "ref": "dimensões nominais da ABNT NBR 6136 + junta de 8 a 12 mm", "nota": "A norma fixa a face de 39x19 cm; o número por m² é o inverso da área do módulo." } }
+        },
+        {
+          "material_id": "cimento-cp2",
+          "variante": "bloco-concreto-9",
+          "coef": { "min": 1.0, "max": 1.2, "unid": "kg/m2", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,0066 m³/m² de argamassa", "nota": "O volume de argamassa cai na proporção da espessura da parede (9 cm em vez de 14 cm)." } }
+        },
+        {
+          "material_id": "cal-hidratada",
+          "variante": "bloco-concreto-9",
+          "coef": { "min": 0.6, "max": 0.9, "unid": "kg/m2", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,0066 m³/m² de argamassa", "nota": "Consumo típico de obra." } }
+        },
+        {
+          "material_id": "areia-media",
+          "variante": "bloco-concreto-9",
+          "coef": { "min": 0.006, "max": 0.008, "unid": "m3/m2", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,0066 m³/m² de argamassa", "nota": "Consumo típico de obra." } }
+        },
+
+        {
+          "material_id": "bloco-ceramico-9x19x39",
+          "variante": "bloco-ceramico-9",
+          "coef": { "min": 12.3, "max": 12.7, "unid": "bloco/m2", "perda": 0.08,
+            "motivo": "Perda maior que a do bloco de concreto: o cerâmico trinca mais no transporte e no corte.",
+            "fonte": { "tipo": "geometrico", "ref": "dimensões nominais da ABNT NBR 15270-1 + junta de 8 a 12 mm", "nota": "A norma fixa as dimensões do bloco cerâmico; o número por m² é o inverso da área do módulo bloco+junta." } }
+        },
+        {
+          "material_id": "cimento-cp2",
+          "variante": "bloco-ceramico-9",
+          "coef": { "min": 1.0, "max": 1.2, "unid": "kg/m2", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,0066 m³/m² de argamassa", "nota": "Consumo típico de obra para parede de 9 cm." } }
+        },
+        {
+          "material_id": "cal-hidratada",
+          "variante": "bloco-ceramico-9",
+          "coef": { "min": 0.6, "max": 0.9, "unid": "kg/m2", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,0066 m³/m² de argamassa", "nota": "A cal dá plasticidade e retenção de água — importante com bloco cerâmico, que suga água da argamassa." } }
+        },
+        {
+          "material_id": "areia-media",
+          "variante": "bloco-ceramico-9",
+          "coef": { "min": 0.006, "max": 0.008, "unid": "m3/m2", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,0066 m³/m² de argamassa", "nota": "Consumo típico de obra." } }
+        },
+
+        {
+          "material_id": "tijolo-baiano-9x19x19",
+          "variante": "tijolo-baiano",
+          "coef": { "min": 24.6, "max": 25.5, "unid": "tijolo/m2", "perda": 0.08,
+            "motivo": "A faixa vem da junta: 8 mm dá 25,5/m²; 12 mm dá 24,6.",
+            "fonte": { "tipo": "geometrico", "ref": "dimensões nominais da ABNT NBR 15270-1 + junta de 8 a 12 mm", "nota": "Face de 19x19 cm; o número por m² é o inverso da área do módulo tijolo+junta." } }
+        },
+        {
+          "material_id": "cimento-cp2",
+          "variante": "tijolo-baiano",
+          "coef": { "min": 1.2, "max": 1.6, "unid": "kg/m2", "perda": 0.10,
+            "motivo": "Peça menor significa mais junta por m², logo mais argamassa que o bloco de 39 cm.",
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,0086 m³/m² de argamassa", "nota": "Consumo típico de obra." } }
+        },
+        {
+          "material_id": "cal-hidratada",
+          "variante": "tijolo-baiano",
+          "coef": { "min": 0.8, "max": 1.1, "unid": "kg/m2", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,0086 m³/m² de argamassa", "nota": "Consumo típico de obra." } }
+        },
+        {
+          "material_id": "areia-media",
+          "variante": "tijolo-baiano",
+          "coef": { "min": 0.008, "max": 0.010, "unid": "m3/m2", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,0086 m³/m² de argamassa", "nota": "Consumo típico de obra." } }
+        },
+
+        {
+          "material_id": "tijolo-macico",
+          "variante": "tijolo-macico",
+          "coef": { "min": 76, "max": 83, "unid": "tijolo/m2", "perda": 0.05,
+            "motivo": "Peça pequena: a junta pesa muito no total. 8 mm dá ~83/m²; 12 mm dá ~76.",
+            "fonte": { "tipo": "geometrico", "ref": "dimensões correntes de 5x10x20 cm (ABNT NBR 15270-1) + junta de 8 a 12 mm", "nota": "Assentado deitado, a face aparente é 20x5 cm; o número por m² é o inverso da área do módulo." } }
+        },
+        {
+          "material_id": "cimento-cp2",
+          "variante": "tijolo-macico",
+          "coef": { "min": 2.9, "max": 3.6, "unid": "kg/m2", "perda": 0.10,
+            "motivo": "Muito mais junta por m² que qualquer bloco — é a alvenaria que mais consome argamassa.",
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,020 m³/m² de argamassa", "nota": "Consumo típico de obra." } }
+        },
+        {
+          "material_id": "cal-hidratada",
+          "variante": "tijolo-macico",
+          "coef": { "min": 1.8, "max": 2.6, "unid": "kg/m2", "perda": 0.10,
+            "motivo": "Muito mais junta por m² que qualquer bloco.",
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,020 m³/m² de argamassa", "nota": "Consumo típico de obra." } }
+        },
+        {
+          "material_id": "areia-media",
+          "variante": "tijolo-macico",
+          "coef": { "min": 0.020, "max": 0.022, "unid": "m3/m2", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 sobre 0,020 m³/m² de argamassa", "nota": "Consumo típico de obra." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "colher-de-pedreiro", "essencial": true },
+        { "id": "nivel-bolha", "essencial": true },
+        { "id": "prumo", "essencial": true },
+        { "id": "linha-pedreiro", "essencial": true },
+        { "id": "trena", "essencial": true },
+        { "id": "masseira", "essencial": true },
+        { "id": "enxada", "essencial": true },
+        { "id": "balde", "essencial": true },
+        { "id": "carrinho-de-mao", "essencial": false },
+        { "id": "betoneira", "essencial": false },
+        { "id": "esquadro", "essencial": false },
+        { "id": "nivel-laser", "essencial": false },
+        { "id": "luva-raspa", "essencial": true },
+        { "id": "oculos-protecao", "essencial": true },
+        { "id": "bota-seguranca", "essencial": true },
+        { "id": "mascara-po", "essencial": false }
+      ],
+      "sequencia": [
+        "Marque a parede no piso com linha e esquadro; confira as diagonais para garantir o esquadro.",
+        "Limpe e molhe a base. Assente a primeira fiada sobre a base nivelada — é a fiada que define toda a parede.",
+        "Estique a linha de pedreiro entre as extremidades e suba fiada por fiada, sempre amarrando (junta desencontrada).",
+        "Confira prumo e nível a cada duas ou três fiadas. Erro pequeno acumulado vira parede torta.",
+        "Deixe as juntas com espessura uniforme (8 a 12 mm) e preencha bem — junta vazia é ponte de umidade.",
+        "Suba no máximo 1,5 m por dia: a argamassa das fiadas de baixo precisa pegar antes de receber mais peso.",
+        "Deixe o encunhamento (aperto no encontro com a laje ou viga) para pelo menos 7 dias depois, quando a parede já assentou."
+      ],
+      "cuidados": [
+        "Molhe blocos cerâmicos antes de assentar; bloco seco rouba a água da argamassa e a junta fica fraca.",
+        "Bloco de concreto NÃO deve ser molhado — ele já é saturado e a água em excesso solta a junta.",
+        "Nunca suba a parede inteira de uma vez: o peso fresco esmaga a argamassa das fiadas de baixo.",
+        "Argamassa que já começou a pegar não se recupera com mais água. Prepare só o que consegue aplicar em cerca de 2 horas."
+      ],
+      "erros_comuns": [
+        "Não amarrar as juntas (deixar junta a prumo): a parede racha em linha reta na junta.",
+        "Primeira fiada fora de nível — o erro sobe com a parede e não tem como corrigir depois.",
+        "Encunhar no mesmo dia: a parede ainda vai acomodar e a trinca aparece no encontro com a laje.",
+        "Esquecer de deixar passagem para eletroduto e tubulação e ter que quebrar a parede depois."
+      ],
+      "riscos": ["estrutural"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 8545",
+        "nota": "Trata da execução de alvenaria de vedação com componentes cerâmicos. Cobre o procedimento de execução; os consumos de material são de prática de obra."
+      }
+    },
+
+    {
+      "id": "chapisco",
+      "nome": "Chapisco",
+      "aliases": ["chapiscar", "chapisco de parede"],
+      "oque": "Camada rala e áspera de argamassa jogada com força sobre a alvenaria, para criar aderência para o emboço ou reboco.",
+      "quando_usar": "Sempre antes de rebocar alvenaria ou estrutura de concreto. Sem chapisco, o reboco descola com o tempo.",
+      "base": "m2",
+      "calculadora": "linear",
+      "consumos": [
+        {
+          "material_id": "cimento-cp2",
+          "coef": { "min": 1.3, "max": 2.4, "unid": "kg/m2", "perda": 0.15,
+            "motivo": "Chapisco é descontínuo por natureza; a espessura efetiva varia de 3 a 5 mm e muito material cai no chão.",
+            "fonte": { "tipo": "mercado", "ref": "traço 1:3 (cimento:areia) sobre 0,003 a 0,005 m³/m² de argamassa", "nota": "Traço e espessura são prática corrente de obra; não há consumo normalizado." } }
+        },
+        {
+          "material_id": "areia-media",
+          "coef": { "min": 0.003, "max": 0.005, "unid": "m3/m2", "perda": 0.15,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:3 (cimento:areia)", "nota": "No traço 1:3 a areia corresponde praticamente ao volume de argamassa produzido." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "colher-de-pedreiro", "essencial": true },
+        { "id": "masseira", "essencial": true },
+        { "id": "enxada", "essencial": true },
+        { "id": "balde", "essencial": true },
+        { "id": "oculos-protecao", "essencial": true },
+        { "id": "luva-nitrilica", "essencial": true },
+        { "id": "betoneira", "essencial": false }
+      ],
+      "sequencia": [
+        "Limpe a parede: poeira, óleo de fôrma e restos de argamassa impedem a aderência.",
+        "Molhe bem a superfície, sem encharcar.",
+        "Prepare a argamassa no traço 1:3 (cimento:areia), bem fluida.",
+        "Jogue com força usando a colher, cobrindo toda a superfície de forma áspera e irregular — chapisco não se alisa.",
+        "Aguarde no mínimo 24 h (idealmente 3 dias) antes de emboçar, molhando de novo antes."
+      ],
+      "cuidados": [
+        "Chapisco alisado perde a função: a rugosidade é justamente o que segura o reboco.",
+        "Superfície de concreto lisa (pilar, viga, fundo de laje) precisa de chapisco com adesivo, senão não pega."
+      ],
+      "erros_comuns": [
+        "Pular o chapisco para ganhar tempo — o reboco descola meses depois, e aí é retrabalho inteiro.",
+        "Chapiscar sobre parede suja ou seca demais."
+      ],
+      "depende": ["alvenaria"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 7200",
+        "nota": "Trata da execução de revestimento de paredes e tetos com argamassas inorgânicas, incluindo o preparo de base (chapisco)."
+      }
+    },
+
+    {
+      "id": "reboco",
+      "nome": "Emboço e reboco (massa única)",
+      "aliases": ["rebocar", "emboco", "emboço", "massa unica", "revestimento de argamassa", "rebocar parede"],
+      "oque": "Camada de argamassa que regulariza a parede depois do chapisco, deixando-a plana e pronta para pintura ou revestimento.",
+      "quando_usar": "Depois do chapisco, em qualquer parede de alvenaria que vá receber pintura, azulejo ou textura.",
+      "base": "m3",
+      "calculadora": "linear",
+      "espessura_padrao": 0.02,
+      "espessura_min": 0.01,
+      "espessura_max": 0.05,
+      "consumos": [
+        {
+          "material_id": "cimento-cp2",
+          "coef": { "min": 145, "max": 180, "unid": "kg/m3", "perda": 0.10,
+            "motivo": "Faixa do traço 1:2:8 conforme a dosagem e a massa unitária do cimento usado.",
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 (cimento:cal:areia) em volume", "nota": "Consumo típico de obra por m³ de argamassa. As normas de revestimento tratam de execução e desempenho, não de consumo." } }
+        },
+        {
+          "material_id": "cal-hidratada",
+          "coef": { "min": 90, "max": 130, "unid": "kg/m3", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 (cimento:cal:areia) em volume", "nota": "A cal dá plasticidade e reduz a fissuração por retração. Consumo típico de obra." } }
+        },
+        {
+          "material_id": "areia-fina",
+          "coef": { "min": 1.0, "max": 1.1, "unid": "m3/m3", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:8 (cimento:cal:areia) em volume", "nota": "A areia corresponde praticamente ao volume de argamassa produzido, porque cimento e cal preenchem os vazios." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "colher-de-pedreiro", "essencial": true },
+        { "id": "desempenadeira-madeira", "essencial": true },
+        { "id": "sarrafo", "essencial": true },
+        { "id": "nivel-bolha", "essencial": true },
+        { "id": "masseira", "essencial": true },
+        { "id": "enxada", "essencial": true },
+        { "id": "desempenadeira-aco", "essencial": false },
+        { "id": "betoneira", "essencial": false },
+        { "id": "luva-nitrilica", "essencial": true },
+        { "id": "oculos-protecao", "essencial": true }
+      ],
+      "sequencia": [
+        "Confira que o chapisco está curado (mínimo 24 h, ideal 3 dias) e molhe a parede.",
+        "Faça as taliscas e as mestras: pontos de referência que definem a espessura final e garantem a parede plana.",
+        "Aplique a argamassa entre as mestras com a colher, preenchendo bem.",
+        "Sarrafeie com a régua apoiada nas mestras, de baixo para cima, tirando o excesso.",
+        "Espere o ponto (a massa não pode grudar no dedo) e desempene para o acabamento.",
+        "Mantenha úmido por alguns dias — cura rápida demais causa fissura de retração."
+      ],
+      "cuidados": [
+        "Espessura acima de 3 cm deve ser feita em duas camadas, com intervalo — camada grossa de uma vez descola pelo próprio peso.",
+        "Não rebocar sob sol forte direto nem com vento: a água evapora antes da hidratação e a massa fica fraca e fissurada.",
+        "Deixe a tubulação elétrica e hidráulica pronta e testada ANTES de rebocar."
+      ],
+      "erros_comuns": [
+        "Pular as mestras e tentar acertar no olho: a parede fica ondulada e aparece na pintura.",
+        "Desempenar cedo demais, ainda com a massa mole — puxa o material e abre falha.",
+        "Areia com barro: o reboco racha e solta pó depois de seco."
+      ],
+      "depende": ["chapisco"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 7200",
+        "nota": "Trata da execução de revestimento de paredes e tetos com argamassas inorgânicas: preparo de base, taliscas, mestras e acabamento."
+      }
+    },
+
+    {
+      "id": "contrapiso",
+      "nome": "Contrapiso",
+      "aliases": ["contra piso", "regularizar piso", "camada regularizadora", "nivelar piso"],
+      "oque": "Camada de argamassa sobre a laje ou o terreno que regulariza o nível, cria caimento e recebe o piso final.",
+      "quando_usar": "Antes de assentar qualquer piso, quando a base está desnivelada, e sempre que for preciso dar caimento para ralo.",
+      "base": "m3",
+      "calculadora": "linear",
+      "espessura_padrao": 0.04,
+      "espessura_min": 0.02,
+      "espessura_max": 0.10,
+      "consumos": [
+        {
+          "material_id": "cimento-cp2",
+          "coef": { "min": 340, "max": 380, "unid": "kg/m3", "perda": 0.08,
+            "motivo": "Faixa do traço 1:4 conforme a dosagem real e a massa unitária dos materiais.",
+            "fonte": { "tipo": "mercado", "ref": "traço 1:4 (cimento:areia) em volume", "nota": "Consumo típico de obra por m³ de argamassa de contrapiso." } }
+        },
+        {
+          "material_id": "areia-media",
+          "coef": { "min": 1.0, "max": 1.1, "unid": "m3/m3", "perda": 0.08,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:4 (cimento:areia) em volume", "nota": "A areia corresponde praticamente ao volume de argamassa produzido." } }
+        },
+        {
+          "material_id": "lona-plastica",
+          "base": "m2",
+          "coef": { "min": 1.05, "max": 1.15, "unid": "m2/m2", "perda": 0.05,
+            "motivo": "A faixa é a sobreposição entre as tiras e a subida nas bordas.",
+            "fonte": { "tipo": "mercado", "ref": "prática corrente de obra", "nota": "Barreira de vapor sob contrapiso apoiado no solo. Em contrapiso sobre laje seca costuma ser dispensada." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "sarrafo", "essencial": true },
+        { "id": "desempenadeira-madeira", "essencial": true },
+        { "id": "nivel-bolha", "essencial": true },
+        { "id": "mangueira-nivel", "essencial": true },
+        { "id": "masseira", "essencial": true },
+        { "id": "enxada", "essencial": true },
+        { "id": "carrinho-de-mao", "essencial": true },
+        { "id": "betoneira", "essencial": false },
+        { "id": "nivel-laser", "essencial": false },
+        { "id": "joelheira", "essencial": false },
+        { "id": "luva-nitrilica", "essencial": true },
+        { "id": "bota-seguranca", "essencial": true }
+      ],
+      "sequencia": [
+        "Limpe a base e remova nata, óleo e resto de argamassa. Se for sobre o solo, compacte e estenda a lona.",
+        "Marque o nível final com mangueira de nível ou laser em todo o perímetro.",
+        "Faça as mestras (faixas-guia) no nível marcado, prevendo o caimento onde houver ralo (cerca de 0,5 a 1 cm por metro).",
+        "Molhe a base e aplique nata de cimento para aderência logo antes de lançar a argamassa.",
+        "Lance a argamassa entre as mestras e sarrafeie com a régua apoiada nelas.",
+        "Desempene e mantenha úmido por pelo menos 3 dias.",
+        "Aguarde a cura antes de assentar o piso — pressa aqui gera piso solto depois."
+      ],
+      "cuidados": [
+        "Caimento é obrigatório em área molhada e sacada: água parada acha o caminho para dentro.",
+        "Contrapiso muito fino (menos de 2 cm) sobre laje lisa tende a soltar; abaixo disso use argamassa autonivelante própria.",
+        "Não libere tráfego pesado antes de 7 dias."
+      ],
+      "erros_comuns": [
+        "Esquecer o caimento e descobrir só quando a água empoça no box.",
+        "Assentar o piso sobre contrapiso ainda úmido — a umidade sobe e mancha o rejunte e o piso.",
+        "Não fazer junta de dilatação em área grande: o contrapiso trinca e a trinca sobe para o piso."
+      ],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 13753",
+        "nota": "Trata do revestimento de piso interno ou externo com placas cerâmicas assentadas com argamassa colante, incluindo os requisitos da base (contrapiso)."
+      }
+    },
+
+    {
+      "id": "assentar-piso",
+      "nome": "Assentar piso cerâmico ou porcelanato",
+      "aliases": ["piso", "assentar piso", "colocar piso", "porcelanato", "ceramica de piso", "assentar ceramica"],
+      "oque": "Colar placas cerâmicas no contrapiso com argamassa colante, mantendo junta uniforme, e depois rejuntar.",
+      "quando_usar": "Acabamento de piso em qualquer ambiente, sobre contrapiso curado e nivelado.",
+      "base": "m2",
+      "calculadora": "ceramico",
+      "variantes": [
+        { "id": "ceramica", "nome": "Piso cerâmico (absorção média, uso interno)", "padrao": true },
+        { "id": "porcelanato", "nome": "Porcelanato (baixa absorção, exige AC-III)" }
+      ],
+      "consumos": [
+        {
+          "material_id": "piso-ceramico",
+          "variante": "ceramica",
+          "coef": { "min": 1.0, "max": 1.0, "unid": "m2/m2", "perda": 0.10,
+            "motivo": "Perda de 10% cobre recortes em assentamento reto. Em diagonal ou ambiente recortado, suba para 15%.",
+            "fonte": { "tipo": "mercado", "ref": "perda típica de assentamento", "nota": "A área de placa é a área do piso mais a perda de corte; a perda depende do desenho do ambiente e do sentido do assentamento." } }
+        },
+        {
+          "material_id": "argamassa-colante-ac2",
+          "variante": "ceramica",
+          "coef": { "min": 4.0, "max": 5.5, "unid": "kg/m2", "perda": 0.05,
+            "motivo": "Depende do dente da desempenadeira e da planeza do contrapiso: base irregular consome muito mais.",
+            "fonte": { "tipo": "fabricante", "ref": "consumo declarado para desempenadeira de 8 mm, colagem simples", "nota": "Fabricantes declaram 4 a 5 kg/m² para placas até 30x30 cm com dente de 8 mm." } }
+        },
+        {
+          "material_id": "piso-ceramico",
+          "variante": "porcelanato",
+          "coef": { "min": 1.0, "max": 1.0, "unid": "m2/m2", "perda": 0.12,
+            "motivo": "Perda maior: porcelanato lasca mais no corte e peça grande desperdiça mais no recorte.",
+            "fonte": { "tipo": "mercado", "ref": "perda típica de assentamento de porcelanato", "nota": "Perda de corte é maior em peças grandes e formatos retangulares." } }
+        },
+        {
+          "material_id": "argamassa-colante-ac3",
+          "variante": "porcelanato",
+          "coef": { "min": 5.5, "max": 8.0, "unid": "kg/m2", "perda": 0.05,
+            "motivo": "Faixa larga porque a dupla colagem (argamassa na base E no verso da peça), obrigatória em peça grande, quase dobra o consumo.",
+            "fonte": { "tipo": "fabricante", "ref": "consumo declarado para dupla colagem com dente de 8 a 10 mm", "nota": "Porcelanato tem baixa absorção e exige AC-III; peças acima de 60x60 cm pedem dupla colagem." } }
+        },
+        {
+          "material_id": "rejunte-cimenticio",
+          "coef": { "min": 0.20, "max": 0.60, "unid": "kg/m2", "perda": 0.10,
+            "motivo": "Esta faixa é um FALLBACK grosseiro. Se você informar o tamanho da placa e a largura da junta, o cálculo passa a usar a geometria real da junta, que é bem mais preciso.",
+            "fonte": { "tipo": "mercado", "ref": "faixa típica para placas de 30x30 a 60x60 cm com junta de 2 a 4 mm", "nota": "O consumo real depende do tamanho da placa, da largura e da profundidade da junta — por isso o cálculo geométrico é preferido." } }
+        },
+        {
+          "material_id": "espacador-piso",
+          "coef": { "min": 4, "max": 12, "unid": "un/m2", "perda": 0.05,
+            "motivo": "Faixa larga porque depende do tamanho da peça: placa de 30x30 usa cerca de 11 espaçadores/m², placa de 60x60 usa cerca de 3.",
+            "fonte": { "tipo": "mercado", "ref": "prática corrente de assentamento", "nota": "Aproximadamente um espaçador por canto de peça, compartilhado entre peças vizinhas." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "desempenadeira-dentada", "essencial": true },
+        { "id": "martelo-borracha", "essencial": true },
+        { "id": "nivel-bolha", "essencial": true },
+        { "id": "cortador-ceramica", "essencial": true },
+        { "id": "rodo-borracha-rejunte", "essencial": true },
+        { "id": "esponja", "essencial": true },
+        { "id": "balde", "essencial": true },
+        { "id": "trena", "essencial": true },
+        { "id": "esquadro", "essencial": true },
+        { "id": "serra-marmore", "essencial": false },
+        { "id": "nivel-laser", "essencial": false },
+        { "id": "joelheira", "essencial": false },
+        { "id": "oculos-protecao", "essencial": true },
+        { "id": "luva-nitrilica", "essencial": true },
+        { "id": "mascara-po", "essencial": false }
+      ],
+      "sequencia": [
+        "Confira que o contrapiso está curado, limpo, nivelado e sem pó.",
+        "Abra várias caixas e confira tonalidade e calibre — misture as caixas para o piso não ficar manchado por lote.",
+        "Marque o eixo do ambiente e faça uma simulação a seco: é assim que se decide onde ficam os recortes (nunca em local visível).",
+        "Prepare a argamassa colante e deixe descansar o tempo de maturação da embalagem antes de usar.",
+        "Espalhe a argamassa com o lado dentado, em área pequena de cada vez (respeite o tempo em aberto, cerca de 15 a 20 min).",
+        "Assente cada peça pressionando e batendo com o martelo de borracha até fechar os cordões; use espaçadores.",
+        "Confira nível e alinhamento constantemente — peça desalinhada só corrige antes da argamassa pegar.",
+        "Aguarde no mínimo 24 h e então rejunte, preenchendo bem as juntas com o rodo de borracha.",
+        "Limpe o excesso com esponja úmida antes do rejunte endurecer."
+      ],
+      "cuidados": [
+        "Junta é obrigatória, não é opcional: o piso dilata e sem junta ele estufa e solta.",
+        "Nunca assente sobre contrapiso úmido — a umidade sobe e mancha rejunte e peça.",
+        "Verifique o PEI da placa: piso de área de muito tráfego pede PEI mais alto, senão risca.",
+        "Argamassa que passou do tempo em aberto forma película e não adere. Se perdeu o ponto, raspe e refaça — não molhe de novo."
+      ],
+      "erros_comuns": [
+        "Não fazer dupla colagem em peça grande: fica vazio embaixo (som oco) e a peça trinca quando pisam.",
+        "Rejuntar antes de 24 h — a umidade da argamassa ainda está saindo e o rejunte mancha.",
+        "Não misturar as caixas e o piso ficar com manchas de tonalidade em faixas.",
+        "Começar pela parede em vez do eixo, e a última fileira acabar num recorte fininho e feio."
+      ],
+      "depende": ["contrapiso"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 13753",
+        "nota": "Trata do revestimento de piso interno ou externo com placas cerâmicas assentadas com argamassa colante: base, assentamento, juntas e rejuntamento."
+      }
+    },
+
+    {
+      "id": "revestir-parede-ceramica",
+      "nome": "Assentar azulejo ou revestimento de parede",
+      "aliases": ["azulejo", "assentar azulejo", "colocar azulejo", "revestimento de parede", "azulejar"],
+      "oque": "Colar placas cerâmicas na parede com argamassa colante, de baixo para cima, com junta uniforme, e rejuntar.",
+      "quando_usar": "Cozinha, banheiro, área de serviço e qualquer parede que precise de superfície lavável e impermeável.",
+      "base": "m2",
+      "calculadora": "ceramico",
+      "variantes": [
+        { "id": "interna", "nome": "Parede interna (AC-I ou AC-II)", "padrao": true },
+        { "id": "fachada", "nome": "Fachada ou área externa (exige AC-III)" }
+      ],
+      "consumos": [
+        {
+          "material_id": "azulejo",
+          "variante": "interna",
+          "coef": { "min": 1.0, "max": 1.0, "unid": "m2/m2", "perda": 0.10,
+            "fonte": { "tipo": "mercado", "ref": "perda típica de assentamento", "nota": "Área de placa igual à área da parede mais perda de corte, maior em paredes com muitos recortes (box, tomadas, janelas)." } }
+        },
+        {
+          "material_id": "argamassa-colante-ac2",
+          "variante": "interna",
+          "coef": { "min": 4.0, "max": 5.5, "unid": "kg/m2", "perda": 0.05,
+            "fonte": { "tipo": "fabricante", "ref": "consumo declarado para desempenadeira de 8 mm", "nota": "AC-II atende parede interna, inclusive áreas molhadas de uso residencial." } }
+        },
+        {
+          "material_id": "azulejo",
+          "variante": "fachada",
+          "coef": { "min": 1.0, "max": 1.0, "unid": "m2/m2", "perda": 0.12,
+            "fonte": { "tipo": "mercado", "ref": "perda típica de assentamento em fachada", "nota": "Perda maior por recortes em quinas, vergas e peitoris." } }
+        },
+        {
+          "material_id": "argamassa-colante-ac3",
+          "variante": "fachada",
+          "coef": { "min": 5.5, "max": 8.0, "unid": "kg/m2", "perda": 0.05,
+            "motivo": "Fachada exige dupla colagem, o que praticamente dobra o consumo.",
+            "fonte": { "tipo": "fabricante", "ref": "consumo declarado para dupla colagem", "nota": "Fachada exige AC-III e dupla colagem: a peça que descola de uma fachada cai na rua." } }
+        },
+        {
+          "material_id": "rejunte-cimenticio",
+          "coef": { "min": 0.15, "max": 0.50, "unid": "kg/m2", "perda": 0.10,
+            "motivo": "FALLBACK grosseiro. Informando o tamanho da placa e a junta, o cálculo usa a geometria real.",
+            "fonte": { "tipo": "mercado", "ref": "faixa típica para azulejos de 20x20 a 30x60 cm com junta de 2 a 3 mm", "nota": "O consumo real depende da geometria da placa e da junta." } }
+        },
+        {
+          "material_id": "espacador-piso",
+          "coef": { "min": 4, "max": 14, "unid": "un/m2", "perda": 0.05,
+            "motivo": "Depende do tamanho da peça.",
+            "fonte": { "tipo": "mercado", "ref": "prática corrente de assentamento", "nota": "Aproximadamente um espaçador por canto de peça." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "desempenadeira-dentada", "essencial": true },
+        { "id": "martelo-borracha", "essencial": true },
+        { "id": "nivel-bolha", "essencial": true },
+        { "id": "prumo", "essencial": true },
+        { "id": "cortador-ceramica", "essencial": true },
+        { "id": "rodo-borracha-rejunte", "essencial": true },
+        { "id": "esponja", "essencial": true },
+        { "id": "balde", "essencial": true },
+        { "id": "trena", "essencial": true },
+        { "id": "serra-marmore", "essencial": false },
+        { "id": "sarrafo", "essencial": false },
+        { "id": "oculos-protecao", "essencial": true },
+        { "id": "luva-nitrilica", "essencial": true }
+      ],
+      "sequencia": [
+        "Confira que o reboco está curado, plano e no prumo — azulejo não corrige parede torta.",
+        "Em área molhada, impermeabilize antes de revestir.",
+        "Marque uma linha de nível de referência e fixe um sarrafo para apoiar a primeira fiada: assentar de baixo para cima sem apoio faz tudo escorregar.",
+        "Planeje onde ficam os recortes — evite fatia fina em canto visível e centralize o desenho.",
+        "Espalhe a argamassa colante em área pequena e assente peça a peça com espaçadores, batendo com o martelo de borracha.",
+        "Confira prumo e nível a cada fiada.",
+        "Aguarde 24 h, retire os espaçadores e rejunte.",
+        "Limpe o excesso com esponja úmida antes de endurecer."
+      ],
+      "cuidados": [
+        "Área molhada precisa de impermeabilização ANTES do azulejo — o azulejo e o rejunte não são barreira de água.",
+        "Não assente a coluna inteira de uma vez: o peso escorrega a peça de baixo enquanto a argamassa está fresca.",
+        "Use rejunte próprio para área molhada no box, e considere rejunte epóxi onde houver contato constante com água."
+      ],
+      "erros_comuns": [
+        "Começar direto do piso, sem sarrafo de apoio e sem conferir se o piso está nivelado.",
+        "Assentar sobre parede sem prumo e tentar corrigir na argamassa — fica vazio atrás e a peça soa oca.",
+        "Esquecer de impermeabilizar o box e ter infiltração no cômodo vizinho meses depois."
+      ],
+      "depende": ["reboco"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 13755",
+        "nota": "Trata do revestimento de paredes externas e fachadas com placas cerâmicas e argamassa colante. Para paredes internas aplica-se procedimento equivalente."
+      }
+    },
+
+    {
+      "id": "pintura-interna",
+      "nome": "Pintura interna",
+      "aliases": ["pintar", "pintura", "pintar parede", "pintar dentro", "tinta interna"],
+      "oque": "Preparar a parede (massa, lixamento, selador) e aplicar tinta em demãos até cobrir uniformemente.",
+      "quando_usar": "Acabamento de paredes e tetos internos, sobre reboco curado ou gesso.",
+      "base": "m2",
+      "calculadora": "pintura",
+      "variantes": [
+        { "id": "acrilica", "nome": "Tinta látex acrílica (mais lavável e resistente)", "padrao": true },
+        { "id": "pva", "nome": "Tinta látex PVA (mais econômica, só interior seco)" }
+      ],
+      "consumos": [
+        {
+          "material_id": "tinta-latex-acrilica",
+          "variante": "acrilica",
+          "coef": { "min": 0.07, "max": 0.11, "unid": "L/m2 por demão", "perda": 0.05,
+            "motivo": "Equivale a 9 a 14 m² por litro por demão. A faixa é larga de propósito: o rendimento impresso na lata costuma ser o do melhor caso (parede selada, lisa e clara). Parede porosa, escura ou nunca pintada consome bem mais.",
+            "fonte": { "tipo": "fabricante", "ref": "rendimento declarado por fabricantes de tinta látex acrílica", "nota": "Confira sempre o rendimento impresso na lata que você comprou: varia por marca e por linha (econômica, standard, premium)." } }
+        },
+        {
+          "material_id": "tinta-latex-pva",
+          "variante": "pva",
+          "coef": { "min": 0.08, "max": 0.12, "unid": "L/m2 por demão", "perda": 0.05,
+            "motivo": "Equivale a 8 a 12 m² por litro por demão. PVA cobre um pouco menos que a acrílica.",
+            "fonte": { "tipo": "fabricante", "ref": "rendimento declarado por fabricantes de tinta látex PVA", "nota": "PVA é para interior seco. Em área molhada ou externa ela descasca." } }
+        },
+        {
+          "material_id": "selador-acrilico",
+          "coef": { "min": 0.08, "max": 0.12, "unid": "L/m2", "perda": 0.05,
+            "motivo": "Uma demão única. Reboco novo e poroso puxa mais.",
+            "fonte": { "tipo": "fabricante", "ref": "rendimento declarado por fabricantes", "nota": "O selador uniformiza a absorção e reduz o consumo de tinta — costuma se pagar." } }
+        },
+        {
+          "material_id": "massa-corrida-pva",
+          "coef": { "min": 1.6, "max": 2.6, "unid": "kg/m2", "perda": 0.10,
+            "motivo": "Total para as duas demãos usuais. Parede muito irregular pode pedir três.",
+            "fonte": { "tipo": "fabricante", "ref": "consumo declarado por fabricantes (0,8 a 1,3 kg/m² por demão)", "nota": "Massa corrida PVA é só para interior seco; em área molhada use massa acrílica." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "rolo-la", "essencial": true },
+        { "id": "pincel", "essencial": true },
+        { "id": "bandeja-pintura", "essencial": true },
+        { "id": "espatula", "essencial": true },
+        { "id": "lixa", "essencial": true },
+        { "id": "fita-crepe", "essencial": true },
+        { "id": "escada", "essencial": true },
+        { "id": "lixadeira-parede", "essencial": false },
+        { "id": "mascara-po", "essencial": true },
+        { "id": "oculos-protecao", "essencial": true }
+      ],
+      "sequencia": [
+        "Proteja piso, rodapé e esquadrias com lona e fita crepe. Tempo aqui economiza limpeza depois.",
+        "Corrija buracos e trincas e deixe secar.",
+        "Aplique o selador (ou fundo preparador, se o reboco solta pó) e aguarde a secagem.",
+        "Aplique a massa corrida em demãos finas, aguardando secar entre elas.",
+        "Lixe até a parede ficar lisa e remova todo o pó com pano levemente úmido — pó embaixo da tinta descasca.",
+        "Aplique a primeira demão de tinta, cortando os cantos com pincel e preenchendo com rolo.",
+        "Aguarde o intervalo da embalagem (cerca de 4 h) e aplique a segunda demão.",
+        "Avalie sob luz natural: cor forte sobre parede clara costuma pedir uma terceira demão."
+      ],
+      "cuidados": [
+        "Reboco novo precisa curar cerca de 30 dias antes de pintar: a alcalinidade do cimento fresco ataca a tinta e ela descasca.",
+        "Não dilua além do que a embalagem manda — tinta muito diluída não cobre e você gasta mais demãos.",
+        "Ventile o ambiente durante e depois da pintura."
+      ],
+      "erros_comuns": [
+        "Pintar direto sobre a massa sem lixar e sem tirar o pó.",
+        "Aplicar a segunda demão antes da primeira secar, o que enruga e descasca.",
+        "Comprar tinta justa e a segunda lata sair de outro lote com tom levemente diferente — compre o total de uma vez.",
+        "Usar PVA em banheiro ou área de serviço."
+      ],
+      "depende": ["reboco"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 13245",
+        "nota": "Trata da execução de pinturas em edificações não industriais: preparo da superfície e aplicação."
+      }
+    },
+
+    {
+      "id": "pintura-externa",
+      "nome": "Pintura externa (fachada e muro)",
+      "aliases": ["pintar fachada", "pintura de fachada", "pintar muro", "pintura externa", "tinta externa"],
+      "oque": "Preparar e pintar superfícies expostas ao tempo, com material próprio para resistir a sol e chuva.",
+      "quando_usar": "Fachada, muro, área externa e qualquer superfície que pegue sol e chuva.",
+      "base": "m2",
+      "calculadora": "pintura",
+      "consumos": [
+        {
+          "material_id": "tinta-latex-acrilica",
+          "coef": { "min": 0.08, "max": 0.13, "unid": "L/m2 por demão", "perda": 0.08,
+            "motivo": "Consome mais que em pintura interna: a superfície externa é mais rugosa e o vento leva parte da tinta. Equivale a cerca de 8 a 12 m² por litro por demão.",
+            "fonte": { "tipo": "fabricante", "ref": "rendimento declarado por fabricantes para uso externo", "nota": "Confira o rendimento impresso na lata. Em fachada, o número real fica no pior caso da faixa." } }
+        },
+        {
+          "material_id": "fundo-preparador",
+          "coef": { "min": 0.08, "max": 0.14, "unid": "L/m2", "perda": 0.08,
+            "motivo": "Fachada velha, caiada ou com reboco solto absorve muito mais.",
+            "fonte": { "tipo": "fabricante", "ref": "rendimento declarado por fabricantes", "nota": "O fundo preparador dá coesão a reboco fraco ou com pó, condição comum em fachada antiga." } }
+        },
+        {
+          "material_id": "massa-acrilica",
+          "coef": { "min": 1.6, "max": 2.8, "unid": "kg/m2", "perda": 0.10,
+            "motivo": "Total para as duas demãos usuais.",
+            "fonte": { "tipo": "fabricante", "ref": "consumo declarado por fabricantes (0,8 a 1,4 kg/m² por demão)", "nota": "Em área externa a massa tem que ser acrílica: a PVA absorve água e solta." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "rolo-la", "essencial": true },
+        { "id": "pincel", "essencial": true },
+        { "id": "bandeja-pintura", "essencial": true },
+        { "id": "espatula", "essencial": true },
+        { "id": "lixa", "essencial": true },
+        { "id": "fita-crepe", "essencial": true },
+        { "id": "andaime", "essencial": true },
+        { "id": "escada", "essencial": false },
+        { "id": "cinto-paraquedista", "essencial": true },
+        { "id": "capacete", "essencial": true },
+        { "id": "oculos-protecao", "essencial": true },
+        { "id": "mascara-po", "essencial": true },
+        { "id": "bota-seguranca", "essencial": true }
+      ],
+      "sequencia": [
+        "Lave a superfície e remova mofo, fungo, tinta solta e reboco desagregado.",
+        "Trate as trincas — em fachada, trinca não tratada volta em poucos meses.",
+        "Aplique o fundo preparador onde o reboco estiver fraco ou soltando pó.",
+        "Aplique a massa acrílica onde precisar nivelar e lixe.",
+        "Aplique duas demãos de tinta acrílica, respeitando o intervalo da embalagem.",
+        "Evite pintar sob sol forte direto, com chuva prevista nas próximas horas ou com vento forte."
+      ],
+      "cuidados": [
+        "Trabalho em altura exige andaime montado corretamente, cinturão tipo paraquedista ancorado e área isolada embaixo (NR-35). Não improvise apoio.",
+        "Nunca use tinta PVA em área externa.",
+        "Pintar sobre superfície úmida ou com mofo vivo garante que o problema volta — trate antes."
+      ],
+      "erros_comuns": [
+        "Pintar por cima do mofo sem tratar: em poucos meses ele atravessa a tinta nova.",
+        "Pintar com o sol batendo direto — a tinta seca antes de nivelar e fica marcada.",
+        "Subestimar o consumo em textura ou superfície rugosa."
+      ],
+      "riscos": ["altura"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 13245",
+        "nota": "Trata da execução de pinturas em edificações não industriais. As exigências de trabalho em altura estão na NR-35."
+      }
+    },
+
+    {
+      "id": "textura",
+      "nome": "Aplicar textura acrílica",
+      "aliases": ["textura", "grafiato", "texturizar", "aplicar grafiato"],
+      "oque": "Aplicar revestimento acrílico de maior espessura que cria relevo, disfarça imperfeições e protege a superfície.",
+      "quando_usar": "Fachada, muro e paredes internas de destaque, quando se quer efeito visual e mais durabilidade que a tinta.",
+      "base": "m2",
+      "calculadora": "linear",
+      "consumos": [
+        {
+          "material_id": "textura-acrilica",
+          "coef": { "min": 1.0, "max": 2.5, "unid": "kg/m2", "perda": 0.10,
+            "motivo": "Esta é a faixa mais larga de toda a base, e é honesta: rolo leve fica perto de 1 kg/m², grafiato desempenado passa de 2,5 kg/m². Sem saber o efeito e a ferramenta, não dá para estreitar. Peça a informação do efeito antes de fechar o orçamento.",
+            "fonte": { "tipo": "fabricante", "ref": "consumo declarado por fabricantes conforme o efeito e a ferramenta", "nota": "Fabricantes publicam consumos bem diferentes para rolo, desempenadeira e grafiato. Faça sempre um painel-teste de 1 m² e meça o consumo real antes de comprar o total." } }
+        },
+        {
+          "material_id": "fundo-preparador",
+          "coef": { "min": 0.08, "max": 0.14, "unid": "L/m2", "perda": 0.08,
+            "fonte": { "tipo": "fabricante", "ref": "rendimento declarado por fabricantes", "nota": "Base selada e coesa é pré-requisito: textura sobre reboco solto cai junto com o reboco." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "rolo-textura", "essencial": true },
+        { "id": "desempenadeira-aco", "essencial": true },
+        { "id": "espatula", "essencial": true },
+        { "id": "fita-crepe", "essencial": true },
+        { "id": "bandeja-pintura", "essencial": false },
+        { "id": "andaime", "essencial": false },
+        { "id": "oculos-protecao", "essencial": true },
+        { "id": "luva-nitrilica", "essencial": true }
+      ],
+      "sequencia": [
+        "Prepare e sele a base; corrija imperfeições grandes (textura disfarça pequenas, não buraco).",
+        "Faça um painel-teste de 1 m² para acertar o efeito e MEDIR o consumo real.",
+        "Demarque as áreas com fita crepe, pensando em onde parar cada pano.",
+        "Aplique em panos inteiros sem interromper no meio da parede — emenda de textura não se disfarça.",
+        "Trabalhe o efeito enquanto o material está fresco, com rolo ou desempenadeira.",
+        "Retire a fita antes da secagem completa."
+      ],
+      "cuidados": [
+        "Textura não corrige parede fora de prumo nem tapa buraco: só disfarça pequenas imperfeições.",
+        "Interromper no meio de uma parede deixa emenda visível para sempre — planeje o pano antes de começar.",
+        "Textura é praticamente irreversível: remover depois é serviço pesado."
+      ],
+      "erros_comuns": [
+        "Comprar o material pela conta do folheto sem fazer painel-teste e faltar no meio do serviço, com o agravante de o lote novo puxar cor diferente.",
+        "Aplicar sobre base não selada.",
+        "Parar no meio da parede para almoçar."
+      ],
+      "fonte": {
+        "tipo": "fabricante",
+        "ref": "fichas técnicas de fabricantes de revestimento acrílico texturizado",
+        "nota": "Consumo e procedimento variam bastante entre marcas e efeitos; o painel-teste é a prática recomendada pelos próprios fabricantes."
+      }
+    },
+
+    {
+      "id": "eletrica-basica",
+      "nome": "Instalação elétrica básica (infraestrutura de circuito)",
+      "aliases": ["eletrica", "elétrica", "instalacao eletrica", "fiacao", "passar fio", "eletroduto", "tomada", "circuito eletrico"],
+      "oque": "Infraestrutura de um circuito de baixa tensão: rasgo, eletroduto embutido, caixas, passagem de condutores e instalação de tomadas e interruptores.",
+      "quando_usar": "Obra nova, reforma que muda pontos de energia, ou ampliação de circuito. A EXECUÇÃO exige profissional habilitado.",
+      "base": "m",
+      "calculadora": "linear",
+      "consumos": [
+        {
+          "material_id": "eletroduto-corrugado-25",
+          "coef": { "min": 1.0, "max": 1.15, "unid": "m/m", "perda": 0.10,
+            "motivo": "A faixa cobre as curvas e sobras: o eletroduto nunca segue reto.",
+            "fonte": { "tipo": "mercado", "ref": "prática corrente de instalação", "nota": "Metro de eletroduto por metro de percurso de circuito, com folga para curvas." } }
+        },
+        {
+          "material_id": "cabo-flexivel-2-5",
+          "coef": { "min": 3.0, "max": 3.6, "unid": "m/m", "perda": 0.10,
+            "motivo": "Três condutores por metro de percurso (fase, neutro e terra), mais sobra para emenda nas caixas.",
+            "fonte": { "tipo": "norma", "ref": "ABNT NBR 5410", "nota": "A norma exige condutor de proteção (terra) nos circuitos de tomadas e fixa 2,5 mm² como seção MÍNIMA para tomadas de uso geral. A seção efetiva do seu circuito depende da carga, do comprimento e da forma de instalação e tem que ser dimensionada por profissional habilitado." } }
+        },
+        {
+          "material_id": "caixa-luz-4x2",
+          "coef": { "min": 0.10, "max": 0.25, "unid": "un/m", "perda": 0.05,
+            "motivo": "Faixa larga porque depende do projeto: uma caixa a cada 4 a 10 m de percurso, conforme a densidade de pontos do ambiente.",
+            "fonte": { "tipo": "mercado", "ref": "prática corrente de instalação residencial", "nota": "Estimativa grosseira a partir do percurso. O número correto sai do projeto elétrico, que lista os pontos." } }
+        },
+        {
+          "material_id": "fita-isolante",
+          "coef": { "min": 0.02, "max": 0.06, "unid": "un/m", "perda": 0.05,
+            "fonte": { "tipo": "mercado", "ref": "prática corrente de instalação", "nota": "Consumível de emenda e isolação." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "alicate-universal", "essencial": true },
+        { "id": "alicate-desencapador", "essencial": true },
+        { "id": "chave-teste", "essencial": true },
+        { "id": "guia-passa-fio", "essencial": true },
+        { "id": "talhadeira", "essencial": true },
+        { "id": "trena", "essencial": true },
+        { "id": "multimetro", "essencial": false },
+        { "id": "esmerilhadeira", "essencial": false },
+        { "id": "martelete", "essencial": false },
+        { "id": "oculos-protecao", "essencial": true },
+        { "id": "luva-nitrilica", "essencial": true },
+        { "id": "mascara-po", "essencial": true },
+        { "id": "protetor-auricular", "essencial": false }
+      ],
+      "sequencia": [
+        "Trabalhe a partir de um projeto elétrico. Sem projeto não há como dimensionar circuito, disjuntor e DR.",
+        "DESLIGUE o disjuntor geral e CONFIRME a ausência de tensão com chave de teste ou multímetro antes de qualquer intervenção.",
+        "Marque o percurso e abra os rasgos na alvenaria (rasgo vertical ou horizontal conforme a regra da alvenaria, nunca em diagonal).",
+        "Fixe as caixas na altura padronizada e chumbe os eletrodutos.",
+        "Passe os condutores com guia, identificando cada um por cor e função.",
+        "Faça as emendas dentro das caixas, nunca dentro do eletroduto.",
+        "Instale tomadas e interruptores, feche e teste circuito por circuito.",
+        "A ligação no quadro de distribuição e o ensaio final são etapas de profissional habilitado."
+      ],
+      "cuidados": [
+        "Este serviço tem risco de morte por choque e de incêndio por dimensionamento errado. A execução e a ligação no quadro exigem profissional habilitado, com as medidas de segurança da NR-10.",
+        "Nunca emende condutor dentro do eletroduto: a emenda tem que ficar acessível dentro de caixa.",
+        "Circuito de chuveiro, forno e ar-condicionado é circuito dedicado e tem exigências próprias — não puxe de tomada existente.",
+        "Dispositivo DR e aterramento não são opcionais na instalação residencial."
+      ],
+      "erros_comuns": [
+        "Emendar fio dentro do eletroduto e não conseguir achar o defeito depois.",
+        "Superlotar o eletroduto de condutores, o que dificulta a dissipação de calor e a manutenção.",
+        "Usar seção de cabo abaixo do necessário porque 'sempre funcionou assim' — aquece e vira risco de incêndio.",
+        "Não identificar os condutores por cor e virar adivinhação na manutenção."
+      ],
+      "riscos": ["eletrico"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 5410",
+        "nota": "Fixa as condições das instalações elétricas de baixa tensão: seções mínimas, proteção, aterramento e DR. A segurança do trabalho com eletricidade está na NR-10."
+      }
+    },
+
+    {
+      "id": "hidraulica-basica",
+      "nome": "Instalação hidráulica básica (água fria e esgoto)",
+      "aliases": ["hidraulica", "hidráulica", "encanamento", "tubulacao", "agua fria", "esgoto", "cano"],
+      "oque": "Montagem de ramais de água fria em PVC soldável e de esgoto em PVC, com rasgo, tubulação, conexões e teste de estanqueidade.",
+      "quando_usar": "Obra nova, troca de tubulação antiga, mudança de posição de pontos de água e esgoto.",
+      "base": "m",
+      "calculadora": "linear",
+      "consumos": [
+        {
+          "material_id": "tubo-pvc-soldavel-25",
+          "coef": { "min": 1.0, "max": 1.15, "unid": "m/m", "perda": 0.10,
+            "motivo": "A faixa cobre as sobras de corte: raramente a barra de 6 m fecha certinho no trecho.",
+            "fonte": { "tipo": "mercado", "ref": "prática corrente de instalação", "nota": "25 mm (¾\") é o diâmetro usual de ramal de água fria residencial. O diâmetro do barrilete e das colunas sai do projeto hidráulico." } }
+        },
+        {
+          "material_id": "adesivo-pvc",
+          "coef": { "min": 3, "max": 8, "unid": "g/m", "perda": 0.10,
+            "motivo": "Depende de quantas conexões há no trecho — trecho cheio de curva consome muito mais que trecho reto.",
+            "fonte": { "tipo": "mercado", "ref": "prática corrente de instalação", "nota": "Consumo por junta soldada; a estimativa por metro é grosseira e serve para não faltar." } }
+        },
+        {
+          "material_id": "fita-veda-rosca",
+          "coef": { "min": 0.03, "max": 0.10, "unid": "un/m", "perda": 0.05,
+            "fonte": { "tipo": "mercado", "ref": "prática corrente de instalação", "nota": "Vedação de conexões roscáveis (registros, torneiras, adaptadores)." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "arco-serra", "essencial": true },
+        { "id": "lixa-tubo", "essencial": true },
+        { "id": "chave-grifo", "essencial": true },
+        { "id": "trena", "essencial": true },
+        { "id": "talhadeira", "essencial": true },
+        { "id": "nivel-bolha", "essencial": true },
+        { "id": "esmerilhadeira", "essencial": false },
+        { "id": "martelete", "essencial": false },
+        { "id": "oculos-protecao", "essencial": true },
+        { "id": "luva-nitrilica", "essencial": true },
+        { "id": "mascara-po", "essencial": false }
+      ],
+      "sequencia": [
+        "Feche o registro geral antes de mexer em qualquer tubulação existente.",
+        "Marque o percurso; o esgoto precisa de caimento contínuo (cerca de 2% em ramais de 100 mm) e o de água fria não pode ficar preso sem folga.",
+        "Abra os rasgos e teste a montagem a seco antes de colar — depois de colado não tem volta.",
+        "Para cada junta soldável: corte esquadrado, tire a rebarba, LIXE as duas superfícies, limpe, aplique adesivo fino e uniforme e encaixe sem torcer.",
+        "Deixe curar no mínimo 12 h antes de pressurizar.",
+        "Faça o teste de estanqueidade com a tubulação ainda aparente — encontrar vazamento depois do reboco é prejuízo dobrado.",
+        "Só feche os rasgos depois do teste aprovado."
+      ],
+      "cuidados": [
+        "Nunca cole sem lixar: a junta soldável de PVC depende do lixamento para a solda química funcionar.",
+        "Adesivo em excesso escorre para dentro do tubo e reduz a seção; adesivo de menos deixa a junta vazando.",
+        "Nunca use fita veda-rosca em junta soldável — são sistemas diferentes.",
+        "Água quente exige tubo próprio (CPVC ou PPR); PVC soldável comum deforma com água quente."
+      ],
+      "erros_comuns": [
+        "Fechar a parede antes do teste de estanqueidade.",
+        "Esquecer o caimento do esgoto e o ramal entupir sempre no mesmo lugar.",
+        "Usar PVC de esgoto para água sob pressão — ele não é feito para isso e estoura.",
+        "Não deixar registro de manutenção acessível."
+      ],
+      "depende": ["alvenaria"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 5626",
+        "nota": "Trata dos sistemas prediais de água fria e água quente: projeto, execução e ensaio de estanqueidade. Para esgoto predial aplica-se a ABNT NBR 8160."
+      }
+    },
+
+    {
+      "id": "telhado",
+      "nome": "Cobrir telhado",
+      "aliases": ["telhado", "telha", "cobertura", "colocar telha", "telhar"],
+      "oque": "Assentar as telhas sobre o madeiramento ou a estrutura da cobertura, respeitando inclinação e recobrimento.",
+      "quando_usar": "Cobertura nova ou troca de telhas. O DIMENSIONAMENTO da estrutura que sustenta o telhado é serviço de profissional.",
+      "base": "m2",
+      "calculadora": "telhado",
+      "variantes": [
+        { "id": "portuguesa", "nome": "Telha cerâmica portuguesa", "padrao": true },
+        { "id": "colonial", "nome": "Telha cerâmica colonial (capa e canal)" },
+        { "id": "fibrocimento", "nome": "Telha ondulada de fibrocimento 6 mm" }
+      ],
+      "consumos": [
+        {
+          "material_id": "telha-ceramica-portuguesa",
+          "variante": "portuguesa",
+          "coef": { "min": 16, "max": 17, "unid": "telha/m2", "perda": 0.05,
+            "motivo": "Varia com o fabricante e com o recobrimento adotado.",
+            "fonte": { "tipo": "fabricante", "ref": "número de peças por m² declarado pelos fabricantes de telha portuguesa", "nota": "A ABNT NBR 15310 especifica a telha e seus ensaios, mas o rendimento por m² é informação do fabricante e varia com o modelo." } }
+        },
+        {
+          "material_id": "telha-ceramica-colonial",
+          "variante": "colonial",
+          "coef": { "min": 24, "max": 26, "unid": "telha/m2", "perda": 0.05,
+            "motivo": "Contagem somando capa e canal — são duas peças por posição, por isso o número é bem maior que o da portuguesa.",
+            "fonte": { "tipo": "fabricante", "ref": "número de peças por m² declarado pelos fabricantes de telha colonial", "nota": "O total inclui capas e canais. Confirme com o fabricante do modelo escolhido." } }
+        },
+        {
+          "material_id": "telha-fibrocimento-6mm",
+          "variante": "fibrocimento",
+          "coef": { "min": 1.15, "max": 1.30, "unid": "m2 de telha/m2", "perda": 0.05,
+            "motivo": "A faixa é o recobrimento: parte da telha fica sobreposta e não cobre área útil.",
+            "fonte": { "tipo": "norma", "ref": "ABNT NBR 15210-1", "nota": "A norma fixa os recobrimentos longitudinal e transversal mínimos da telha ondulada de fibrocimento, que é o que faz a área comprada ser maior que a área coberta." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "trena", "essencial": true },
+        { "id": "linha-pedreiro", "essencial": true },
+        { "id": "martelo-borracha", "essencial": true },
+        { "id": "escada", "essencial": true },
+        { "id": "andaime", "essencial": false },
+        { "id": "esmerilhadeira", "essencial": false },
+        { "id": "cinto-paraquedista", "essencial": true },
+        { "id": "capacete", "essencial": true },
+        { "id": "bota-seguranca", "essencial": true },
+        { "id": "luva-raspa", "essencial": true },
+        { "id": "oculos-protecao", "essencial": true }
+      ],
+      "sequencia": [
+        "Confirme com o profissional responsável que a estrutura suporta o peso do tipo de telha escolhido — telha cerâmica pesa muito mais que fibrocimento.",
+        "Confira a inclinação mínima exigida pelo fabricante da telha. Inclinação abaixo do mínimo dá infiltração por capilaridade, e não tem conserto além de refazer.",
+        "Confira o alinhamento e o espaçamento das ripas ou terças conforme a telha escolhida.",
+        "Comece pelo beiral, subindo em fiadas, e trabalhe no sentido contrário ao vento dominante.",
+        "Respeite os recobrimentos longitudinal e transversal indicados pelo fabricante.",
+        "Fixe as telhas nas bordas, cumeeira e beiral, onde o vento levanta.",
+        "Feche cumeeiras e espigões com as peças próprias e argamassa ou fixação específica.",
+        "Teste com mangueira antes de considerar pronto."
+      ],
+      "cuidados": [
+        "Trabalho em telhado é trabalho em altura: exige cinturão tipo paraquedista ancorado em ponto firme, calçado antiderrapante e área isolada embaixo (NR-35).",
+        "NUNCA pise diretamente na telha: use tábua apoiada sobre as terças para distribuir o peso. Telha de fibrocimento rompe sem aviso e a queda é de altura.",
+        "Não trabalhe em telhado molhado, com vento forte ou com risco de raio.",
+        "Telha velha de fibrocimento pode conter amianto: não corte nem quebre a seco, e consulte a regra local de descarte.",
+        "O dimensionamento do madeiramento (terças, caibros, ripas) e a verificação da estrutura são serviço de engenheiro ou arquiteto responsável, não de tabela."
+      ],
+      "erros_comuns": [
+        "Adotar inclinação abaixo do mínimo do fabricante para 'ficar mais bonito' e ter infiltração no primeiro temporal.",
+        "Não fixar as telhas do beiral e da cumeeira e perder o telhado no primeiro vendaval.",
+        "Recobrimento menor que o especificado para economizar telha.",
+        "Pisar na telha e cair."
+      ],
+      "riscos": ["altura", "estrutural"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15575-5",
+        "nota": "Trata dos requisitos de desempenho para sistemas de cobertura de edificações habitacionais. As telhas em si são especificadas pela ABNT NBR 15310 (cerâmicas) e ABNT NBR 15210-1 (fibrocimento); o trabalho em altura, pela NR-35."
+      }
+    },
+
+    {
+      "id": "impermeabilizacao",
+      "nome": "Impermeabilização",
+      "aliases": ["impermeabilizar", "impermeabilizacao", "manta asfaltica", "infiltracao", "laje impermeavel"],
+      "oque": "Aplicar barreira contínua que impede a passagem de água em laje, box, sacada, calha, baldrame ou reservatório.",
+      "quando_usar": "Toda superfície que recebe água e tem ambiente embaixo ou do lado: laje exposta, box, sacada, jardineira, baldrame.",
+      "base": "m2",
+      "calculadora": "linear",
+      "variantes": [
+        { "id": "manta", "nome": "Manta asfáltica (laje exposta, área grande)", "padrao": true },
+        { "id": "polimerica", "nome": "Argamassa polimérica (box, área molhada interna)" },
+        { "id": "emulsao", "nome": "Emulsão asfáltica (baldrame, superfície de apoio)" }
+      ],
+      "consumos": [
+        {
+          "material_id": "manta-asfaltica",
+          "variante": "manta",
+          "coef": { "min": 1.15, "max": 1.30, "unid": "m2/m2", "perda": 0.05,
+            "motivo": "A faixa cobre a sobreposição entre as tiras (cerca de 10 cm) e a subida obrigatória nas paredes (rodapé de 20 a 30 cm).",
+            "fonte": { "tipo": "norma", "ref": "ABNT NBR 9574", "nota": "A norma de execução de impermeabilização exige sobreposição entre mantas e arremate subindo nas paredes; é isso que faz a área comprada superar a área do piso." } }
+        },
+        {
+          "material_id": "argamassa-polimerica",
+          "variante": "polimerica",
+          "coef": { "min": 3.0, "max": 4.5, "unid": "kg/m2", "perda": 0.08,
+            "motivo": "Total para as três demãos cruzadas usuais. Superfície rugosa consome mais.",
+            "fonte": { "tipo": "fabricante", "ref": "consumo declarado por fabricantes (cerca de 1,0 a 1,5 kg/m² por demão, 3 demãos)", "nota": "A ABNT NBR 9575 trata da seleção e projeto de impermeabilização; o consumo por demão é dado do fabricante." } }
+        },
+        {
+          "material_id": "emulsao-asfaltica",
+          "variante": "emulsao",
+          "coef": { "min": 2.4, "max": 3.6, "unid": "L/m2", "perda": 0.08,
+            "motivo": "Total para as três demãos cruzadas usuais (0,8 a 1,2 L/m² cada).",
+            "fonte": { "tipo": "fabricante", "ref": "consumo declarado por fabricantes de emulsão asfáltica", "nota": "Usada em baldrame e como preparo de base; não é impermeabilização de laje exposta ao tráfego." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "trincha-impermeabilizante", "essencial": true },
+        { "id": "balde", "essencial": true },
+        { "id": "estilete", "essencial": true },
+        { "id": "trena", "essencial": true },
+        { "id": "maçarico-manta", "essencial": false },
+        { "id": "desempenadeira-aco", "essencial": false },
+        { "id": "luva-nitrilica", "essencial": true },
+        { "id": "oculos-protecao", "essencial": true },
+        { "id": "mascara-po", "essencial": true },
+        { "id": "bota-seguranca", "essencial": true }
+      ],
+      "sequencia": [
+        "Confira o caimento da base para os ralos ANTES de impermeabilizar — impermeabilização não corrige água empoçada.",
+        "Limpe a superfície e arredonde os cantos vivos com argamassa (meia-cana): impermeabilizante racha em canto a 90°.",
+        "Aplique o primer ou a demão de imprimação recomendada pelo sistema escolhido.",
+        "Aplique o sistema: manta aquecida e aderida com sobreposição, ou argamassa/emulsão em demãos CRUZADAS (uma no sentido da outra).",
+        "Suba o arremate nas paredes (20 a 30 cm) e reforce ralos, cantos e passagens de tubulação.",
+        "Faça o teste de estanqueidade: lâmina d'água represada por no mínimo 72 h.",
+        "Só depois do teste aprovado, execute a camada de proteção mecânica antes do acabamento."
+      ],
+      "cuidados": [
+        "A proteção mecânica não é opcional: impermeabilização exposta ao sol e ao tráfego se degrada rápido.",
+        "Nunca pule o teste de estanqueidade. Descobrir a falha depois do piso assentado significa quebrar tudo de novo.",
+        "Trabalho com maçarico envolve chama aberta e vapores: exige ventilação, extintor à mão e nenhum material inflamável por perto.",
+        "Emulsão e primer asfáltico soltam vapores — use máscara e ventile."
+      ],
+      "erros_comuns": [
+        "Impermeabilizar sem arredondar os cantos, e a manta romper exatamente na quina.",
+        "Não subir o arremate na parede: a água entra pela lateral, por cima da impermeabilização.",
+        "Pular o teste de estanqueidade e descobrir a falha com o ambiente pronto.",
+        "Aplicar demãos no mesmo sentido em vez de cruzadas, deixando falha contínua."
+      ],
+      "riscos": ["quimico"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 9574",
+        "nota": "Trata da execução de impermeabilização: preparo de base, aplicação, arremates e ensaio de estanqueidade. A seleção do sistema está na ABNT NBR 9575."
+      }
+    },
+
+    {
+      "id": "drywall",
+      "nome": "Parede ou forro de drywall",
+      "aliases": ["drywall", "gesso acartonado", "parede de gesso", "forro de gesso", "parede drywall"],
+      "oque": "Estrutura de perfis de aço galvanizado fechada com chapas de gesso acartonado, com tratamento de juntas.",
+      "quando_usar": "Divisórias internas rápidas e leves, forros, e sempre que não se quiser o peso e a sujeira da alvenaria. Não serve para parede exposta ao tempo.",
+      "base": "m2",
+      "calculadora": "drywall",
+      "variantes": [
+        { "id": "parede", "nome": "Parede divisória (duas faces fechadas)", "padrao": true },
+        { "id": "forro", "nome": "Forro (uma face fechada)" }
+      ],
+      "consumos": [
+        {
+          "material_id": "chapa-drywall-st",
+          "variante": "parede",
+          "coef": { "min": 2.0, "max": 2.0, "unid": "m2 de chapa/m2 de parede", "perda": 0.10,
+            "motivo": "Duas faces: cada m² de parede consome 2 m² de chapa. A perda de 10% cobre os recortes.",
+            "fonte": { "tipo": "geometrico", "ref": "duas faces por parede", "nota": "Relação direta: parede fechada dos dois lados consome o dobro da sua área em chapa." } }
+        },
+        {
+          "material_id": "chapa-drywall-st",
+          "variante": "forro",
+          "coef": { "min": 1.0, "max": 1.0, "unid": "m2 de chapa/m2 de forro", "perda": 0.10,
+            "fonte": { "tipo": "geometrico", "ref": "uma face", "nota": "Forro fecha só um lado." } }
+        },
+        {
+          "material_id": "montante-48",
+          "coef": { "min": 1.67, "max": 2.60, "unid": "m/m2", "perda": 0.10,
+            "motivo": "1,67 m/m² é o espaçamento de 60 cm entre montantes; 2,60 m/m² é o espaçamento de 40 cm, exigido quando a chapa recebe revestimento cerâmico ou carga.",
+            "fonte": { "tipo": "geometrico", "ref": "espaçamento de 40 a 60 cm entre montantes (ABNT NBR 15758-1)", "nota": "A norma trata do projeto e da execução do sistema. O consumo por m² é o inverso do espaçamento adotado." } }
+        },
+        {
+          "material_id": "guia-48",
+          "coef": { "min": 0.60, "max": 0.90, "unid": "m/m2", "perda": 0.10,
+            "motivo": "Depende do pé-direito: guia superior e inferior somam 2 vezes o comprimento da parede, diluídos na área. Informando a altura real, o cálculo passa a usar a geometria exata em vez desta faixa.",
+            "fonte": { "tipo": "geometrico", "ref": "duas guias (piso e teto) por parede, com pé-direito de 2,2 a 3,3 m", "nota": "Consumo por m² = 2 / altura da parede." } }
+        },
+        {
+          "material_id": "parafuso-drywall",
+          "coef": { "min": 30, "max": 40, "unid": "un/m2", "perda": 0.10,
+            "motivo": "Duas faces, com parafusos a cada 25 a 30 cm nos montantes.",
+            "fonte": { "tipo": "norma", "ref": "ABNT NBR 15758-1", "nota": "A norma fixa o espaçamento máximo de fixação das chapas aos perfis; o número por m² decorre desse espaçamento." } }
+        },
+        {
+          "material_id": "massa-juntas-drywall",
+          "coef": { "min": 0.5, "max": 0.9, "unid": "kg/m2", "perda": 0.10,
+            "motivo": "Depende do nível de acabamento: três demãos para pintura lisa consomem mais que o tratamento básico.",
+            "fonte": { "tipo": "fabricante", "ref": "consumo declarado por fabricantes para tratamento de juntas em 3 demãos", "nota": "O procedimento de tratamento de juntas está na ABNT NBR 15758-1; o consumo é dado do fabricante." } }
+        },
+        {
+          "material_id": "fita-papel-drywall",
+          "coef": { "min": 2.0, "max": 2.6, "unid": "m/m2", "perda": 0.10,
+            "fonte": { "tipo": "geometrico", "ref": "juntas entre chapas de 1,20 m de largura, nas duas faces", "nota": "Toda junta entre chapas recebe fita; a metragem decorre da largura da chapa." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "parafusadeira", "essencial": true },
+        { "id": "estilete", "essencial": true },
+        { "id": "tesoura-chapa", "essencial": true },
+        { "id": "nivel-bolha", "essencial": true },
+        { "id": "prumo", "essencial": true },
+        { "id": "trena", "essencial": true },
+        { "id": "espatula", "essencial": true },
+        { "id": "lixa", "essencial": true },
+        { "id": "nivel-laser", "essencial": false },
+        { "id": "escada", "essencial": true },
+        { "id": "oculos-protecao", "essencial": true },
+        { "id": "mascara-po", "essencial": true },
+        { "id": "luva-nitrilica", "essencial": false }
+      ],
+      "sequencia": [
+        "Marque a posição da parede no piso e transfira para o teto com prumo ou laser.",
+        "Fixe as guias no piso e no teto, com banda acústica embaixo se quiser reduzir a transmissão de ruído.",
+        "Encaixe os montantes nas guias, no espaçamento definido (60 cm no caso geral, 40 cm quando houver revestimento ou carga).",
+        "Reforce com montante duplo ou peça de madeira onde for pendurar carga (TV, armário, bancada) — isso tem que ser decidido ANTES de fechar.",
+        "Passe a infraestrutura elétrica e hidráulica por dentro, com proteção nas travessias dos perfis.",
+        "Feche a primeira face parafusando as chapas nos montantes, sem afundar demais o parafuso.",
+        "Coloque a lã (acústica ou térmica), se for o caso, e feche a segunda face desencontrando as juntas.",
+        "Trate as juntas: massa, fita de papel e mais duas demãos de massa, lixando entre elas.",
+        "Lixe o acabamento final e remova o pó antes de pintar."
+      ],
+      "cuidados": [
+        "Em área molhada use chapa RU (verde, resistente à umidade) e impermeabilize a base. Chapa ST comum em box vira papelão molhado.",
+        "Carga pendurada precisa de reforço definido antes do fechamento — bucha comum em chapa de gesso não segura peso.",
+        "Nunca use drywall em parede externa exposta ao tempo.",
+        "Armazene as chapas deitadas e secas; chapa empenada ou molhada não recupera."
+      ],
+      "erros_comuns": [
+        "Esquecer o reforço para a TV e ter que abrir a parede depois.",
+        "Alinhar as juntas das duas faces no mesmo montante, criando um plano fraco que trinca.",
+        "Afundar o parafuso demais e rasgar o papel da chapa, o que anula a fixação.",
+        "Usar chapa ST em banheiro."
+      ],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 15758-1",
+        "nota": "Trata do projeto e dos procedimentos executivos de sistemas construtivos em chapas de gesso para drywall, incluindo espaçamentos, fixação e tratamento de juntas."
+      }
+    },
+
+    {
+      "id": "gesso-liso",
+      "nome": "Revestimento de gesso liso",
+      "aliases": ["gesso liso", "gesso", "revestimento de gesso", "emassar com gesso"],
+      "oque": "Camada fina de gesso aplicada diretamente sobre a alvenaria ou o concreto, deixando a superfície lisa e pronta para pintura.",
+      "quando_usar": "Substitui o reboco mais a massa corrida em ambientes internos secos, com acabamento mais liso e execução mais rápida.",
+      "base": "m2",
+      "calculadora": "linear",
+      "consumos": [
+        {
+          "material_id": "gesso-em-po",
+          "coef": { "min": 5.0, "max": 10.0, "unid": "kg/m2", "perda": 0.15,
+            "motivo": "A faixa é a espessura: 5 mm bem executado fica perto de 5 kg/m², parede irregular que precisa de 10 mm dobra isso. A perda de 15% é alta e realista — gesso tem pega rápida e o que sobra na masseira endurece e vai fora.",
+            "fonte": { "tipo": "mercado", "ref": "consumo típico de obra para gesso liso de 5 a 10 mm de espessura", "nota": "A ABNT NBR 13207 especifica o gesso para construção civil, mas não publica consumo por m². O valor decorre da espessura aplicada e da massa específica do gesso endurecido." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "desempenadeira-aco", "essencial": true },
+        { "id": "espatula", "essencial": true },
+        { "id": "masseira", "essencial": true },
+        { "id": "balde", "essencial": true },
+        { "id": "sarrafo", "essencial": true },
+        { "id": "lixa", "essencial": false },
+        { "id": "mascara-po", "essencial": true },
+        { "id": "luva-nitrilica", "essencial": true },
+        { "id": "oculos-protecao", "essencial": true }
+      ],
+      "sequencia": [
+        "Confira que a parede está seca, limpa e sem partes soltas.",
+        "Prepare APENAS a quantidade que consegue aplicar em 15 a 20 minutos — gesso pega rápido e não se recupera.",
+        "Aplique com a desempenadeira, puxando de baixo para cima.",
+        "Sarrafeie e alise antes da pega; o acabamento é feito com o gesso ainda plástico.",
+        "Dê o alisamento final com desempenadeira e um pouco de água.",
+        "Aguarde a secagem completa antes de pintar."
+      ],
+      "cuidados": [
+        "Gesso NÃO vai em área molhada nem em parede externa: ele absorve água e desagrega.",
+        "Gesso não adere bem sobre superfície muito lisa de concreto sem preparo prévio.",
+        "Nunca reidrate gesso que começou a pegar — ele perde resistência de vez.",
+        "A poeira de gesso é fina e irritante: máscara PFF-2 sempre."
+      ],
+      "erros_comuns": [
+        "Preparar massa demais de uma vez e jogar metade fora.",
+        "Usar gesso em banheiro e ver a parede esfarelar.",
+        "Pintar sobre gesso ainda úmido, o que borbulha e descasca."
+      ],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 13207",
+        "nota": "Especifica o gesso para construção civil: tipos, requisitos físicos e químicos. O procedimento de aplicação é prática consolidada de obra."
+      }
+    },
+
+    {
+      "id": "concretagem-simples",
+      "nome": "Calçada e concretagem simples",
+      "aliases": ["calcada", "calçada", "concretar", "concretagem", "piso de concreto", "lastro", "contra piso de concreto"],
+      "oque": "Concretagem de superfícies apoiadas no solo: calçada, piso de garagem, lastro sob contrapiso. NÃO cobre peça estrutural.",
+      "quando_usar": "Calçada, área de circulação externa, piso de garagem, lastro de regularização sobre o solo.",
+      "base": "m3",
+      "calculadora": "concretagem",
+      "espessura_padrao": 0.07,
+      "espessura_min": 0.05,
+      "espessura_max": 0.15,
+      "variantes": [
+        { "id": "calcada", "nome": "Calçada ou piso de circulação (traço 1:2:3, com tela)", "padrao": true },
+        { "id": "lastro", "nome": "Lastro de regularização (traço 1:4:8, sem tela)" }
+      ],
+      "consumos": [
+        {
+          "material_id": "cimento-cp2",
+          "variante": "calcada",
+          "coef": { "min": 320, "max": 380, "unid": "kg/m3", "perda": 0.08,
+            "motivo": "Equivale a cerca de 6,5 a 7,5 sacos por m³. A faixa cobre a variação real de dosagem e de massa unitária dos agregados.",
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:3 (cimento:areia:brita) em volume", "nota": "Traço corrente de obra para concreto não estrutural de calçada. Concreto ESTRUTURAL tem que ser dosado conforme a ABNT NBR 12655, com controle tecnológico e projeto." } }
+        },
+        {
+          "material_id": "areia-media",
+          "variante": "calcada",
+          "coef": { "min": 0.50, "max": 0.62, "unid": "m3/m3", "perda": 0.08,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:3 (cimento:areia:brita) em volume", "nota": "Consumo típico de obra. A soma dos volumes soltos supera 1 m³ porque os finos preenchem os vazios da brita." } }
+        },
+        {
+          "material_id": "brita-1",
+          "variante": "calcada",
+          "coef": { "min": 0.60, "max": 0.72, "unid": "m3/m3", "perda": 0.08,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:2:3 (cimento:areia:brita) em volume", "nota": "Consumo típico de obra." } }
+        },
+        {
+          "material_id": "cimento-cp2",
+          "variante": "lastro",
+          "coef": { "min": 150, "max": 200, "unid": "kg/m3", "perda": 0.08,
+            "motivo": "Concreto magro: cerca de 3 a 4 sacos por m³. Serve para regularizar, não para receber carga.",
+            "fonte": { "tipo": "mercado", "ref": "traço 1:4:8 (cimento:areia:brita) em volume", "nota": "Traço de concreto magro, usado como lastro de regularização. Não tem função estrutural." } }
+        },
+        {
+          "material_id": "areia-media",
+          "variante": "lastro",
+          "coef": { "min": 0.55, "max": 0.70, "unid": "m3/m3", "perda": 0.08,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:4:8 em volume", "nota": "Consumo típico de obra." } }
+        },
+        {
+          "material_id": "brita-1",
+          "variante": "lastro",
+          "coef": { "min": 0.65, "max": 0.80, "unid": "m3/m3", "perda": 0.08,
+            "fonte": { "tipo": "mercado", "ref": "traço 1:4:8 em volume", "nota": "Consumo típico de obra." } }
+        },
+        {
+          "material_id": "tela-soldada-q92",
+          "variante": "calcada",
+          "base": "m2",
+          "coef": { "min": 1.05, "max": 1.15, "unid": "m2/m2", "perda": 0.05,
+            "motivo": "A faixa é a sobreposição entre painéis vizinhos.",
+            "fonte": { "tipo": "mercado", "ref": "prática corrente para calçada e piso apoiado no solo", "nota": "A tela combate a fissuração por retração em piso apoiado no solo. Ela NÃO transforma a peça em elemento estrutural: laje, viga e piso que recebe carga precisam de armadura de projeto (ABNT NBR 6118)." } }
+        },
+        {
+          "material_id": "lona-plastica",
+          "base": "m2",
+          "coef": { "min": 1.05, "max": 1.15, "unid": "m2/m2", "perda": 0.05,
+            "fonte": { "tipo": "mercado", "ref": "prática corrente de obra", "nota": "Barreira contra a perda de água do concreto para o solo e contra a umidade ascendente." } }
+        },
+        {
+          "material_id": "tabua-pinus",
+          "base": "m2",
+          "coef": { "min": 0.30, "max": 0.90, "unid": "m/m2", "perda": 0.10,
+            "motivo": "Faixa muito larga porque depende do FORMATO da área, não do tamanho: uma calçada estreita e comprida tem muito mais perímetro por m² que uma área quadrada. Se você informar o perímetro real, o número fica exato.",
+            "fonte": { "tipo": "geometrico", "ref": "perímetro da área a concretar", "nota": "A fôrma acompanha o perímetro; a relação perímetro/área varia com a geometria." } }
+        }
+      ],
+      "ferramentas": [
+        { "id": "betoneira", "essencial": true },
+        { "id": "carrinho-de-mao", "essencial": true },
+        { "id": "sarrafo", "essencial": true },
+        { "id": "desempenadeira-madeira", "essencial": true },
+        { "id": "enxada", "essencial": true },
+        { "id": "pa", "essencial": true },
+        { "id": "mangueira-nivel", "essencial": true },
+        { "id": "nivel-bolha", "essencial": true },
+        { "id": "trena", "essencial": true },
+        { "id": "vibrador-concreto", "essencial": false },
+        { "id": "desempenadeira-aco", "essencial": false },
+        { "id": "bota-seguranca", "essencial": true },
+        { "id": "luva-nitrilica", "essencial": true },
+        { "id": "oculos-protecao", "essencial": true },
+        { "id": "joelheira", "essencial": false }
+      ],
+      "sequencia": [
+        "Regularize e COMPACTE o solo. Solo fofo embaixo é a causa número um de calçada quebrada.",
+        "Monte as fôrmas laterais no nível e no caimento desejado (cerca de 1% para escoar a água para fora).",
+        "Estenda a lona plástica sobre o solo compactado.",
+        "Posicione a tela soldada elevada com espaçadores, no meio da espessura — tela jogada no chão não trabalha.",
+        "Prepare o concreto no traço definido, com água controlada: excesso de água derruba a resistência.",
+        "Lance, espalhe e adense o concreto; sarrafeie apoiado nas fôrmas.",
+        "Desempene quando o concreto perder o brilho da água superficial e dê o acabamento (vassourado antiderrapante, se for calçada).",
+        "Faça as juntas de dilatação a cada 2 a 3 m em ambas as direções — o concreto vai trincar, a junta decide ONDE.",
+        "Cure mantendo úmido ou coberto com lona por no mínimo 7 dias.",
+        "Libere para pedestres após 3 dias e para veículo após 28 dias."
+      ],
+      "cuidados": [
+        "Este serviço cobre apenas concreto APOIADO NO SOLO. Laje, viga, pilar, sapata, muro de arrimo e qualquer peça que vença vão ou receba carga são elementos ESTRUTURAIS: o traço, a armadura e as dimensões têm que vir de projeto de engenheiro ou arquiteto responsável.",
+        "Junta de dilatação não é detalhe estético: sem ela a placa trinca de forma aleatória e feia.",
+        "Não jogue água no concreto fresco para 'facilitar o acabamento' — isso enfraquece a superfície e ela vira pó depois.",
+        "Cura é obrigatória. Concreto que seca rápido demais perde boa parte da resistência."
+      ],
+      "erros_comuns": [
+        "Concretar sobre solo não compactado.",
+        "Adicionar água além do traço para o concreto ficar mais fácil de espalhar.",
+        "Esquecer as juntas de dilatação.",
+        "Deixar a tela no fundo, encostada na lona, onde ela não combate a fissuração.",
+        "Liberar carro sobre a calçada antes dos 28 dias."
+      ],
+      "riscos": ["estrutural"],
+      "fonte": {
+        "tipo": "norma",
+        "ref": "ABNT NBR 12655",
+        "nota": "Trata do preparo, controle, recebimento e aceitação do concreto de cimento Portland. Concreto estrutural exige ainda projeto conforme a ABNT NBR 6118."
+      }
+    }
+  ]
+}

@@ -40,15 +40,15 @@ func setupTestDB(t *testing.T) *sql.DB {
 // mockGateway é uma implementação stubbada de psp.Gateway para os webhook tests.
 // Permite controlar o que VerifyWebhook/ParseWebhookEvent/GetPayment retornam.
 type mockGateway struct {
-	name           string
-	verifyErr      error
-	parsedEvent    *psp.WebhookEvent
-	parseErr       error
-	getResult      *psp.GetResult
-	getErr         error
+	name        string
+	verifyErr   error
+	parsedEvent *psp.WebhookEvent
+	parseErr    error
+	getResult   *psp.GetResult
+	getErr      error
 }
 
-func (m *mockGateway) Name() string                                                    { return m.name }
+func (m *mockGateway) Name() string { return m.name }
 func (m *mockGateway) CreatePayment(ctx context.Context, r psp.CreateRequest) (*psp.CreateResult, error) {
 	return nil, errors.New("not implemented")
 }

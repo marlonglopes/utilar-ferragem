@@ -21,6 +21,15 @@ func RequestID() gin.HandlerFunc {
 		}
 		c.Set("request_id", id)
 		c.Header(RequestIDHeader, id)
+
+		// Também no context.Context da request, não só no gin.Context.
+		//
+		// É ESTE passo que faz a correlação atravessar serviços: o transport de
+		// pkg/httpclient lê o id do context e injeta X-Request-Id em toda chamada
+		// service-to-service (payment→order, payment→auth, payment→PSP). Sem
+		// isso o id morria aqui e um checkout virava 3 traços desconexos.
+		c.Request = c.Request.WithContext(requestid.NewContext(c.Request.Context(), id))
+
 		c.Next()
 	}
 }
@@ -35,8 +44,14 @@ func AccessLog() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
+		// user_id entra na linha de log (M-OBS): sem ele não dá pra responder
+		// "o que este usuário fez na última hora" numa investigação, e é a
+		// segunda dimensão de correlação depois do request_id. É um UUID
+		// opaco — não é PII por si só (nome/email/CPF continuam fora).
 		slog.Info("http",
 			"request_id", c.GetString("request_id"),
+			"user_id", c.GetString("user_id"),
+			"role", c.GetString("user_role"),
 			"method", c.Request.Method,
 			"path", c.FullPath(),
 			"status", c.Writer.Status(),
@@ -88,4 +103,3 @@ func SecurityHeaders() gin.HandlerFunc {
 		c.Next()
 	}
 }
-

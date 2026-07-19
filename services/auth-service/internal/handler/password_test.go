@@ -4,9 +4,9 @@ import "testing"
 
 func TestValidatePasswordStrength_Aceita(t *testing.T) {
 	for _, pw := range []string{
-		"Senha-Forte-1!",  // 14 chars, 4 categorias
-		"abcdef1234ABC",   // 13 chars, 3 categorias
-		"super-secret-123", // 16 chars, lower+digit+symbol
+		"Senha-Forte-1!",       // 14 chars, 4 categorias
+		"abcdef1234ABC",        // 13 chars, 3 categorias
+		"super-secret-123",     // 16 chars, lower+digit+symbol
 		"longo o suficiente1A", // contém espaço (symbol)
 	} {
 		if err := validatePasswordStrength(pw); err != nil {
@@ -23,12 +23,12 @@ func TestValidatePasswordStrength_RejeitaCurta(t *testing.T) {
 
 func TestValidatePasswordStrength_RejeitaPoucasCategorias(t *testing.T) {
 	for _, pw := range []string{
-		"abcdefghijk",      // só lowercase
-		"ABCDEFGHIJK",      // só uppercase
-		"12345678901",      // só dígito
-		"!!!!!!!!!!!",      // só símbolo
-		"abcdefghABC",      // 2 categorias (lower+upper)
-		"abcdefgh12",       // 2 categorias (lower+digit)
+		"abcdefghijk", // só lowercase
+		"ABCDEFGHIJK", // só uppercase
+		"12345678901", // só dígito
+		"!!!!!!!!!!!", // só símbolo
+		"abcdefghABC", // 2 categorias (lower+upper)
+		"abcdefgh12",  // 2 categorias (lower+digit)
 	} {
 		if err := validatePasswordStrength(pw); err == nil {
 			t.Errorf("senha %q (poucas categorias) deveria ser rejeitada", pw)
@@ -38,9 +38,9 @@ func TestValidatePasswordStrength_RejeitaPoucasCategorias(t *testing.T) {
 
 func TestValidatePasswordStrength_RejeitaBlacklist(t *testing.T) {
 	for _, pw := range []string{
-		"utilar123",       // 9 chars (já reprovado por curta) — não conta
-		"utilar2026",      // 10 chars, lower+digit, mas blacklisted
-		"Password123",     // bate sensitive case insensitive? Não — não está exatamente lá
+		"utilar123",   // 9 chars (já reprovado por curta) — não conta
+		"utilar2026",  // 10 chars, lower+digit, mas blacklisted
+		"Password123", // bate sensitive case insensitive? Não — não está exatamente lá
 	} {
 		// utilar2026 (lower+digit = 2 categorias) ainda passa por blacklist primeiro
 		_ = pw

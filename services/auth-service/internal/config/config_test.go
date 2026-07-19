@@ -45,6 +45,9 @@ func TestLoad_RejectsShortJWTSecretInProd(t *testing.T) {
 
 func TestLoad_AcceptsStrongJWTSecretInProd(t *testing.T) {
 	t.Setenv("JWT_SECRET", strings.Repeat("a", 64))
+	// A1: fora de DEV_MODE o boot exige o segredo de serviço, distinto do de
+	// usuário. Ver service_secret_test.go para a cobertura dessa regra.
+	t.Setenv("SERVICE_JWT_SECRET", strings.Repeat("b", 64))
 	t.Setenv("DEV_MODE", "false")
 
 	cfg, err := Load()

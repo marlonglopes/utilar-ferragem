@@ -1,9 +1,12 @@
 // Testa o cross-service amount/ownership do PaymentHandler.Create (audit C1+C2).
 //
 // C1: amount usado no PSP vem do order-service, não do body. Cliente que envia
-//     `amount: 0.01` num pedido de R$ 5000 paga 5000.
+//
+//	`amount: 0.01` num pedido de R$ 5000 paga 5000.
+//
 // C2: order_id que não pertence ao user retorna 404 (cliente do order-service
-//     já filtra por user_id; payment-service confia nessa garantia).
+//
+//	já filtra por user_id; payment-service confia nessa garantia).
 package handler_test
 
 import (

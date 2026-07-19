@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/utilar/payment-service/internal/auth"
+	"github.com/utilar/pkg/servicetoken"
 )
 
 // JWTMiddleware valida o JWT do auth-service usando claims tipadas
@@ -27,6 +28,17 @@ func JWTMiddleware(secret string) gin.HandlerFunc {
 		// UserID é obrigatório; sem ele não há ownership scoping.
 		if claims.UserID == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid claims"})
+			return
+		}
+
+		// A1 (auditoria 2026-07-18): `role=service` é identidade de MÁQUINA e vive
+		// noutro segredo (SERVICE_JWT_SECRET, ver pkg/servicetoken). O
+		// payment-service não expõe rota de serviço e não carrega esse segredo,
+		// então um token de usuário com essa claim só pode ser tentativa de
+		// escalar papel — recusado explicitamente em vez de virar um `user_role`
+		// desconhecido no contexto.
+		if claims.Role == servicetoken.Role {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			return
 		}
 

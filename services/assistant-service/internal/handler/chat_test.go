@@ -10,8 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/utilar/assistant-service/internal/catalog"
 	"github.com/utilar/assistant-service/internal/alice"
+	"github.com/utilar/assistant-service/internal/catalog"
+	"github.com/utilar/assistant-service/internal/knowledge"
 	"github.com/utilar/assistant-service/internal/llm"
 )
 
@@ -123,7 +124,11 @@ func TestClampHistoryDescartaVaziosENormalizaRole(t *testing.T) {
 // -- LimitBody ----------------------------------------------------------------
 
 func newChatRouter() *gin.Engine {
-	h := NewChatHandler(alice.New(llm.NewMock(), catalog.New("http://127.0.0.1:1")))
+	kb, err := knowledge.Load()
+	if err != nil {
+		panic("base de conhecimento inválida: " + err.Error())
+	}
+	h := NewChatHandler(alice.New(llm.NewMock(), catalog.New("http://127.0.0.1:1"), kb, alice.Opts{}))
 	r := gin.New()
 	r.POST("/chat", LimitBody(MaxRequestBytes), h.Chat)
 	return r

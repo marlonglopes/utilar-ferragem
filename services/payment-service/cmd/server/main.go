@@ -16,6 +16,8 @@ import (
 	"github.com/utilar/payment-service/internal/config"
 	"github.com/utilar/payment-service/internal/db"
 	"github.com/utilar/payment-service/internal/handler"
+	"github.com/utilar/payment-service/internal/ledger"
+	"github.com/utilar/payment-service/internal/obs"
 	"github.com/utilar/payment-service/internal/orderclient"
 	"github.com/utilar/payment-service/internal/outbox"
 	"github.com/utilar/payment-service/internal/psp"
@@ -23,7 +25,9 @@ import (
 	appmaxv1gateway "github.com/utilar/payment-service/internal/psp/appmaxv1"
 	mpgateway "github.com/utilar/payment-service/internal/psp/mercadopago"
 	stripegateway "github.com/utilar/payment-service/internal/psp/stripe"
+	"github.com/utilar/pkg/audit"
 	"github.com/utilar/pkg/idempotency"
+	"github.com/utilar/pkg/metrics"
 	"github.com/utilar/pkg/ratelimit"
 )
 
@@ -82,17 +86,40 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go drainer.Run(ctx)
+
+	// Observabilidade. O registry é próprio do serviço (não o default global),
+	// e as métricas de negócio se penduram nele.
+	mreg := metrics.New("payment-service")
+	bizMetrics := obs.New(mreg.Registerer())
+	// Poller independente do drainer: se o drainer travar, uma métrica
+	// alimentada por ele ficaria congelada e o alerta nunca dispararia.
+	bizMetrics.StartDBPolling(ctx, database, 15*time.Second)
+
+	// Trilha de auditoria + livro contábil.
+	auditRec := audit.New(database, "payment-service")
+	poster := ledger.NewPoster(database, auditRec)
+	closer := ledger.NewCloser(database, auditRec)
+	reconciler := ledger.NewReconciler(database, gateway, bizMetrics)
+
+	go drainer.WithMetrics(bizMetrics).Run(ctx)
 
 	// Router
 	r := gin.New()
 	r.Use(
 		gin.Recovery(),
 		handler.RequestID(),
+		mreg.Middleware(),
 		handler.AccessLog(),
 		handler.SecurityHeaders(),
 		handler.CORS(cfg.AllowedOrigins),
 	)
+
+	// /metrics: fail-closed por token (ver pkg/metrics.Handler). Sem
+	// METRICS_TOKEN o endpoint responde 404 — nunca fica público por omissão.
+	r.GET("/metrics", mreg.Handler(cfg.MetricsToken))
+	if cfg.MetricsToken == "" {
+		slog.Warn("METRICS_TOKEN não configurado — /metrics DESABILITADO (fail-closed)")
+	}
 
 	// Cliente HTTP pra order-service (audit C1, C2 — server-side amount/ownership).
 	orderC := orderclient.New(cfg.OrderServiceURL)
@@ -100,7 +127,10 @@ func main() {
 	authC := authclient.New(cfg.AuthServiceURL)
 
 	paymentH := handler.NewPaymentHandler(database, gateway, orderC, authC, cfg.DevMode)
-	webhookH := handler.NewWebhookHandler(database, gateway)
+	webhookH := handler.NewWebhookHandler(database, gateway).
+		WithLedger(poster).
+		WithMetrics(bizMetrics)
+	ledgerH := handler.NewLedgerHandler(database, poster, closer, reconciler, auditRec)
 
 	// Webhook endpoint provider-agnostic. O `:provider` precisa bater com
 	// gateway.Name() — assim o atacante não consegue forçar webhook pra um
@@ -145,6 +175,27 @@ func main() {
 		api.POST("/payments", createChain...)
 		api.GET("/payments/:id", paymentH.Get)
 		api.POST("/payments/:id/sync", paymentH.Sync)
+	}
+
+	// API contábil — role=admin obrigatório. Contrato em docs/ledger-api.md.
+	adm := r.Group("/api/v1/ledger", handler.JWTMiddleware(cfg.JWTSecret), handler.AdminOnly())
+	{
+		adm.GET("/summary", ledgerH.Summary)
+		adm.GET("/by-method", ledgerH.ByMethod)
+		adm.GET("/daily", ledgerH.Daily)
+		adm.GET("/trial-balance", ledgerH.TrialBalance)
+		adm.GET("/entries", ledgerH.Entries)
+		adm.GET("/transactions/:id", ledgerH.GetTransaction)
+		adm.POST("/transactions/:id/reverse", ledgerH.Reverse)
+		adm.GET("/periods", ledgerH.ListPeriods)
+		adm.GET("/periods/:period", ledgerH.GetPeriod)
+		adm.POST("/periods/:period/close", ledgerH.ClosePeriod)
+		adm.POST("/reconcile", ledgerH.Reconcile)
+		adm.GET("/discrepancies", ledgerH.Discrepancies)
+		adm.POST("/discrepancies/:id/resolve", ledgerH.ResolveDiscrepancy)
+		adm.GET("/export", ledgerH.Export)
+		adm.GET("/audit", ledgerH.ListAudit)
+		adm.GET("/audit/verify", ledgerH.VerifyAudit)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

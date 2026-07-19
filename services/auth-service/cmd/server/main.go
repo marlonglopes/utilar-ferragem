@@ -43,6 +43,7 @@ func main() {
 
 	authH := handler.NewAuthHandler(database, cfg)
 	addrH := handler.NewAddressHandler(database)
+	storeH := handler.NewStoreHandler(database)
 
 	// A14-M5: cleanup periódico de tokens expirados (refresh, reset, verify).
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
@@ -50,7 +51,7 @@ func main() {
 	handler.StartTokenCleanup(cleanupCtx, database)
 
 	// A6-H2: rate limiter via Redis. Em dev sem REDIS_URL, mid noop (limiters nil-safe).
-	var loginRL, forgotRL, resetRL, verifyRL, registerRL gin.HandlerFunc
+	var loginRL, forgotRL, resetRL, verifyRL, registerRL, docLookupRL gin.HandlerFunc
 	if cfg.RedisURL != "" {
 		opts, err := redis.ParseURL(cfg.RedisURL)
 		if err != nil {
@@ -65,6 +66,13 @@ func main() {
 		verifyRL = ratelimit.Middleware(rl, "auth:verify", ratelimit.Limit{Max: 10, Window: time.Minute}, ratelimit.IPKey)
 		// L-AUTH-3: registro é raro (1 por usuário no funil). 5/h por IP.
 		registerRL = ratelimit.Middleware(rl, "auth:register", ratelimit.Limit{Max: 5, Window: time.Hour}, ratelimit.IPKey)
+		// LGPD: busca de cliente por CPF/CNPJ é superfície de enumeração de dado
+		// pessoal. 60/min POR OPERADOR (UserKey, não IPKey — a loja inteira sai
+		// pelo mesmo IP e um limite por IP puniria o caixa vizinho). 60/min é
+		// folga larga sobre o uso humano (um cliente a cada segundo) e ainda
+		// torna a varredura de CPFs inviável.
+		docLookupRL = ratelimit.Middleware(rl, "store:customer-lookup",
+			ratelimit.Limit{Max: 60, Window: time.Minute}, ratelimit.UserKey)
 
 		// L-AUTH-2: deny-list de access tokens via Redis. TTL = TTL do access token.
 		denyList := handler.NewAccessTokenDenyList(rdb, cfg.AccessTokenTTL)
@@ -101,6 +109,42 @@ func main() {
 		priv.GET("/addresses", addrH.List)
 		priv.POST("/addresses", addrH.Create)
 		priv.DELETE("/addresses/:id", addrH.Delete)
+	}
+
+	// -- PDV de balcão --------------------------------------------------------
+	// Administração de lojas e operadores: só admin. Conceder a alguém o poder
+	// de dar desconto é conceder acesso ao caixa.
+	admin := r.Group("/api/v1/admin",
+		handler.JWTAuth(cfg.JWTSecret, authH.AccessTokenDenyList()),
+		handler.RequireRole("admin"))
+	{
+		admin.POST("/stores", storeH.CreateStore)
+		admin.GET("/stores", storeH.ListStores)
+		admin.POST("/operators", storeH.CreateOperator)
+		admin.GET("/operators", storeH.ListOperators)
+		admin.PATCH("/operators/:userId", storeH.UpdateOperator)
+	}
+
+	// Superfície do vendedor no caixa. `admin` entra junto para suporte, mas
+	// `customer` e `seller` (lojista do marketplace) NÃO — é exatamente a
+	// confusão semântica que o papel novo existe para evitar.
+	store := r.Group("/api/v1/store",
+		handler.JWTAuth(cfg.JWTSecret, authH.AccessTokenDenyList()),
+		handler.RequireRole("store_operator", "admin"))
+	{
+		store.GET("/me", storeH.MyOperator)
+		store.GET("/customers", withRL(docLookupRL, storeH.LookupCustomer)...)
+		store.POST("/customers", storeH.CreateCustomer)
+	}
+
+	// Rotas de serviço — chamadas pelo order-service com token role=service
+	// assinado com o JWT_SECRET compartilhado (mesmo padrão do catalog-service).
+	internal := r.Group("/api/v1/internal",
+		handler.JWTAuth(cfg.JWTSecret, nil),
+		handler.RequireRole("service", "admin"))
+	{
+		internal.GET("/operators/:userId", storeH.GetOperatorInternal)
+		internal.GET("/customers/:id", storeH.GetCustomer)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

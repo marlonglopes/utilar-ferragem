@@ -45,7 +45,10 @@ var (
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
-	jwtSecret  string // assina o token role=service das rotas /internal (ver reservation.go)
+	// serviceSecret assina o token role=service das rotas /internal.
+	// A1: é o SERVICE_JWT_SECRET, distinto do JWT_SECRET de usuário — ver
+	// reservation.go e pkg/servicetoken.
+	serviceSecret string
 }
 
 // New cria um cliente. baseURL ex.: "http://localhost:8091" (sem trailing slash).
@@ -62,9 +65,10 @@ func New(baseURL string) *Client {
 }
 
 // NewWithSecret cria um cliente capaz de chamar as rotas internas de reserva.
-func NewWithSecret(baseURL, jwtSecret string) *Client {
+// serviceSecret é o SERVICE_JWT_SECRET — nunca o JWT_SECRET de usuário.
+func NewWithSecret(baseURL, serviceSecret string) *Client {
 	c := New(baseURL)
-	c.jwtSecret = jwtSecret
+	c.serviceSecret = serviceSecret
 	return c
 }
 

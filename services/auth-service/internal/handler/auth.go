@@ -208,7 +208,10 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		DBError(c, err)
 		return
 	}
-	access, err := auth.GenerateAccessToken(u.ID, u.Email, u.Role, h.cfg.JWTSecret, h.cfg.AccessTokenTTL)
+	// O refresh reemite o contexto de loja a partir do banco, não do token
+	// antigo: se o operador foi transferido de filial ou desativado, o token
+	// novo já nasce com a realidade atual.
+	access, err := auth.GenerateAccessTokenWithStore(u.ID, u.Email, u.Role, h.cfg.JWTSecret, h.cfg.AccessTokenTTL, h.storeContext(u))
 	if err != nil {
 		InternalError(c, "could not sign token")
 		return
@@ -459,8 +462,26 @@ func (h *AuthHandler) loadUser(id string) (*model.User, error) {
 	return &u, nil
 }
 
+// storeContext busca o vínculo de loja para embutir no token. Só consulta o
+// banco quando o papel é de operador — o login do cliente comum (o caminho
+// quente) não paga query extra nenhuma.
+func (h *AuthHandler) storeContext(u *model.User) *auth.StoreContext {
+	if u.Role != model.RoleStoreOperator {
+		return nil
+	}
+	storeID, level, ok := StoreContextFor(h.db, u.ID)
+	if !ok {
+		// Papel de operador sem vínculo ativo: estado inconsistente que o
+		// CreateOperator transacional impede, mas que um UPDATE manual no banco
+		// pode criar. Token sai sem store_id e o PDV barra na primeira rota.
+		slog.Warn("store_operator without active store binding", "user_id", u.ID)
+		return nil
+	}
+	return &auth.StoreContext{StoreID: storeID, Level: level}
+}
+
 func (h *AuthHandler) issueTokens(c *gin.Context, u *model.User) (access, refresh string, err error) {
-	access, err = auth.GenerateAccessToken(u.ID, u.Email, u.Role, h.cfg.JWTSecret, h.cfg.AccessTokenTTL)
+	access, err = auth.GenerateAccessTokenWithStore(u.ID, u.Email, u.Role, h.cfg.JWTSecret, h.cfg.AccessTokenTTL, h.storeContext(u))
 	if err != nil {
 		return "", "", err
 	}

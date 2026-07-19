@@ -49,13 +49,13 @@ func main() {
 	// NewWithSecret: o mesmo cliente serve pra consultar preço (rota pública) e
 	// pra reservar estoque (rotas /internal, que exigem token role=service
 	// assinado com o JWT_SECRET compartilhado).
-	catalog := catalogclient.NewWithSecret(cfg.CatalogServiceURL, cfg.JWTSecret)
+	catalog := catalogclient.NewWithSecret(cfg.CatalogServiceURL, cfg.ServiceJWTSecret)
 	rates := shipping.NewStore(database)
 
 	// authclient: de onde sai o TETO DE DESCONTO autoritativo do operador de
 	// balcão. Sem ele o balcão opera fail-closed (teto 0 → todo desconto vai
 	// para a fila do gerente), nunca fail-open.
-	authc := authclient.New(cfg.AuthServiceURL, cfg.JWTSecret)
+	authc := authclient.New(cfg.AuthServiceURL, cfg.ServiceJWTSecret)
 
 	orderH := handler.NewOrderHandler(database, catalog, cfg.DevMode).
 		WithStock(catalog).

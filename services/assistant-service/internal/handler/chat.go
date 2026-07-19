@@ -135,7 +135,16 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 
 	history := clampHistory(req.History)
 
-	res, err := h.engine.Chat(c.Request.Context(), history, req.Message)
+	// MODO: derivado EXCLUSIVAMENTE das claims validadas pelo OptionalAuth.
+	//
+	// Repare que `chatRequest` não tem campo `mode`, e isso é deliberado: se o
+	// modo viesse do corpo, qualquer visitante do site público mandaria
+	// {"mode":"vendedor"} e leria o custo e a margem da loja — o dado mais
+	// sensível do negócio. O corpo da requisição é entrada do usuário; papel é
+	// afirmação do servidor sobre quem ele é.
+	mode := alice.ModeFromClaims(c.GetString("user_id") != "", c.GetString("user_role"))
+
+	res, err := h.engine.Chat(c.Request.Context(), mode, history, req.Message)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "assistant unavailable"})
 		return

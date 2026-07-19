@@ -42,6 +42,7 @@ import (
 
 	"github.com/utilar/payment-service/internal/psp"
 	"github.com/utilar/pkg/httpclient"
+	"github.com/utilar/pkg/requestid"
 )
 
 // Endpoints padrão (produção). Sandbox via env — ver Config.
@@ -217,7 +218,13 @@ func (c *Client) refreshToken(ctx context.Context) (string, error) {
 		}
 	}
 	if tr.AccessToken == "" {
-		return "", fmt.Errorf("%w: oauth2/token sem access_token: %s", psp.ErrUpstream, raw)
+		// SEGURANÇA (audit AV1-H4): NÃO ecoamos `raw` aqui. Este é o corpo do
+		// endpoint de TOKEN — se a Appmax mudar o shape da resposta (o parser é
+		// tolerante justamente porque isso já aconteceu), o token viria dentro
+		// dele e cairia na mensagem de erro, que é logada e sobe pelo stack até
+		// o handler. Erro de auth reporta o QUE falhou, nunca o corpo.
+		return "", fmt.Errorf("%w: oauth2/token respondeu %d sem access_token reconhecível (%d bytes) — confira APPMAX_V1_CLIENT_ID/SECRET e a URL de auth",
+			psp.ErrUpstream, resp.StatusCode, len(raw))
 	}
 
 	ttl := time.Duration(tr.ExpiresIn) * time.Second
@@ -774,6 +781,13 @@ func (c *Client) SplitOrder(ctx context.Context, orderID int64, entries []SplitE
 		if strings.TrimSpace(e.RecipientHash) == "" {
 			return nil, fmt.Errorf("%w: split recipient_hash vazio", psp.ErrInvalidRequest)
 		}
+		// SEGURANÇA (audit appmaxv1 2026-07-18, AV1-H2): soma com detecção de
+		// overflow. Sem isto, duas entries de ~4.6e18 centavos estouram o int64,
+		// `sum` fica NEGATIVO e passa direto pela comparação `sum > cap` — a
+		// trava do split é contornada com dois números grandes.
+		if sum > math.MaxInt64-e.Amount {
+			return nil, fmt.Errorf("%w: soma do split estoura int64 — valores absurdos (%d centavos) são recusados", psp.ErrInvalidRequest, e.Amount)
+		}
 		sum += e.Amount
 	}
 
@@ -795,12 +809,29 @@ func (c *Client) SplitOrder(ctx context.Context, orderID int64, entries []SplitE
 			psp.ErrInvalidRequest, sum, cap, opts.ReferenceCents, ratio)
 	}
 
-	// Split é proibido em pedido aprovado — checagem best-effort (a API não
-	// devolve erro claro nesse caso).
-	if ov, err := c.GetOrder(ctx, strconv.FormatInt(orderID, 10)); err == nil && ov != nil {
-		if NormalizeStatus(ov.Status) == psp.StatusApproved {
-			return nil, fmt.Errorf("%w: split proibido em pedido já aprovado (status=%q)", psp.ErrInvalidRequest, ov.Status)
-		}
+	// Split é proibido em pedido aprovado. FAIL-CLOSED (audit AV1-H3): se não
+	// conseguimos confirmar o status, NÃO enviamos o split.
+	//
+	// A versão anterior era `if err == nil` — ou seja, qualquer falha na consulta
+	// (timeout, 5xx, ou um atacante capaz de derrubar só essa chamada) fazia a
+	// verificação ser PULADA e o split seguir. Guarda que some quando o sistema
+	// está sob stress é guarda que não existe.
+	ov, gerr := c.GetOrder(ctx, strconv.FormatInt(orderID, 10))
+	if gerr != nil {
+		return nil, fmt.Errorf("%w: não foi possível confirmar o status do pedido %d antes do split (fail-closed): %v",
+			psp.ErrUpstream, orderID, gerr)
+	}
+	// Status VAZIO é o caso traiçoeiro: um 200 com corpo ilegível (ou um shape
+	// que o parser tolerante não reconhece) produz OrderView zerado, e
+	// NormalizeStatus("") devolve `pending` — ou seja, "não consegui ler" ficava
+	// indistinguível de "pedido pendente" e o split passava. Ausência de
+	// informação NUNCA pode ser tratada como permissão.
+	if ov == nil || strings.TrimSpace(ov.Status) == "" {
+		return nil, fmt.Errorf("%w: pedido %d não retornou status legível — split bloqueado (fail-closed)",
+			psp.ErrUpstream, orderID)
+	}
+	if NormalizeStatus(ov.Status) == psp.StatusApproved {
+		return nil, fmt.Errorf("%w: split proibido em pedido já aprovado (status=%q)", psp.ErrInvalidRequest, ov.Status)
 	}
 
 	slog.Info("appmax-v1 split", "order_id", orderID, "recipients", len(entries), "sum_cents", sum)
@@ -929,8 +960,51 @@ func (c *Client) RecipientBalances(ctx context.Context, hash string) (*Balances,
 	return b, nil
 }
 
+// AVISO DE AUTORIZAÇÃO (audit AV1-M1) — LEIA ANTES DE EXPOR ISTO EM HTTP.
+//
+// Os três métodos abaixo MOVEM DINHEIRO PARA FORA da plataforma. Hoje eles NÃO
+// têm rota HTTP: são chamáveis só a partir do processo, o que é a razão de não
+// haver falha de autorização explorável no estado atual.
+//
+// Se um dia virarem endpoint, o mínimo obrigatório é:
+//   1. role=admin (handler.AdminOnly) — nunca o JWT do vendedor direto, senão
+//      quem sacaria é quem escolhe o `hash`;
+//   2. checar que o recipient_hash pertence ao vendedor do JWT (IDOR: o hash é
+//      o ÚNICO parâmetro, então sem essa checagem qualquer vendedor autenticado
+//      saca o saldo de outro só trocando a string);
+//   3. Idempotency-Key (pkg/idempotency): a Appmax v1 não tem idempotência, um
+//      duplo clique é um duplo saque;
+//   4. lançamento no livro (ledger.SellerWithdrawal) na mesma operação;
+//   5. registro em pkg/audit com actor, IP e valor.
+
+// maxWithdrawCents é um teto de sanidade (R$ 1.000.000,00). Não substitui
+// autorização — existe pra que um bug de unidade (reais tratados como centavos,
+// ou o inverso) não vire uma ordem de saque de valor absurdo.
+const maxWithdrawCents int64 = 100_000_000
+
+// validateWithdrawValue recusa valor não-positivo e absurdo ANTES da rede.
+// Valor <= 0 chegava a ser enviado à Appmax: sem contrato documentado sobre
+// negativos, o comportamento do outro lado é desconhecido — e "desconhecido"
+// numa rota de saque é inaceitável.
+func validateWithdrawValue(hash string, valueCents int64) error {
+	if strings.TrimSpace(hash) == "" {
+		return fmt.Errorf("%w: recipient_hash vazio", psp.ErrInvalidRequest)
+	}
+	if valueCents <= 0 {
+		return fmt.Errorf("%w: valor de saque deve ser > 0 centavos (veio %d)", psp.ErrInvalidRequest, valueCents)
+	}
+	if valueCents > maxWithdrawCents {
+		return fmt.Errorf("%w: valor de saque %d centavos acima do teto de sanidade %d — confira a unidade (centavos, não reais)",
+			psp.ErrInvalidRequest, valueCents, maxWithdrawCents)
+	}
+	return nil
+}
+
 // SimulateAnticipation simula a antecipação de um valor (centavos, na query).
 func (c *Client) SimulateAnticipation(ctx context.Context, hash string, valueCents int64) (json.RawMessage, error) {
+	if err := validateWithdrawValue(hash, valueCents); err != nil {
+		return nil, err
+	}
 	return c.doJSON(ctx, http.MethodGet,
 		"/v1/recipient/"+url.PathEscape(hash)+"/withdraw-request/anticipation/simulate?value="+strconv.FormatInt(valueCents, 10), nil)
 }
@@ -939,7 +1013,16 @@ func (c *Client) SimulateAnticipation(ctx context.Context, hash string, valueCen
 const WithdrawStatusPending = 2
 
 // RequestAnticipation solicita saque por antecipação (status 2 = pending).
+// Ver AVISO DE AUTORIZAÇÃO acima.
 func (c *Client) RequestAnticipation(ctx context.Context, hash string, valueCents int64) (json.RawMessage, error) {
+	if err := validateWithdrawValue(hash, valueCents); err != nil {
+		return nil, err
+	}
+	// Log de saque é obrigatório: é a linha que permite reconstruir quem tirou
+	// dinheiro e quando. O hash é identificador do recebedor, não segredo.
+	slog.Info("appmax-v1 saque por antecipação solicitado",
+		"recipient_hash", hash, "value_cents", valueCents,
+		"request_id", requestid.FromContext(ctx))
 	return c.doJSON(ctx, http.MethodPost,
 		"/v1/recipient/"+url.PathEscape(hash)+"/withdraw-request/anticipation",
 		map[string]any{"value": valueCents})
@@ -947,7 +1030,14 @@ func (c *Client) RequestAnticipation(ctx context.Context, hash string, valueCent
 
 // RequestAvailableWithdraw solicita saque do saldo disponível.
 // Lembrete: sem shipping-tracking-code no pedido, o saldo não é liberado.
+// Ver AVISO DE AUTORIZAÇÃO acima.
 func (c *Client) RequestAvailableWithdraw(ctx context.Context, hash string, valueCents int64) (json.RawMessage, error) {
+	if err := validateWithdrawValue(hash, valueCents); err != nil {
+		return nil, err
+	}
+	slog.Info("appmax-v1 saque de saldo disponível solicitado",
+		"recipient_hash", hash, "value_cents", valueCents,
+		"request_id", requestid.FromContext(ctx))
 	return c.doJSON(ctx, http.MethodPost,
 		"/v1/recipient/"+url.PathEscape(hash)+"/withdraw-request/available",
 		map[string]any{"value": valueCents})

@@ -1,0 +1,129 @@
+{
+  "_leia_me": [
+    "Conversões de unidade. Erro de unidade é o erro mais comum e mais caro de obra:",
+    "pedir 10 kg de cimento quando se queria 10 sacos, ou orçar m³ como se fosse lata.",
+    "Por isso o fator é DADO versionado com fonte, nunca conta de cabeça do modelo.",
+    "aprox=true marca conversões que dependem de densidade (areia, brita, cimento solto)",
+    "e portanto variam com umidade e compactação — a Alice avisa quando usa uma dessas."
+  ],
+  "conversoes": [
+    {
+      "de": "saco de cimento",
+      "para": "kg",
+      "fator": 50,
+      "nota": "Saco padrão de cimento Portland no Brasil.",
+      "fonte": { "tipo": "definicao", "ref": "embalagem padrão de venda", "nota": "O saco de 50 kg é a embalagem padrão de cimento Portland no varejo brasileiro." }
+    },
+    {
+      "de": "saco de cal",
+      "para": "kg",
+      "fator": 20,
+      "nota": "Saco padrão de cal hidratada.",
+      "fonte": { "tipo": "definicao", "ref": "embalagem padrão de venda", "nota": "Cal hidratada é vendida majoritariamente em saco de 20 kg." }
+    },
+    {
+      "de": "saco de argamassa",
+      "para": "kg",
+      "fator": 20,
+      "nota": "Saco padrão de argamassa colante industrializada.",
+      "fonte": { "tipo": "definicao", "ref": "embalagem padrão de venda", "nota": "Argamassa colante AC-I/II/III é vendida em saco de 20 kg." }
+    },
+    {
+      "de": "lata de tinta",
+      "para": "L",
+      "fator": 18,
+      "nota": "Lata cheia de tinta imobiliária.",
+      "fonte": { "tipo": "definicao", "ref": "embalagem padrão de venda", "nota": "A lata de 18 L é a embalagem grande padrão de tinta imobiliária no Brasil." }
+    },
+    {
+      "de": "galão de tinta",
+      "para": "L",
+      "fator": 3.6,
+      "nota": "Galão de tinta imobiliária.",
+      "fonte": { "tipo": "definicao", "ref": "embalagem padrão de venda", "nota": "O galão de 3,6 L é a embalagem média padrão de tinta imobiliária." }
+    },
+    {
+      "de": "m3",
+      "para": "L",
+      "fator": 1000,
+      "nota": "Conversão exata de volume.",
+      "fonte": { "tipo": "definicao", "ref": "Sistema Internacional de Unidades", "nota": "1 metro cúbico equivale a 1000 litros, por definição." }
+    },
+    {
+      "de": "m3",
+      "para": "lata de 18 litros",
+      "fator": 55.5556,
+      "nota": "Quantas latas de 18 L cabem em 1 m³ — útil para dosar traço em volume na obra.",
+      "fonte": { "tipo": "definicao", "ref": "Sistema Internacional de Unidades", "nota": "Decorre de 1 m³ = 1000 L dividido por 18 L da lata." }
+    },
+    {
+      "de": "barra de tubo",
+      "para": "m",
+      "fator": 6,
+      "nota": "Barra padrão de tubo de PVC, água fria e esgoto.",
+      "fonte": { "tipo": "definicao", "ref": "embalagem padrão de venda", "nota": "Tubos de PVC predial são vendidos em barras de 6 m." }
+    },
+    {
+      "de": "barra de perfil drywall",
+      "para": "m",
+      "fator": 3,
+      "nota": "Barra padrão de montante e guia.",
+      "fonte": { "tipo": "definicao", "ref": "embalagem padrão de venda", "nota": "Perfis de drywall são vendidos em barras de 3 m." }
+    },
+    {
+      "de": "m",
+      "para": "cm",
+      "fator": 100,
+      "nota": "Conversão exata de comprimento.",
+      "fonte": { "tipo": "definicao", "ref": "Sistema Internacional de Unidades", "nota": "1 metro equivale a 100 centímetros, por definição." }
+    },
+    {
+      "de": "m2",
+      "para": "cm2",
+      "fator": 10000,
+      "nota": "Conversão exata de área.",
+      "fonte": { "tipo": "definicao", "ref": "Sistema Internacional de Unidades", "nota": "Decorre de 1 m = 100 cm elevado ao quadrado." }
+    },
+    {
+      "de": "kg",
+      "para": "g",
+      "fator": 1000,
+      "nota": "Conversão exata de massa.",
+      "fonte": { "tipo": "definicao", "ref": "Sistema Internacional de Unidades", "nota": "1 quilograma equivale a 1000 gramas, por definição." }
+    },
+    {
+      "de": "polegada",
+      "para": "mm",
+      "fator": 25.4,
+      "nota": "Usada em bitola de tubo e disco de corte.",
+      "fonte": { "tipo": "definicao", "ref": "definição internacional da polegada", "nota": "1 polegada equivale exatamente a 25,4 mm." }
+    },
+    {
+      "de": "m3 de areia",
+      "para": "kg",
+      "fator": 1500,
+      "aprox": true,
+      "escopo": "areia média seca, solta",
+      "nota": "Faixa real de 1400 a 1600 kg/m³. Areia úmida ou compactada pesa mais.",
+      "fonte": { "tipo": "mercado", "ref": "massa unitária típica de areia em obra", "nota": "Massa unitária depende de granulometria, umidade e compactação; por isso o valor é aproximado." }
+    },
+    {
+      "de": "m3 de brita",
+      "para": "kg",
+      "fator": 1400,
+      "aprox": true,
+      "escopo": "brita 1 solta",
+      "nota": "Faixa real de 1350 a 1500 kg/m³.",
+      "fonte": { "tipo": "mercado", "ref": "massa unitária típica de brita em obra", "nota": "Massa unitária varia com a rocha de origem e a granulometria." }
+    },
+    {
+      "de": "saco de cimento",
+      "para": "L",
+      "fator": 35.7,
+      "aprox": true,
+      "escopo": "cimento em pó, solto",
+      "nota": "Um saco de 50 kg ocupa cerca de 35,7 L. Serve para dosar traço em volume com lata.",
+      "fonte": { "tipo": "mercado", "ref": "massa unitária típica do cimento solto (~1400 kg/m³)", "nota": "Volume aparente do cimento solto varia com a compactação do saco." }
+    }
+  ]
+}
