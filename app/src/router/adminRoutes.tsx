@@ -36,6 +36,9 @@ const SellersPage = lazy(() => import('@/pages/admin/SellersPage'))
 const AuditTrailPage = lazy(() => import('@/pages/admin/AuditTrailPage'))
 const ObservabilityPage = lazy(() => import('@/pages/admin/ObservabilityPage'))
 const ImportPage = lazy(() => import('@/pages/admin/ImportPage'))
+const ProductsPage = lazy(() => import('@/pages/admin/ProductsPage'))
+const ProductNewPage = lazy(() => import('@/pages/admin/ProductNewPage'))
+const ProductEditPage = lazy(() => import('@/pages/admin/ProductEditPage'))
 
 /** Envolve a página no guard de papel + Suspense + fronteira de erro. */
 function adminPage(element: ReactNode): ReactNode {
@@ -60,6 +63,26 @@ export const adminRoutes: RouteObject[] = [
   {
     path: '/admin/vendedores',
     element: adminPage(<SellersPage />),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: '/admin/produtos',
+    element: adminPage(<ProductsPage />),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // ⚠️ ANTES de `/admin/produtos/:id`. React Router 6 ranqueia rotas por
+    // especificidade e o segmento estático já venceria o dinâmico, então a
+    // ordem aqui é redundante — mas explícita: se um dia isto virar um
+    // `children` com `index`, a ordem volta a importar e "novo" seria lido
+    // como um id de produto.
+    path: '/admin/produtos/novo',
+    element: adminPage(<ProductNewPage />),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: '/admin/produtos/:id',
+    element: adminPage(<ProductEditPage />),
     errorElement: <RouteErrorBoundary />,
   },
   {

@@ -93,7 +93,39 @@ export default defineConfig({
       },
     },
   },
-  server: { port: 5175 },
+  server: {
+    port: 5175,
+    // Aceita o host do túnel. Sem isto o Vite recusa a requisição vinda do
+    // ngrok com "Blocked request. This host is not allowed".
+    allowedHosts: true,
+    // ── Proxy para os 5 serviços ──────────────────────────────────────────
+    //
+    // PORQUÊ: o ngrok expõe UMA porta, e o SPA fala com 5 serviços em portas
+    // diferentes. Sem proxy, quem abre o túnel de fora recebe o HTML e depois
+    // vê o navegador tentar chamar 192.168.0.7:8091 — um IP da rede local, que
+    // não existe para ele. A loja carrega vazia.
+    //
+    // Com o proxy, tudo passa pela mesma origem e um túnel só resolve. Também
+    // elimina o CORS: mesma origem, sem preflight.
+    //
+    // Para usar: deixe as VITE_*_URL VAZIAS no .env.local. Aí o front chama
+    // caminho relativo e cai aqui.
+    proxy: {
+      '/api/v1/products':   { target: 'http://localhost:8091', changeOrigin: true },
+      '/api/v1/categories': { target: 'http://localhost:8091', changeOrigin: true },
+      '/api/v1/sellers':    { target: 'http://localhost:8091', changeOrigin: true },
+      '/api/v1/admin':      { target: 'http://localhost:8091', changeOrigin: true },
+      '/api/v1/store':      { target: 'http://localhost:8091', changeOrigin: true },
+      '/media':             { target: 'http://localhost:8091', changeOrigin: true },
+      '/api/v1/auth':       { target: 'http://localhost:8093', changeOrigin: true },
+      '/api/v1/orders':     { target: 'http://localhost:8092', changeOrigin: true },
+      '/api/v1/shipping':   { target: 'http://localhost:8092', changeOrigin: true },
+      '/api/v1/balcao':     { target: 'http://localhost:8092', changeOrigin: true },
+      '/api/v1/payments':   { target: 'http://localhost:8090', changeOrigin: true },
+      '/api/v1/ledger':     { target: 'http://localhost:8090', changeOrigin: true },
+      '/api/v1/assistant':  { target: 'http://localhost:8094', changeOrigin: true },
+    },
+  },
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
