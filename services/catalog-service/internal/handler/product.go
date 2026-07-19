@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
@@ -97,96 +99,69 @@ const productColumns = `
 func (h *ProductHandler) List(c *gin.Context) {
 	params := parseProductsQuery(c)
 
-	where := []string{"p.status = 'published'"}
-	args := []any{}
-	idx := 1
+	// CASCATA DE BUSCA — a ordem é a feature, não um detalhe.
+	//
+	//   1. tsvector exato   (lema + acento + plural, com relevância por peso)
+	//   2. prefixo `:*`     (autocomplete, no MESMO passo — é um OR na tsquery)
+	//   3. similaridade     (erro de grafia) ← SÓ se 1 e 2 vierem vazios
+	//
+	// O gatilho do passo 3 é "não achei NADA", nunca "sempre". Rodar
+	// similaridade junto com a busca boa traria lixo aproximado misturado com
+	// resultado exato e destruiria a busca que já funciona — falso positivo
+	// aqui é pior que o bug original.
+	var q dbQueryer = h.db
 
-	if params.Category != "" {
-		where = append(where, fmt.Sprintf("p.category_id = $%d", idx))
-		args = append(args, params.Category)
-		idx++
-	}
-	// Lookup exato de scanner/balcão. Vem ANTES do `q` porque é a leitura mais
-	// quente do PDV e precisa cair direto no índice único, sem ILIKE.
-	if params.SKU != "" {
-		where = append(where, fmt.Sprintf("p.sku = $%d", idx))
-		args = append(args, params.SKU)
-		idx++
-	}
-	if params.Barcode != "" {
-		where = append(where, fmt.Sprintf("p.barcode = $%d", idx))
-		args = append(args, params.Barcode)
-		idx++
-	}
-	if params.Q != "" {
-		// SEGURANÇA (audit CT1-C1): escapar `%` `_` `\` no termo de busca antes
-		// do ILIKE, com `ESCAPE '\'`. Sem isso, atacante envia `%_%_%_%_%_%_%_`
-		// e força ReDoS no pg_trgm (consumo CPU 100%).
-		//
-		// SKU entra na busca geral por PREFIXO (`ABC%`), não por `%ABC%`: código
-		// de produto é lido/digitado da esquerda pra direita, e o infixo daria
-		// resultado lixo ("12" casando com metade do catálogo) além de ser mais
-		// caro. Antes desta mudança o SKU não era buscável de jeito nenhum — o
-		// vendedor digitava o código no balcão e recebia zero resultados.
-		where = append(where, fmt.Sprintf(
-			"(p.name ILIKE $%d ESCAPE '\\' OR COALESCE(p.description,'') ILIKE $%d ESCAPE '\\' OR s.name ILIKE $%d ESCAPE '\\' OR COALESCE(p.sku,'') ILIKE $%d ESCAPE '\\' OR p.barcode = $%d)",
-			idx, idx, idx, idx+1, idx+2))
-		esc := escapeLikePattern(params.Q)
-		args = append(args, "%"+esc+"%", esc+"%", params.Q)
-		idx += 3
-	}
-	if params.Brand != "" {
-		where = append(where, fmt.Sprintf("p.brand = $%d", idx))
-		args = append(args, params.Brand)
-		idx++
-	}
-	if params.PriceMin != nil {
-		where = append(where, fmt.Sprintf("p.price >= $%d", idx))
-		args = append(args, *params.PriceMin)
-		idx++
-	}
-	if params.PriceMax != nil {
-		where = append(where, fmt.Sprintf("p.price <= $%d", idx))
-		args = append(args, *params.PriceMax)
-		idx++
-	}
-	if params.InStock {
-		where = append(where, "p.stock > 0")
-	}
-
-	// Facetas técnicas: cada filtro de atributo vira um EXISTS independente,
-	// que é o que dá semântica de AND entre grandezas diferentes ("bitola 2,5
-	// E cor azul"). Um JOIN único não conseguiria — uma linha de
-	// product_attributes tem uma chave só.
-	where, args, idx = appendAttrFilters(where, args, idx, params)
-
-	// orderBy é whitelist — qualquer valor não reconhecido cai no default (audit CT1-M3).
-	orderBy := "p.created_at DESC"
-	switch params.Sort {
-	case "price_asc":
-		orderBy = "p.price ASC"
-	case "price_desc":
-		orderBy = "p.price DESC"
-	case "top_rated":
-		orderBy = "p.rating DESC, p.review_count DESC"
-	case "newest", "":
-		orderBy = "p.created_at DESC"
-	}
-
-	whereSQL := strings.Join(where, " AND ")
-
-	// Count
-	var total int
-	countSQL := "SELECT count(*) FROM products p JOIN sellers s ON s.id = p.seller_id WHERE " + whereSQL
-	if err := h.db.QueryRow(countSQL, args...).Scan(&total); err != nil {
-		DBError(c, err)
+	f := buildProductFilters(params, searchFullText, scopeList)
+	total, err := h.countProducts(c, q, f)
+	if err != nil {
 		return
 	}
 
-	// Page
-	offset := (params.Page - 1) * params.PerPage
-	args = append(args, params.PerPage, offset)
+	approximate := false
+	if total == 0 && params.Q != "" {
+		// A busca aproximada roda numa TRANSAÇÃO porque precisa de
+		// `SET LOCAL pg_trgm.strict_word_similarity_threshold` (ver
+		// fuzzyThreshold). `SET LOCAL` é desfeito no COMMIT/ROLLBACK — um
+		// `SET` normal contaminaria a conexão do POOL e mudaria o limiar de
+		// todas as buscas seguintes que pegassem aquela conexão. Esse tipo de
+		// vazamento de estado por pool é bug intermitente e irreproduzível.
+		tx, err := h.db.Begin()
+		if err != nil {
+			DBError(c, err)
+			return
+		}
+		defer func() { _ = tx.Rollback() }() // só leitura: rollback sempre
 
+		if _, err := tx.Exec(
+			"SET LOCAL pg_trgm.strict_word_similarity_threshold = " + fuzzyThreshold); err != nil {
+			DBError(c, err)
+			return
+		}
+
+		fz := buildProductFilters(params, searchFuzzy, scopeList)
+		fzTotal, err := h.countProducts(c, tx, fz)
+		if err != nil {
+			return
+		}
+		// Só troca se a aproximada achou algo. Se ela também vier vazia,
+		// devolvemos a busca exata vazia — sem marcar como aproximado, porque
+		// não houve aproximação nenhuma.
+		if fzTotal > 0 {
+			f, total, approximate, q = fz, fzTotal, true, tx
+		}
+	}
+
+	orderBy := productOrderBy(params, f)
+	whereSQL := strings.Join(f.where, " AND ")
+
+	// Page
+	args := append(f.args, params.PerPage, (params.Page-1)*params.PerPage)
+
+	// O JOIN com sellers continua para PROJETAR s.name/s.rating no payload — mas
+	// ele saiu do WHERE. Era `s.name ILIKE ...` dentro do OR que impedia
+	// qualquer índice em `products` de ser usado; agora o nome do vendedor mora
+	// no search_vector (peso D) e o predicado é de uma tabela só.
+	//
 	// #nosec G202 — whereSQL/orderBy são construídos só de literais hardcoded
 	// (`p.brand = $N`, `p.price ASC`, etc.) com placeholders posicionais.
 	// orderBy passa por whitelist em parseProductsQuery (CT1-M3); valores
@@ -197,9 +172,9 @@ func (h *ProductHandler) List(c *gin.Context) {
 		JOIN sellers s ON s.id = p.seller_id
 		WHERE ` + whereSQL + `
 		ORDER BY ` + orderBy + `
-		LIMIT $` + strconv.Itoa(idx) + ` OFFSET $` + strconv.Itoa(idx+1)
+		LIMIT $` + strconv.Itoa(f.idx) + ` OFFSET $` + strconv.Itoa(f.idx+1)
 
-	rows, err := h.db.Query(querySQL, args...)
+	rows, err := q.Query(querySQL, args...)
 	if err != nil {
 		DBError(c, err)
 		return
@@ -215,15 +190,534 @@ func (h *ProductHandler) List(c *gin.Context) {
 		}
 		products = append(products, p)
 	}
+	// rows.Err() distingue "acabaram os produtos" de "a varredura morreu no
+	// meio" — sem isso a vitrine mostraria uma página truncada como completa.
+	if err := rows.Err(); err != nil {
+		DBError(c, err)
+		return
+	}
 
 	// Capa de cada produto, em uma query só (ver loadThumbnails).
 	h.loadThumbnails(c, products)
 
-	totalPages := (total + params.PerPage - 1) / params.PerPage
-	c.JSON(http.StatusOK, model.ProductsResponse{
-		Data: products,
-		Meta: model.Meta{Page: params.Page, PerPage: params.PerPage, Total: total, TotalPages: totalPages},
-	})
+	meta := model.Meta{
+		Page: params.Page, PerPage: params.PerPage,
+		Total: total, TotalPages: (total + params.PerPage - 1) / params.PerPage,
+	}
+	if approximate {
+		meta.Approximate = true
+		// Sugestão calculada em Go, sobre os nomes que ACABARAM de vir — zero
+		// consulta a mais. Ver suggestFromNames.
+		meta.Suggestion = suggestFromNames(params.Q, products)
+	}
+
+	c.JSON(http.StatusOK, model.ProductsResponse{Data: products, Meta: meta})
+}
+
+// dbQueryer é o mínimo que List precisa, satisfeito tanto por *sql.DB quanto
+// por *sql.Tx. Existe porque a busca aproximada roda em transação (SET LOCAL do
+// limiar) e a exata não — sem a interface seria o corpo de List duplicado.
+type dbQueryer interface {
+	Query(string, ...any) (*sql.Rows, error)
+	QueryRow(string, ...any) *sql.Row
+}
+
+// countProducts roda o COUNT do filtro. Em erro já responde 500 e devolve err —
+// quem chama só precisa dar `return`.
+//
+// Note que NÃO há JOIN com sellers: o predicado de busca virou uma coluna de
+// `products` (search_vector), e era exatamente o `s.name` dentro do OR que
+// obrigava o JOIN e cegava o planejador.
+func (h *ProductHandler) countProducts(c *gin.Context, q dbQueryer, f productFilters) (int, error) {
+	var total int
+	// #nosec G202 — ver comentário em List: fragmentos hardcoded, valores em args.
+	countSQL := "SELECT count(*) FROM products p WHERE " + strings.Join(f.where, " AND ")
+	if err := q.QueryRow(countSQL, f.args...).Scan(&total); err != nil {
+		DBError(c, err)
+		return 0, err
+	}
+	return total, nil
+}
+
+// productOrderBy resolve a ordenação. É whitelist — valor não reconhecido cai
+// no default (audit CT1-M3).
+//
+// MUDANÇA DE COMPORTAMENTO: com termo de busca e sem `sort` explícito, o
+// default passa a ser RELEVÂNCIA, não data de cadastro. Ordenar resultado de
+// busca por data de cadastro é o mesmo que não ordenar. `sort=newest` continua
+// entregando data — quem pede explicitamente recebe o que pediu.
+func productOrderBy(params productsQuery, f productFilters) string {
+	switch params.Sort {
+	case "price_asc":
+		return "p.price ASC"
+	case "price_desc":
+		return "p.price DESC"
+	case "top_rated":
+		return "p.rating DESC, p.review_count DESC"
+	case "newest":
+		return "p.created_at DESC"
+	}
+	if f.rankExpr == "" {
+		return "p.created_at DESC"
+	}
+	// Desempate ESTÁVEL: sem `p.id` no fim, dois produtos com o mesmo rank e o
+	// mesmo created_at podem trocar de lugar entre a página 1 e a 2, e o
+	// usuário vê o mesmo item duas vezes (ou nenhuma). Paginação sem ordem
+	// total é bug de resultado, não de performance.
+	return f.rankExpr + " DESC, p.created_at DESC, p.id ASC"
+}
+
+// -- construção do filtro de busca -------------------------------------------
+
+// searchStrategy escolhe COMO o termo `q` vira predicado.
+type searchStrategy int
+
+const (
+	// searchFullText: tsvector + GIN. O caminho normal.
+	searchFullText searchStrategy = iota
+	// searchFuzzy: similaridade trigram no nome. Só quando o full-text não
+	// achou nada — cobre erro de digitação.
+	searchFuzzy
+)
+
+// tsConfig é a configuração de busca criada na migration 014: `portuguese`
+// com `unaccent` no dicionário. É por causa dela que "eletrica" acha
+// "elétrica" E que a coluna gerada pôde ser IMMUTABLE (ver o cabeçalho da
+// migration — `unaccent()` chamado direto na expressão seria rejeitado).
+const tsConfig = "utilar_pt"
+
+// productFilters é o WHERE montado, mais o que o ORDER BY precisa saber.
+type productFilters struct {
+	where []string
+	args  []any
+	idx   int // próximo placeholder livre
+	// rankExpr é o fragmento SQL de relevância (vazio quando não há busca).
+	rankExpr string
+}
+
+// filterScope diz QUAIS filtros entram no WHERE.
+type filterScope int
+
+const (
+	// scopeList: todos os filtros. É a listagem que o usuário vê.
+	scopeList filterScope = iota
+	// scopeFacets: só categoria, busca e atributos.
+	//
+	// ⚠️ NÃO ACRESCENTE brand/price/in_stock AQUI. Faceta descreve o universo
+	// ANTES do refinamento: se a contagem de marcas já viesse filtrada pela
+	// marca selecionada, a lista de marcas colapsaria pra uma só e o usuário
+	// não teria como trocar de marca sem limpar o filtro. Mesma coisa pro
+	// slider de preço, que viraria a faixa que ele já escolheu.
+	scopeFacets
+)
+
+// buildProductFilters monta o WHERE compartilhado por List, Facets e pelo
+// COUNT. Ter um builder só é o que garante que a contagem e a página falam da
+// MESMA busca — quando eram dois trechos de código, divergiam (o predicado de
+// Facets não olhava o vendedor e o de List olhava).
+func buildProductFilters(params productsQuery, strategy searchStrategy, scope filterScope) productFilters {
+	f := productFilters{where: []string{"p.status = 'published'"}, args: []any{}, idx: 1}
+
+	if params.Category != "" {
+		f.where = append(f.where, fmt.Sprintf("p.category_id = $%d", f.idx))
+		f.args = append(f.args, params.Category)
+		f.idx++
+	}
+	if scope == scopeList {
+		// Lookup exato de scanner/balcão. Vem ANTES do `q` porque é a leitura
+		// mais quente do PDV e precisa cair direto no índice único, sem ILIKE e
+		// sem tsvector. NÃO REGREDIR: é o caminho do leitor de código de barras.
+		if params.SKU != "" {
+			f.where = append(f.where, fmt.Sprintf("p.sku = $%d", f.idx))
+			f.args = append(f.args, params.SKU)
+			f.idx++
+		}
+		if params.Barcode != "" {
+			f.where = append(f.where, fmt.Sprintf("p.barcode = $%d", f.idx))
+			f.args = append(f.args, params.Barcode)
+			f.idx++
+		}
+	}
+	if params.Q != "" {
+		f.appendSearch(params.Q, strategy)
+	}
+	if scope == scopeList {
+		if params.Brand != "" {
+			f.where = append(f.where, fmt.Sprintf("p.brand = $%d", f.idx))
+			f.args = append(f.args, params.Brand)
+			f.idx++
+		}
+		if params.PriceMin != nil {
+			f.where = append(f.where, fmt.Sprintf("p.price >= $%d", f.idx))
+			f.args = append(f.args, *params.PriceMin)
+			f.idx++
+		}
+		if params.PriceMax != nil {
+			f.where = append(f.where, fmt.Sprintf("p.price <= $%d", f.idx))
+			f.args = append(f.args, *params.PriceMax)
+			f.idx++
+		}
+		if params.InStock {
+			f.where = append(f.where, "p.stock > 0")
+		}
+	}
+
+	// Facetas técnicas: cada filtro de atributo vira um EXISTS independente,
+	// que é o que dá semântica de AND entre grandezas diferentes ("bitola 2,5
+	// E cor azul"). Um JOIN único não conseguiria — uma linha de
+	// product_attributes tem uma chave só.
+	f.where, f.args, f.idx = appendAttrFilters(f.where, f.args, f.idx, params)
+	return f
+}
+
+// appendSearch acrescenta o predicado do termo de busca.
+//
+// Formato do ramo full-text:
+//
+//	p.search_vector @@ (websearch_to_tsquery(cfg,$a) || to_tsquery(cfg,$b))
+//	  OR p.sku ILIKE $c ESCAPE '\'
+//	  OR p.barcode = $d
+//
+// Todas as colunas são de `products`. É essa a correção: o antigo `s.name`
+// dentro do OR vinha da tabela do JOIN e impedia o planejador de usar
+// QUALQUER índice em products. O vendedor agora está no search_vector (peso D).
+//
+// ⚠️ `p.sku ILIKE`, NUNCA `COALESCE(p.sku,”) ILIKE`. Isto foi MEDIDO em 150k:
+// o COALESCE (que estava no código antigo) é uma EXPRESSÃO, não uma coluna, e
+// nenhum índice a serve. Um só ramo não-indexável derruba o OR inteiro —
+// mesmo com o GIN pronto o plano voltava pra Parallel Seq Scan:
+//
+//	com COALESCE:  Parallel Seq Scan   124,9 ms / 12.132 buffers
+//	sem COALESCE:  BitmapOr (3 índices)  5,2 ms /    360 buffers
+//
+// A semântica é idêntica aqui: `NULL ILIKE 'x%'` é NULL, e num OR do WHERE
+// NULL e FALSE dão no mesmo (a linha não entra). A única divergência seria com
+// padrão vazio, e `q` nunca é vazio neste ramo (guardado por `params.Q != ""`).
+func (f *productFilters) appendSearch(q string, strategy searchStrategy) {
+	esc := escapeLikePattern(q)
+
+	if strategy == searchFuzzy {
+		// `%>>` é o operador de STRICT WORD SIMILARITY do pg_trgm — não é
+		// wildcard de LIKE, não tem metacaractere pra escapar e o custo é
+		// linear no tamanho da string. Não há superfície de ReDoS aqui.
+		// Servido pelo GIN trigram que já existia e nunca era usado
+		// (idx_products_name_trgm) — a infraestrutura estava pronta, só o `OR`
+		// cruzado impedia.
+		//
+		// ⚠️ `similarity()` (o `%` comum) NÃO SERVE aqui, e isso foi MEDIDO:
+		// ele divide pelos trigramas do nome INTEIRO, então uma palavra errada
+		// contra um nome longo afunda:
+		//
+		//   similarity('furadera', 'Furadeira de Impacto 1/2" 750W')  = 0,219
+		//   similarity('argamasa', 'Argamassa Colante AC-I ... 20kg') = 0,205
+		//   similarity('cimeto',   'Cimento Portland CP II-32 ...')   = 0,135
+		//
+		// Todos ABAIXO do corte default de 0,3 — ou seja, o `%` não corrigiria
+		// NENHUM erro de grafia real. strict_word_similarity compara com a
+		// melhor extensão de PALAVRAS do alvo e resolve os três (0,583 / 0,727
+		// / 0,500).
+		//
+		// ⚠️ SKU continua ILIKE por PREFIXO e o CÓDIGO DE BARRAS FICA DE FORA
+		// da busca aproximada, de propósito: bipar um item e receber "o mais
+		// parecido" venderia o produto errado, com o preço errado. Leitor de
+		// código exige correspondência exata ou nada.
+		f.where = append(f.where, fmt.Sprintf(
+			"(p.name %%>> $%d OR p.sku ILIKE $%d ESCAPE '\\')", f.idx, f.idx+1))
+		f.args = append(f.args, q, esc+"%")
+		f.rankExpr = fmt.Sprintf("strict_word_similarity($%d, p.name)", f.idx)
+		f.idx += 2
+		return
+	}
+
+	web, prefix := buildTsqueryInputs(q)
+	tsq := fmt.Sprintf("(websearch_to_tsquery('%s', $%d) || to_tsquery('%s', $%d))",
+		tsConfig, f.idx, tsConfig, f.idx+1)
+
+	// SKU continua na busca geral por PREFIXO (`ABC%`), não por `%ABC%`: código
+	// de produto é lido/digitado da esquerda pra direita, e o infixo daria
+	// resultado lixo ("12" casando com metade do catálogo) além de ser mais
+	// caro. O SKU também está no vetor (peso B), mas o vetor não faz prefixo
+	// de token com hífen — é o ILIKE que atende o vendedor digitando o começo
+	// do código no balcão.
+	f.where = append(f.where, fmt.Sprintf(
+		"(p.search_vector @@ %s OR p.sku ILIKE $%d ESCAPE '\\' OR p.barcode = $%d)",
+		tsq, f.idx+2, f.idx+3))
+	f.args = append(f.args, web, prefix, esc+"%", q)
+
+	// Match de CÓDIGO ganha de qualquer relevância textual: quem digitou o SKU
+	// no balcão quer aquele produto, não o mais bem ranqueado que menciona o
+	// código na descrição. Sem esse degrau o item exato caía no fim da lista
+	// com rank 0 (não está no vetor por prefixo).
+	//
+	// ⚠️ `ts_rank`, NÃO `ts_rank_cd` — decisão MEDIDA em 150k produtos:
+	//
+	//	termo                       ts_rank_cd   ts_rank
+	//	"argamassa colante" (294)      32,8 ms    4,5 ms
+	//	"acrilico"       (24.458)     379,6 ms   29,2 ms   ← 13x
+	//
+	// O que o `_cd` acrescenta é COVER DENSITY: o quão PRÓXIMOS os termos da
+	// busca aparecem dentro do documento. Isso vale em texto corrido longo.
+	// Nome de produto tem 3 a 8 palavras — os termos estão sempre próximos, o
+	// sinal é praticamente constante, e estaríamos pagando 13x por ele.
+	//
+	// A ordenação por PESO (que é a relevância que importa aqui) é idêntica
+	// nos dois. Verificado com o caso que o dono pediu — termo no nome tem que
+	// ganhar de termo só na descrição:
+	//
+	//	"Massa Acrílica Premium 18L" (termo no NOME, peso A)   ts_rank 0,608
+	//	"Rolo de Espuma" (termo só na DESCRIÇÃO, peso C)       ts_rank 0,122
+	//
+	// Mesma proporção 5:1 do ts_rank_cd. E note que o peso C NÃO zera: quem
+	// só menciona o termo na descrição continua aparecendo, depois — que é
+	// exatamente o comportamento pedido.
+	f.rankExpr = fmt.Sprintf(
+		"(CASE WHEN p.sku ILIKE $%d ESCAPE '\\' OR p.barcode = $%d THEN 1 ELSE 0 END) DESC, ts_rank(p.search_vector, %s)",
+		f.idx+2, f.idx+3, tsq)
+	f.idx += 4
+}
+
+// -- saneamento do termo de busca (audit CT1-C1, estendido pro tsquery) -------
+
+// maxSearchWords limita quantos termos entram na tsquery de prefixo.
+//
+// PORQUÊ: cada termo é um ramo `&` a mais no plano. `q` já vem truncado em 100
+// runes por parseProductsQuery (CT1-M1), então isto é a segunda camada — mas é
+// a que impede uma string de 100 caracteres de espaço-separados virar uma
+// tsquery de 50 ramos com prefixo, que é cara mesmo com índice.
+const maxSearchWords = 8
+
+// buildTsqueryInputs traduz o termo do usuário nas DUAS entradas de tsquery.
+//
+// ⚠️ SEGURANÇA — a superfície do CT1-C1 mudou de lugar, NÃO sumiu.
+//
+// Com ILIKE o risco era wildcard injection (`%_%_%_%`) forçando ReDoS no
+// pg_trgm; por isso existe (e continua existindo) escapeLikePattern — o ramo do
+// SKU ainda é ILIKE. Com tsquery o risco é outro:
+//
+//   - `to_tsquery` LANÇA EXCEÇÃO com sintaxe inválida (`&&&`, `((`, `!`), e
+//     exceção no banco vira **500 na busca**: derrubar a vitrine com uma query
+//     string é DoS de graça.
+//   - `websearch_to_tsquery` é TOLERANTE — nunca lança, devolve tsquery vazia.
+//     Foi a razão principal de escolhê-lo pro texto livre do usuário.
+//
+// Daí a divisão:
+//
+//	web    — o termo CRU vai pro websearch_to_tsquery, que aceita aspas e
+//	         `-negação` (o que o usuário já espera de uma caixa de busca) e
+//	         engole qualquer lixo sem exceção.
+//	prefix — entrada do to_tsquery, montada SÓ com tokens alfanuméricos que
+//	         NÓS geramos. O texto do usuário nunca chega cru no to_tsquery,
+//	         então não existe sintaxe pra quebrar.
+//
+// prefix é "" quando o usuário usou operadores (aspas ou negação): aí ele está
+// sendo específico de propósito, e OR-ar um ramo de prefixo por cima desfaria a
+// negação que ele pediu. `to_tsquery(cfg, ”)` devolve tsquery vazia (com
+// NOTICE, sem erro), e `x || ”::tsquery` = x — então o SQL não precisa de
+// ramo condicional.
+func buildTsqueryInputs(q string) (web, prefix string) {
+	return q, tsPrefixQuery(q)
+}
+
+// tsPrefixQuery monta `termo1 & termo2 & ultimo:*` para autocomplete —
+// quem digita "furad" tem que achar "furadeira".
+func tsPrefixQuery(q string) string {
+	// Operadores do websearch: respeitá-los significa NÃO adicionar o ramo de
+	// prefixo, que é um OR e afrouxaria a busca que o usuário restringiu.
+	if strings.Contains(q, `"`) || strings.HasPrefix(q, "-") || strings.Contains(q, " -") {
+		return ""
+	}
+
+	words := make([]string, 0, maxSearchWords)
+	for _, field := range strings.Fields(q) {
+		// Só letra e dígito sobrevivem. É isto que torna impossível uma
+		// tsquery malformada: `&`, `|`, `!`, `(`, `)`, `:`, `*`, aspas e
+		// qualquer pontuação são descartados ANTES de virar entrada do
+		// to_tsquery. Unicode incluso — "válvula" continua sendo uma palavra.
+		var b strings.Builder
+		for _, r := range field {
+			if unicode.IsLetter(r) || unicode.IsDigit(r) {
+				b.WriteRune(r)
+			}
+		}
+		if w := b.String(); w != "" {
+			words = append(words, w)
+			if len(words) == maxSearchWords {
+				break
+			}
+		}
+	}
+	if len(words) == 0 {
+		return ""
+	}
+
+	// Só o ÚLTIMO termo ganha `:*`. É o que o usuário está digitando agora; os
+	// anteriores ele já terminou. Prefixar todos multiplicaria o resultado sem
+	// melhorar a intenção ("furadeira imp" traria toda palavra começada em "f").
+	words[len(words)-1] += ":*"
+	return strings.Join(words, " & ")
+}
+
+// -- limiar da busca aproximada ----------------------------------------------
+
+// fuzzyThreshold é o corte de `strict_word_similarity` da busca por
+// similaridade. CALIBRADO POR VARREDURA, não chutado — um limiar chutado é pior
+// que não ter busca aproximada, porque destrói a confiança na busca.
+//
+// Método: varri os limiares candidatos contra 12 erros de grafia reais (padrões
+// de quem digita em português: letra dobrada, sílaba comida, tecla vizinha) e 7
+// termos sem sentido, medindo os DOIS lados ao mesmo tempo — o que se acha e o
+// que se traz de lixo junto:
+//
+//	limiar | acertos | perdidos | ruído | RESULTADOS IRRELEVANTES
+//	  0,35 |    11   |    1     |   0   |   38   ← inunda de lixo
+//	  0,38 |    11   |    1     |   0   |    6   ← começa o lixo
+//	  0,40 |    11   |    1     |   0   |    0
+//	  0,42 |    11   |    1     |   0   |    0   ← ESCOLHIDO (meio do platô)
+//	  0,44 |    11   |    1     |   0   |    0
+//	  0,45 |    10   |    2     |   0   |    0   ← perde 'tomda' (0,444)
+//	  0,50 |    10   |    2     |   0   |    0
+//
+// O platô seguro é [0,40 ; 0,44]: recall máximo com ZERO resultado irrelevante.
+// Fora dele há dois precipícios — em 0,38 o lixo aparece, em 0,45 o recall cai.
+// 0,42 é o MEIO do platô, e é meio de propósito: escolher uma das pontas seria
+// ajustar o número à amostra, e a próxima palavra do catálogo derrubaria a
+// escolha para um dos lados.
+//
+// ⚠️ O 1 caso perdido é 'luninaria' → 'Luminária' (troca m→n no meio da
+// palavra), que mede **0,250** — abaixo até do pior falso-positivo conhecido
+// ('cimento' → 'Cimeira', 0,333). Não dá pra alcançá-lo sem descer a 0,35 e
+// aceitar 38 resultados irrelevantes. É limite conhecido e ACEITO: uma
+// substituição de letra no meio de uma palavra longa quebra três trigramas de
+// uma vez. Perder um caso raro vale mais que estragar a busca de todo mundo.
+//
+// String (e não float) porque vai concatenada num `SET LOCAL`, que não aceita
+// placeholder. É constante hardcoded, nunca entrada de usuário.
+const fuzzyThreshold = "0.42"
+
+// -- sugestão de termo ("você quis dizer?") ----------------------------------
+
+// suggestFromNames devolve o termo corrigido pro "Mostrando resultados para
+// **furadeira**", ou "" se não houver correção que valha a pena mostrar.
+//
+// PORQUÊ EM GO, e não numa consulta: os nomes dos produtos aproximados JÁ estão
+// em memória — foram a resposta que acabamos de montar. Uma consulta a mais
+// (varrer o catálogo atrás da palavra mais parecida) custaria uma ida ao banco
+// pra produzir um enfeite de UI. Aqui custa zero I/O e é testável sem banco.
+//
+// Corrige PALAVRA A PALAVRA: em "furadera bosch" só "furadera" está errado, e
+// sugerir a frase inteira do produto ("Furadeira de Impacto 1/2\" 750W") não é
+// uma sugestão de busca, é um título.
+func suggestFromNames(q string, products []model.Product) string {
+	origem := strings.Fields(q)
+	if len(origem) == 0 || len(products) == 0 {
+		return ""
+	}
+
+	// Vocabulário: todas as palavras dos nomes devolvidos, normalizadas.
+	vocab := make([]string, 0, 64)
+	vistas := make(map[string]bool, 64)
+	for _, p := range products {
+		for _, w := range strings.Fields(p.Name) {
+			w = normalizeWord(w)
+			if len(w) < 3 || vistas[w] {
+				continue
+			}
+			vistas[w] = true
+			vocab = append(vocab, w)
+		}
+	}
+
+	corrigidas := make([]string, len(origem))
+	mudou := false
+	for i, orig := range origem {
+		alvo := normalizeWord(orig)
+		corrigidas[i] = orig
+		if len(alvo) < 3 {
+			continue // "de", "x", "40" não se corrigem
+		}
+		melhor, melhorSim := "", fuzzyThresholdFloat
+		for _, cand := range vocab {
+			if s := trigramSimilarity(alvo, cand); s > melhorSim {
+				melhor, melhorSim = cand, s
+			}
+		}
+		// `melhor != alvo` evita sugerir exatamente o que o usuário digitou —
+		// "Mostrando resultados para **cimento**" quando ele digitou "cimento"
+		// é ruído que faz a loja parecer quebrada.
+		if melhor != "" && melhor != alvo {
+			corrigidas[i] = melhor
+			mudou = true
+		}
+	}
+	if !mudou {
+		return ""
+	}
+	return strings.Join(corrigidas, " ")
+}
+
+// fuzzyThresholdFloat espelha fuzzyThreshold pro lado Go. Manter os dois em
+// sincronia é proposital: a sugestão exibida tem que usar o MESMO corte que
+// selecionou os resultados, senão a loja mostra "você quis dizer X" e devolve
+// uma lista que não tem nada de X.
+const fuzzyThresholdFloat = 0.42
+
+// normalizeWord tira acento, pontuação e caixa — "Acrílica" e "acrilico"
+// precisam ser comparáveis, que é justamente o erro que o cliente comete.
+func normalizeWord(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if d, ok := deaccent[r]; ok {
+			b.WriteRune(d)
+			continue
+		}
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// deaccent cobre o que aparece em português. Tabela explícita em vez de
+// golang.org/x/text/unicode/norm pra não adicionar dependência ao módulo por
+// causa de um enfeite de UI.
+var deaccent = map[rune]rune{
+	'á': 'a', 'à': 'a', 'ã': 'a', 'â': 'a', 'ä': 'a',
+	'é': 'e', 'ê': 'e', 'è': 'e', 'ë': 'e',
+	'í': 'i', 'î': 'i', 'ì': 'i', 'ï': 'i',
+	'ó': 'o', 'õ': 'o', 'ô': 'o', 'ò': 'o', 'ö': 'o',
+	'ú': 'u', 'û': 'u', 'ù': 'u', 'ü': 'u',
+	'ç': 'c', 'ñ': 'n',
+}
+
+// trigramSimilarity reproduz o `similarity()` do pg_trgm: Jaccard sobre os
+// conjuntos de trigramas, com a mesma convenção de padding (dois espaços na
+// frente, um atrás). Só é usada pra ESCOLHER O TEXTO da sugestão — quem
+// seleciona as linhas continua sendo o Postgres, com o índice.
+func trigramSimilarity(a, b string) float64 {
+	ta, tb := trigrams(a), trigrams(b)
+	if len(ta) == 0 || len(tb) == 0 {
+		return 0
+	}
+	inter := 0
+	for t := range ta {
+		if tb[t] {
+			inter++
+		}
+	}
+	uni := len(ta) + len(tb) - inter
+	if uni == 0 {
+		return 0
+	}
+	return float64(inter) / float64(uni)
+}
+
+func trigrams(s string) map[string]bool {
+	r := []rune("  " + s + " ")
+	out := make(map[string]bool, len(r))
+	for i := 0; i+3 <= len(r); i++ {
+		out[string(r[i:i+3])] = true
+	}
+	return out
 }
 
 // GetBySlug GET /api/v1/products/:slug
@@ -303,23 +797,13 @@ func (h *ProductHandler) GetByID(c *gin.Context) {
 func (h *ProductHandler) Facets(c *gin.Context) {
 	params := parseProductsQuery(c)
 
-	where := []string{"p.status = 'published'"}
-	args := []any{}
-	idx := 1
-
-	if params.Category != "" {
-		where = append(where, fmt.Sprintf("p.category_id = $%d", idx))
-		args = append(args, params.Category)
-		idx++
-	}
-	if params.Q != "" {
-		where = append(where, fmt.Sprintf("(p.name ILIKE $%d ESCAPE '\\' OR COALESCE(p.description,'') ILIKE $%d ESCAPE '\\' OR COALESCE(p.sku,'') ILIKE $%d ESCAPE '\\')", idx, idx, idx+1))
-		esc := escapeLikePattern(params.Q)
-		args = append(args, "%"+esc+"%", esc+"%")
-		idx += 2
-	}
-	where, args, idx = appendAttrFilters(where, args, idx, params)
-	whereSQL := strings.Join(where, " AND ")
+	// MESMO builder de List: antes eram dois predicados de busca escritos à mão
+	// em lugares diferentes, e eles já divergiam (o de Facets não olhava o
+	// vendedor). Faceta que não descreve o resultado exibido é pior que faceta
+	// nenhuma — o usuário filtra por uma marca que a lista não tem.
+	f := buildProductFilters(params, searchFullText, scopeFacets)
+	args := f.args
+	whereSQL := strings.Join(f.where, " AND ")
 
 	// Brands with counts.
 	// #nosec G202 — whereSQL é construído só de literais hardcoded (`p.brand = $N`,
@@ -385,14 +869,18 @@ func (h *ProductHandler) attributeFacets(c *gin.Context, params productsQuery, w
 		return out
 	}
 
-	// `p` continua na cláusula porque whereSQL referencia p.*; o JOIN com
-	// sellers é necessário porque whereSQL pode citar s.name (busca por `q`).
+	// `p` continua na cláusula porque whereSQL referencia p.*.
+	//
+	// O JOIN com `sellers` FOI REMOVIDO: ele só existia porque o whereSQL antigo
+	// citava `s.name` na busca por `q` — e era justamente esse `s.name` dentro
+	// do OR que impedia o planejador de usar índice em products. Agora o nome do
+	// vendedor mora em p.search_vector (peso D) e o predicado é de uma tabela só.
+	//
 	// #nosec G202 — whereSQL vem do mesmo builder das outras queries: literais
 	// hardcoded com placeholders posicionais.
 	base := `
 		FROM product_attributes pa
 		JOIN products p ON p.id = pa.product_id
-		JOIN sellers s ON s.id = p.seller_id
 		JOIN category_attributes ca ON ca.key = pa.key AND ca.category_id = p.category_id
 		WHERE ` + whereSQL + ` AND ca.filterable = true`
 
@@ -512,6 +1000,28 @@ const (
 	maxFilterCode     = 64  // SKU / código de barras (EAN tem 14; SKU de fornecedor é maior)
 	maxFilterAttr     = 128 // par `chave:valor` de faceta técnica
 )
+
+// sanitizeText remove o que o Postgres NÃO ACEITA em texto, antes que vire
+// argumento de consulta.
+//
+// 🐛 BUG REAL, pego por teste de entrada hostil: `?q=%00` (byte nulo) fazia o
+// driver devolver `pq: invalid byte sequence for encoding "UTF8": 0x00` e a
+// busca respondia **500**. Ou seja: derrubar a vitrine custava uma query
+// string de 5 caracteres. O problema é anterior ao tsvector — o ILIKE tinha
+// exatamente a mesma falha, ela só nunca havia sido testada.
+//
+// Também caem os demais caracteres de controle e os runes inválidos de UTF-8
+// (que viram RuneError na decodificação e chegariam malformados ao banco).
+// Nada disso é digitável numa caixa de busca: só aparece em ataque.
+func sanitizeText(s string) string {
+	limpo := strings.Map(func(r rune) rune {
+		if r == utf8.RuneError || r == 0 || unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, s)
+	return strings.TrimSpace(limpo)
+}
 
 // truncateRunes corta a string mantendo os primeiros N runes (não bytes).
 // Evita explodir caracteres UTF-8 multibyte no meio.
@@ -650,10 +1160,12 @@ func parseProductsQuery(c *gin.Context) productsQuery {
 
 	// CT1-M1: trunca cada filtro pra um cap sensato. Cap > limite humano (q=100
 	// chars já é uma frase longa) mas << que payload abusivo.
+	// sanitizeText ANTES do truncate em todo filtro textual: byte nulo e
+	// caractere de controle viram erro do driver e 500 (ver sanitizeText).
 	q := productsQuery{
-		Category: truncateRunes(c.Query("category"), maxFilterCategory),
-		Q:        truncateRunes(strings.TrimSpace(c.Query("q")), maxFilterQ),
-		Brand:    truncateRunes(c.Query("brand"), maxFilterBrand),
+		Category: truncateRunes(sanitizeText(c.Query("category")), maxFilterCategory),
+		Q:        truncateRunes(sanitizeText(c.Query("q")), maxFilterQ),
+		Brand:    truncateRunes(sanitizeText(c.Query("brand")), maxFilterBrand),
 		InStock:  c.Query("in_stock") == "true",
 		Sort:     truncateRunes(c.Query("sort"), maxFilterSort),
 		Page:     page,
@@ -661,8 +1173,8 @@ func parseProductsQuery(c *gin.Context) productsQuery {
 		// SKU e barcode são lookup EXATO (`=`), nunca ILIKE: é leitura de
 		// scanner e digitação de código no balcão — precisa bater o índice
 		// único e voltar em microssegundos, não varrer trigrama.
-		SKU:     truncateRunes(strings.TrimSpace(c.Query("sku")), maxFilterCode),
-		Barcode: truncateRunes(strings.TrimSpace(c.Query("barcode")), maxFilterCode),
+		SKU:     truncateRunes(sanitizeText(c.Query("sku")), maxFilterCode),
+		Barcode: truncateRunes(sanitizeText(c.Query("barcode")), maxFilterCode),
 		Attrs:   parseAttrFilters(c),
 	}
 

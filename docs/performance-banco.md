@@ -157,7 +157,12 @@ As filas do balcão **já estavam bem servidas** e não precisaram de nada:
 
 ---
 
-### 5. 🟡 Busca textual não usa nenhum índice — **6.110 buffers, seq scan**
+### 5. ✅ Busca textual não usava nenhum índice — **165,9 ms → 4,4 ms (38x), 10.183 → 360 buffers**
+
+> **Atualizado em 2026-07-19** — corrigido. O diagnóstico original está preservado abaixo;
+> a correção e as medições novas vêm logo depois.
+
+#### Diagnóstico original
 
 A busca por `q` faz seq scan em 150k produtos e **nunca** usa os índices trigram que existem
 (`idx_products_name_trgm`, `idx_products_sku_trgm`).
@@ -172,11 +177,158 @@ Com `s.name` (tabela `sellers`, do JOIN) dentro do mesmo `OR`, o Postgres não c
 predicado por índice em `products` — teria que provar que nenhum dos outros ramos casa, e o ramo do
 seller depende do JOIN. Resultado: varre tudo e filtra.
 
-❌ **NÃO corrigido — precisa de decisão sua.** Ver "Decisões pendentes" abaixo. É a única correção do
-levantamento que exige mudar a **semântica** da busca ou o schema, e por isso não entrou.
-
 **O caminho do balcão está OK**: `sku` e `barcode` exatos caem em `Index Scan` (8 buffers, 0,04 ms).
 O leitor de código de barras não passa pelo caminho lento.
+
+#### ✅ Correção aplicada — `tsvector` + GIN com configuração própria
+
+`services/catalog-service/migrations/014_fulltext_search.{up,down}.sql`
+
+**A armadilha do caminho, e a decisão.** Coluna `GENERATED ALWAYS AS (...) STORED` exige expressão
+IMMUTABLE. `to_tsvector('portuguese', x)` (2 argumentos) é immutable; **`unaccent()` não é** — depende
+do dicionário instalado. As três saídas eram:
+
+| Saída | Veredito |
+|---|---|
+| Coluna mantida por **trigger** | Funciona, mas troca uma declaração verificada pelo banco por código imperativo que precisa cobrir INSERT *e* UPDATE. Um caminho de escrita esquecido desatualiza o vetor **em silêncio**. |
+| **Wrapper `IMMUTABLE`** sobre `unaccent` | Funciona, mas é uma **mentira ao planejador**: trocar o dicionário deixa o índice errado sem ninguém saber. Corrupção silenciosa de índice é o pior modo de falha disponível. |
+| **Configuração de busca própria** (`utilar_pt`) | ✅ **Escolhida.** |
+
+A escolhida é a única honesta: `unaccent` vira parte do **dicionário** da configuração, não uma chamada
+de função na expressão. Aí `to_tsvector('utilar_pt', x)` é o `to_tsvector` de dois argumentos de
+sempre — immutable de verdade — e o Postgres aceita a coluna gerada, com a dependência registrada no
+catálogo.
+
+Ela ainda resolveu de graça um bug que as outras duas teriam: como a config é usada **pelos dois
+lados** (o `to_tsvector` da coluna e o `to_tsquery` da consulta), é impossível aplicar unaccent em um
+lado só. Esse é exatamente o bug que faz "palavra inteira acha, prefixo curto não" — `acri` não
+casaria `Acrílica` se o lexema da consulta não passasse pelo mesmo unaccent. Coberto por
+`TestBusca_PrefixoCurtoComAcentoDepoisDoCorte`.
+
+**O vetor, com pesos:** A = nome, B = marca + SKU, C = descrição, **D = nome do vendedor
+(denormalizado em `products.seller_name_cache`)**. É a denormalização do vendedor que tira o JOIN do
+`WHERE` e destrava o índice. Consistência por dois gatilhos: `BEFORE INSERT OR UPDATE OF seller_id` em
+`products`, e `AFTER UPDATE OF name` em `sellers` (propaga para os produtos da loja). Coberto por
+`TestRegressao_RenomearVendedorAtualizaOVetorDeBusca` — denormalização desatualizada não dá erro, dá
+**resultado errado**.
+
+**Medições (150k produtos, cache quente):**
+
+| Consulta | Antes | Depois | Ganho |
+|---|---|---|---|
+| `count` "argamassa colante" (294 resultados) | 165,9 ms / 10.183 buffers | **4,4 ms / 360** | **38x**, 28x menos I/O |
+| `count` "acrilico" (24.458 resultados, 17% do catálogo) | 144,9 ms / 10.183 | **26,7 ms / 9.570** | 5,4x |
+| Fuzzy "vuradeira" (caminho raro) | — | 38,9 ms / 5.439 | — |
+| SKU exato (balcão) | 0,073 ms / 4 | **0,073 ms / 4** | inalterado ✅ |
+
+O segundo caso é o honesto de reportar: num termo que casa 17% do catálogo os buffers **empatam** —
+qualquer plano tem que tocar o heap dessas linhas. O ganho ali é de CPU (não avalia `ILIKE` em 138 mil
+linhas), não de I/O. O ganho grande é em termo seletivo, que é a busca normal.
+
+##### 🐛 Dois bugs achados durante a correção (nenhum é do tsvector)
+
+**a) `COALESCE(p.sku,'')` cegava o planejador — o mesmo bug do `s.name`, em outra roupa.**
+A primeira versão manteve o `COALESCE` que já existia no código e o plano **voltou a ser seq scan**,
+com o GIN pronto e sem uso:
+
+| | Plano | Tempo | Buffers |
+|---|---|---|---|
+| `COALESCE(p.sku,'') ILIKE ...` | Parallel Seq Scan | 124,9 ms | 12.132 |
+| `p.sku ILIKE ...` | BitmapOr de 3 índices | **5,2 ms** | **360** |
+
+`COALESCE(col, '')` é uma **expressão**, não uma coluna — nenhum índice a serve, e **um só ramo
+não-indexável derruba o `OR` inteiro**. A semântica é idêntica (`NULL ILIKE 'x%'` é NULL, e num `OR`
+de `WHERE` NULL e FALSE dão no mesmo). É a mesma lição do `s.name`: no `OR` de busca, todo ramo
+precisa ser indexável.
+
+**b) `?q=%00` devolvia HTTP 500** (`pq: invalid byte sequence for encoding "UTF8": 0x00`). Derrubar a
+busca custava uma query string de 5 caracteres. **É anterior ao tsvector** — o `ILIKE` tinha
+exatamente a mesma falha, ela só nunca havia sido testada. Corrigido com `sanitizeText` em todos os
+filtros textuais (byte nulo, caracteres de controle e runes UTF-8 inválidos).
+
+**c) Gatilho sem `SET search_path` quebrava o restore de backup.** `pg_dump`/`pg_restore` rodam com
+`search_path = ''`, e o `FROM sellers` dentro do corpo da função não resolvia:
+`ERROR: relation "sellers" does not exist` **no meio da tabela de produtos**. Descoberto ao carregar o
+dump real na base de medição. Com "backup nunca restaurado" já aberto em `CLAUDE.md`, seria o tipo de
+surpresa que só aparece na hora do desastre. As duas funções agora fixam `search_path`.
+
+##### `ts_rank` e não `ts_rank_cd` — decisão medida
+
+| termo | `ts_rank_cd` | `ts_rank` |
+|---|---|---|
+| "argamassa colante" (294) | 32,8 ms | **4,5 ms** |
+| "acrilico" (24.458) | 379,6 ms | **29,2 ms** | ← **13x** |
+
+O que o `_cd` acrescenta é **cover density** — o quão próximos os termos aparecem no documento. Isso
+vale em texto corrido longo; nome de produto tem 3 a 8 palavras e os termos estão sempre próximos.
+Estaríamos pagando 13x por um sinal praticamente constante. A ordenação **por peso**, que é a
+relevância que importa, é idêntica nos dois (verificado: termo no nome 0,608 × termo só na descrição
+0,122 — mesma proporção 5:1). E o peso C **não zera**: quem cita o termo só na descrição continua
+aparecendo, depois.
+
+##### Cascata de busca, e o limiar do fuzzy
+
+1. `tsvector` exato (lema + acento + plural, com relevância por peso)
+2. prefixo `:*` no último termo — autocomplete, no **mesmo** passo (é um `OR` na tsquery)
+3. **similaridade trigram** — só quando 1 e 2 vêm **vazios**
+
+O gatilho do passo 3 é "não achei nada", nunca "sempre": misturar aproximado com exato destruiria a
+busca que já funciona. `TestRegressao_BuscaCorretaNuncaViraAproximada` trava isso.
+
+**O limiar foi calibrado com medição, não chutado** — e a primeira descoberta foi que
+`similarity()` (o `%` do pg_trgm) **não corrige erro nenhum**, porque divide pelos trigramas do nome
+inteiro:
+
+```
+similarity('furadera', 'Furadeira de Impacto 1/2" 750W')  = 0,219
+similarity('argamasa', 'Argamassa Colante AC-I ... 20kg') = 0,205
+similarity('cimeto',   'Cimento Portland CP II-32 ...')   = 0,135     ← todos < 0,3 (corte default)
+```
+
+Quem serve é **`strict_word_similarity`** (`%>>`), que compara com a melhor extensão de palavras do
+alvo — e é indexável pelo `idx_products_name_trgm` que já existia e nunca era usado.
+
+O limiar saiu de uma **varredura** contra 12 erros de grafia reais e 7 termos sem sentido, medindo os
+dois lados ao mesmo tempo:
+
+| limiar | acertos | perdidos | ruído | **resultados irrelevantes** |
+|---|---|---|---|---|
+| 0,35 | 11 | 1 | 0 | **38** ← inunda de lixo |
+| 0,38 | 11 | 1 | 0 | **6** ← começa o lixo |
+| 0,40 | 11 | 1 | 0 | 0 |
+| **0,42** | **11** | **1** | **0** | **0** ← **escolhido** |
+| 0,44 | 11 | 1 | 0 | 0 |
+| 0,45 | 10 | 2 | 0 | 0 ← perde `tomda` (0,444) |
+| 0,50 (default PG) | 10 | 2 | 0 | 0 |
+
+O platô seguro é `[0,40 ; 0,44]` — recall máximo com **zero** resultado irrelevante — com dois
+precipícios próximos: em 0,38 o lixo aparece, em 0,45 o recall cai. **0,42 é o meio do platô**, e é
+meio de propósito: escolher uma das pontas seria ajustar o número à amostra.
+`TestRegressao_LimiarDoFuzzyNaoPodeSerMexidoSemMedir` trava os dois lados.
+
+⚠️ **Limite conhecido e aceito:** `luninaria` → `Luminária` (troca m→n no meio da palavra) mede
+**0,250** — abaixo até do pior falso positivo conhecido (`cimento` → `Cimeira`, 0,333). Não é
+alcançável sem descer a 0,35 e aceitar 38 resultados irrelevantes. Uma substituição no meio de uma
+palavra longa quebra três trigramas de uma vez. Perder um caso raro vale mais que estragar a busca de
+todo mundo.
+
+Aplicado com `SET LOCAL` dentro de transação: um `SET` normal contaminaria a conexão do **pool** e
+mudaria o limiar de todas as buscas seguintes que pegassem aquela conexão.
+
+**Payload distingue exato de aproximado**: `meta.approximate` e `meta.suggestion` ("mostrando
+resultados para *furadeira*"). Sem isso o frontend fingiria que achou o que o usuário pediu, e o
+cliente compraria o item errado. A sugestão é calculada **em Go**, sobre os nomes já em memória —
+zero consulta a mais.
+
+⚠️ **Código de barras nunca é aproximado.** Fuzzy no leitor venderia o produto errado, com preço
+errado, para um cliente no caixa. `TestRegressao_CodigoDeBarrasNuncaEhAproximado` trava isso.
+
+##### Descoberta contraintuitiva: o stemmer já corrige parte dos erros de grafia
+
+`furadera` e `argamasa` **não chegam** ao passo 3 — o stemmer português corta o sufixo errado junto
+com o certo (`furadera` → lema `furad`), e o prefixo `furad:*` casa `furadeir` no passo 2. Os testes
+verificam o **resultado** (achou o produto), não o caminho: travar o caminho tornaria a suíte frágil
+a qualquer ajuste do stemmer.
 
 ---
 
@@ -250,16 +402,12 @@ própria — não é decisão técnica.
 
 ## Decisões pendentes (não mexi, precisa da sua palavra)
 
-**1. Busca textual (gargalo nº 5).** Duas saídas, ambas mudam comportamento:
-
-- **Tirar `s.name` do `OR`** — a busca deixa de casar por nome do fornecedor. É a correção barata e
-  destrava os índices trigram existentes. **Muda o que o usuário encontra.**
-- **Coluna `tsvector` + índice GIN** (`name || description || sku`), com `websearch_to_tsquery`.
-  Busca de verdade, com stemming em português e ranking. Custa uma migration com `GENERATED ALWAYS AS`,
-  reescrita do handler e revisão do teste de escape do `ILIKE` (a proteção contra ReDoS do `pg_trgm`,
-  audit CT1-C1, deixa de ser necessária nesse caminho — mas não pode simplesmente sumir).
-
-Recomendo a segunda se busca é caminho de receita; a primeira se a prioridade é fechar o gargalo agora.
+**1. ~~Busca textual (gargalo nº 5).~~ ✅ RESOLVIDO em 2026-07-19** — foi pela segunda opção
+(`tsvector` + GIN), com `websearch_to_tsquery`, pesos, prefixo para autocomplete e cascata para
+similaridade em erro de grafia. Ver a seção 5 acima. A proteção anti-ReDoS do `ILIKE` (CT1-C1) **não
+sumiu**: o ramo do SKU continua sendo `ILIKE` com `escapeLikePattern`, e a superfície nova
+(`to_tsquery` lança exceção com sintaxe inválida → 500) foi tratada com `websearch_to_tsquery`
+tolerante + saneamento por lista de permissão no ramo de prefixo, tudo com teste de entrada hostil.
 
 **2. Índices redundantes por prefixo — não removi (removal é sua decisão).**
 
@@ -317,6 +465,10 @@ não pega lock de tabela nem varre `products`.
 | 4 | `order-service/internal/handler/balcao.go` | `ListPendingApprovals` rewired — **201 → 5** consultas |
 | 5 | `{catalog,order,auth,payment}-service/internal/db/db.go` | `SetConnMaxLifetime` + pool 25→10, tunável por env |
 | 6 | `order-service/internal/handler/order_batchload_test.go` | 3 testes de regressão (verificados por mutação) |
+| 7 | `catalog-service/migrations/014_fulltext_search.{up,down}.sql` | `tsvector` + GIN, config `utilar_pt` com unaccent, vendedor denormalizado + 2 gatilhos — **38x** |
+| 8 | `catalog-service/internal/handler/product.go` | Cascata de busca, `ts_rank`, fuzzy calibrado, `sanitizeText` (corrige 500 com `?q=%00`) |
+| 9 | `catalog-service/internal/model/catalog.go` | `meta.approximate` + `meta.suggestion` no payload |
+| 10 | `catalog-service/internal/handler/search_test.go`, `search_unit_test.go` | 20 testes: acento, plural, prefixo curto, palavra do meio, relevância, erro de grafia, entrada hostil, balcão exato |
 
 **Validação:** `go build` e `go test -race` verdes **por módulo** nos 4 serviços
 (`go build ./services/...` falha por layout de workspace — sempre por módulo).

@@ -211,6 +211,22 @@ type Meta struct {
 	PerPage    int `json:"per_page"`
 	Total      int `json:"total"`
 	TotalPages int `json:"total_pages"`
+
+	// Approximate marca que ESTES resultados vieram da busca aproximada
+	// (similaridade), não da busca exata — o usuário errou a grafia e o
+	// catálogo respondeu com o que se parece.
+	//
+	// PORQUÊ está no payload: sem esta marca o frontend não tem como
+	// distinguir "achei o que você pediu" de "não achei, olha o que existe de
+	// parecido", e acabaria fingindo que achou. Fingir é pior que corrigir —
+	// o cliente compra o item errado achando que buscou certo.
+	//
+	// omitempty: a busca exata (o caso normal) não carrega o campo.
+	Approximate bool `json:"approximate,omitempty"`
+
+	// Suggestion é o termo corrigido, para o "Mostrando resultados para
+	// **furadeira**". Vazio quando não houve correção a sugerir.
+	Suggestion string `json:"suggestion,omitempty"`
 }
 
 type Facets struct {
