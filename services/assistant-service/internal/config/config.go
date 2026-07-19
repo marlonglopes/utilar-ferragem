@@ -25,13 +25,27 @@ type Config struct {
 	// respostas guiadas por regras + dados reais do catálogo, sem chamar a API) —
 	// permite demonstrar sem chave, no mesmo espírito mock do resto do Utilar.
 	AnthropicAPIKey string
-	// Modelo padrão: claude-opus-4-8 (o mais capaz). Ajustável via ALICE_MODEL —
+	// Modelo padrão: claude-sonnet-5 (equilíbrio custo-capacidade). Ajustável via ALICE_MODEL —
 	// a Gi do gifthy usa claude-haiku-4-5 por custo/latência em escala.
 	Model string
 
 	// CatalogServiceURL — a Alice busca fatos (produto/preço/estoque) aqui via
 	// tool use; nunca inventa. É a "única fonte de fatos" (padrão da Gi).
 	CatalogServiceURL string
+
+	// OrderServiceURL — origem dos padrões AGREGADOS de co-compra
+	// ("quem levou X também levou Y"). Vazio = sugestão por co-compra desligada;
+	// a Alice continua sugerindo complementares por regra técnica, que vêm da
+	// base de conhecimento. Nunca se inventa co-compra.
+	OrderServiceURL string
+
+	// ServiceToken é a credencial de serviço para os endpoints INTERNOS
+	// (custo/margem no catálogo, co-compra no order-service).
+	//
+	// Vazio = o modo balcão roda SEM custo. Escolha deliberada: sem credencial,
+	// a Alice diz que não tem o custo em vez de tentar adivinhá-lo, e o site
+	// público segue idêntico. É o padrão que falha fechado.
+	ServiceToken string
 }
 
 func Load() *Config {
@@ -42,8 +56,10 @@ func Load() *Config {
 		RedisURL:          os.Getenv("REDIS_URL"),
 		JWTSecret:         os.Getenv("JWT_SECRET"),
 		AnthropicAPIKey:   os.Getenv("ANTHROPIC_API_KEY"),
-		Model:             env("ALICE_MODEL", "claude-opus-4-8"),
+		Model:             env("ALICE_MODEL", "claude-sonnet-5"),
 		CatalogServiceURL: env("CATALOG_SERVICE_URL", "http://localhost:8091"),
+		OrderServiceURL:   os.Getenv("ORDER_SERVICE_URL"),
+		ServiceToken:      os.Getenv("SERVICE_TOKEN"),
 	}
 }
 

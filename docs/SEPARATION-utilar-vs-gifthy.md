@@ -38,7 +38,7 @@ equivalentes **próprios do Utilar** assim que as contas dedicadas existirem:
 | **Domínio** | Registro.br | `utilarferragem.com.br` |
 | **E-mail transacional** | SES (na conta AWS do Utilar) | remetente `no-reply@utilarferragem.com.br` |
 | **JWT_SECRET (prod)** | gerar (`openssl rand -base64 48`) | 32+ chars, no `.env.prod` |
-| **Anthropic (Lara, opcional)** | console Anthropic | `ANTHROPIC_API_KEY` (senão Lara roda em mock) |
+| **Anthropic (Alice, opcional)** | console Anthropic | `ANTHROPIC_API_KEY` (senão Alice roda em mock) |
 
 Ver também: `docs/aws-build-utilar.md`, `docs/appmax-integration.md`,
 `docs/orcamento-utilar-aws-2026-07.md`.
