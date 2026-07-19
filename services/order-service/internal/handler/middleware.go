@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"github.com/utilar/pkg/idempotency"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -63,7 +64,11 @@ func CORS(allowed []string) gin.HandlerFunc {
 		}
 
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-Id, "+RequestIDHeader)
+		// Idempotency-Key precisa estar aqui: o SPA passa a enviá-lo em POST
+		// /orders e /payments pra evitar cobrança duplicada no duplo clique.
+		// Header não declarado faz o PREFLIGHT falhar e a requisição nem sai —
+		// o usuário vê "Failed to fetch" no Pix e no boleto, sem log no servidor.
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-Id, "+RequestIDHeader+", "+idempotency.HeaderName)
 		c.Header("Access-Control-Expose-Headers", RequestIDHeader)
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)
