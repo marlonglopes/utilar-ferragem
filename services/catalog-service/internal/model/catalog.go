@@ -132,6 +132,49 @@ type AdminProduct struct {
 	Status      string   `json:"status"`
 }
 
+// ProductCost é o payload da rota de balcão (`/api/v1/store/products/costs`).
+//
+// PORQUÊ uma struct própria em vez de reusar AdminProduct: o operador de balcão
+// precisa de custo e margem para negociar desconto, e de NADA MAIS do que o
+// AdminProduct carrega. Fornecedor, SKU do fornecedor e dados fiscais são
+// inteligência de compra — quem opera o caixa não precisa saber de quem a loja
+// compra nem por quanto o concorrente compraria. Menos campo exposto, menor o
+// estrago se um token de operador vazar.
+//
+// ⚠️ Esta struct NUNCA pode ser serializada em rota pública. É a segunda (e
+// última) do serviço que carrega `cost`; a outra é AdminProduct.
+type ProductCost struct {
+	ID   string  `json:"id"`
+	SKU  *string `json:"sku,omitempty"`
+	Name string  `json:"name"`
+	// Price é o preço de tabela. Vem junto de propósito: sem ele o PDV teria
+	// que casar o custo com o preço que ele mesmo tem em memória, e um item
+	// cujo preço mudou no meio da venda mostraria margem de outro preço.
+	Price    float64 `json:"price"`
+	Currency string  `json:"currency"`
+	// Cost e MarginPct SEM `omitempty`: `null` é informação, não ausência de
+	// resposta. Produto sem custo cadastrado tem que chegar no PDV como
+	// "margem indisponível" — o modo de falha que estamos consertando é
+	// justamente o balcão preencher a lacuna com um chute (`preço × 0,72`).
+	Cost          *float64 `json:"cost"`
+	MarginPct     *float64 `json:"marginPct"`
+	UnitOfMeasure string   `json:"unitOfMeasure"`
+	// Status entra porque a rota do balcão NÃO filtra por `published`: o
+	// vendedor tem o item na prateleira mesmo quando ele está em rascunho na
+	// vitrine. Quem exibe decide se avisa.
+	Status string `json:"status"`
+}
+
+// ProductCostsResponse é a resposta em lote da rota de balcão.
+//
+// `Missing` existe para que o PDV distinga "id não achado" de "achado sem
+// custo". Sem essa distinção, um id errado no carrinho sumiria em silêncio e a
+// barra de margem cobriria só parte dos itens sem ninguém notar.
+type ProductCostsResponse struct {
+	Data    []ProductCost `json:"data"`
+	Missing []string      `json:"missing"`
+}
+
 type ProductsResponse struct {
 	Data []Product `json:"data"`
 	Meta Meta      `json:"meta"`

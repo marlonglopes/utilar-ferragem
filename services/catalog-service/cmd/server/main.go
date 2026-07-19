@@ -48,6 +48,7 @@ func main() {
 	catalogAdminH := handler.NewCatalogAdminHandler(database)
 	reservationH := handler.NewReservationHandler(database)
 	importH := handler.NewImportHandler(database)
+	storeCostH := handler.NewStoreCostHandler(database)
 
 	if cfg.DevMode {
 		slog.Warn("DEV_MODE=true — /admin aceita fallback X-User-Role; nunca use em produção")
@@ -152,6 +153,22 @@ func main() {
 		internal.POST("/reservations", reservationH.Reserve)
 		internal.POST("/reservations/:orderId/commit", reservationH.Commit)
 		internal.POST("/reservations/:orderId/release", reservationH.Release)
+	}
+
+	// Rotas do BALCÃO — leitura autenticada que o PDV faz. Aceita
+	// role=store_operator, role=admin (token de usuário) e role=service (token
+	// de serviço, para o order-service registrar o CMV do pedido de balcão).
+	//
+	// PORQUÊ um grupo separado do /admin: o /admin tem ESCRITA no catálogo
+	// (preço, importação de planilha). Operador de balcão precisa VER o custo
+	// pra negociar desconto; não pode mudar preço de produto. Grupo próprio
+	// mantém a superfície do operador do tamanho da necessidade dele.
+	store := r.Group("/api/v1/store", handler.RequireStore(cfg.JWTSecret, cfg.ServiceJWTSecret, cfg.DevMode))
+	{
+		// Em lote de propósito: o carrinho de balcão tem vários itens e uma
+		// chamada por item seria N+1 no caminho mais quente da loja.
+		store.GET("/products/costs", storeCostH.Costs)
+		store.POST("/products/costs", storeCostH.CostsBatch)
 	}
 
 	// Sweeper de expiração: devolve à vitrine o estoque de carrinhos abandonados.

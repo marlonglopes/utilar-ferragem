@@ -108,6 +108,45 @@ func RequireRole(jwtSecret string, devMode bool, roles ...string) gin.HandlerFun
 // teste e smoke sem subir o order-service. Isso é seguro porque o pkg/devguard
 // recusa DEV_MODE em qualquer ambiente com sinal de produção.
 func RequireInternal(jwtSecret, serviceSecret string, devMode bool) gin.HandlerFunc {
+	return requireServiceOrRoles(jwtSecret, serviceSecret, devMode, "admin")
+}
+
+// RequireStore protege as rotas /api/v1/store — a leitura autenticada que o PDV
+// de balcão faz.
+//
+// PORQUÊ existe separada de RequireAdmin: o custo de aquisição precisa chegar
+// ao operador do balcão. Sem isso o PDV estima o custo como `preço × 0,72` e a
+// barra de margem mente — num caso medido, custo real dava 60% de margem e a
+// estimativa dava 28%. São 32 pontos, e é esse número que o vendedor usa pra
+// decidir até onde pode dar desconto.
+//
+// PORQUÊ não foi só somar `store_operator` ao RequireAdmin do grupo /admin:
+// aquele grupo tem ESCRITA (criar produto, mudar preço, importar planilha).
+// Operador de balcão não pode escrever no catálogo. Rota nova, papel novo,
+// superfície mínima.
+//
+// `role=service` também passa (mesma checagem de segredo separado do
+// RequireInternal) porque o order-service precisa do custo pra registrar o CMV
+// do pedido de balcão sem fazer SELECT no banco do catálogo.
+func RequireStore(jwtSecret, serviceSecret string, devMode bool) gin.HandlerFunc {
+	return requireServiceOrRoles(jwtSecret, serviceSecret, devMode, "store_operator", "admin")
+}
+
+// requireServiceOrRoles é o tronco comum de RequireInternal e RequireStore:
+// aceita identidade de SERVIÇO (assinada com o serviceSecret) ou identidade de
+// USUÁRIO com um dos papéis listados (assinada com o jwtSecret).
+//
+// Extraído quando a rota de custo do balcão precisou exatamente da mesma
+// separação de segredos com outra lista de papéis. Duplicar o middleware seria
+// convite a divergir na próxima mudança de segurança — e é justamente aqui que
+// divergir custa caro.
+func requireServiceOrRoles(jwtSecret, serviceSecret string, devMode bool, roles ...string) gin.HandlerFunc {
+	allowed := make(map[string]struct{}, len(roles))
+	for _, r := range roles {
+		allowed[r] = struct{}{}
+	}
+	wanted := "service or " + strings.Join(roles, " or ") + " role required"
+
 	return func(c *gin.Context) {
 		if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
 			raw := strings.TrimPrefix(auth, "Bearer ")
@@ -120,7 +159,7 @@ func RequireInternal(jwtSecret, serviceSecret string, devMode bool) gin.HandlerF
 				return
 			}
 
-			// 2) Token de usuário — só admin entra aqui.
+			// 2) Token de usuário — só os papéis da lista entram aqui.
 			sub, role, err := parseJWTClaims(raw, jwtSecret)
 			if err != nil {
 				slog.Warn("auth: invalid jwt em rota interna",
@@ -129,13 +168,22 @@ func RequireInternal(jwtSecret, serviceSecret string, devMode bool) gin.HandlerF
 				c.Abort()
 				return
 			}
-			if role != "admin" {
-				// Log explícito: `role=service` chegando por aqui é tentativa de
-				// usar o segredo de usuário como se fosse o de serviço — ou seja,
-				// exatamente o ataque que A1 descreve.
+			// `role=service` NUNCA vale aqui: o caminho (1) já teria aceitado se
+			// a assinatura fosse a de serviço. Chegar até aqui com essa claim é
+			// tentativa de usar o segredo de usuário como se fosse o de serviço —
+			// exatamente o ataque que A1 descreve. A recusa é explícita para que
+			// uma lista de papéis futura não possa incluir "service" por engano.
+			if role == servicetoken.Role {
+				slog.Warn("auth: token de usuário com role=service recusado em rota interna",
+					"sub", sub, "request_id", c.GetString("request_id"))
+				Unauthorized(c, "invalid token")
+				c.Abort()
+				return
+			}
+			if _, ok := allowed[role]; !ok {
 				slog.Warn("auth: rota interna negada",
 					"role", role, "sub", sub, "request_id", c.GetString("request_id"))
-				Forbidden(c, "service or admin role required")
+				Forbidden(c, wanted)
 				c.Abort()
 				return
 			}
@@ -147,7 +195,8 @@ func RequireInternal(jwtSecret, serviceSecret string, devMode bool) gin.HandlerF
 
 		// 3) Fallback dev — headers explícitos, só com DevMode.
 		if devMode {
-			if hdr := c.GetHeader("X-User-Role"); hdr == servicetoken.Role || hdr == "admin" {
+			hdr := c.GetHeader("X-User-Role")
+			if _, ok := allowed[hdr]; ok || hdr == servicetoken.Role {
 				c.Set("user_id", c.GetHeader("X-User-Id"))
 				c.Set("user_role", hdr)
 				c.Next()

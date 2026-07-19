@@ -66,10 +66,9 @@ func (h *CatalogAdminHandler) GetProduct(c *gin.Context) {
 	p.Cost = cost
 	// Margem calculada no servidor pra que o PDV pare de estimar custo como
 	// `preço × 0,72` — o chute que hoje sustenta a barra de margem do balcão.
-	if cost != nil && p.Price > 0 {
-		m := (p.Price - *cost) / p.Price * 100
-		p.MarginPct = &m
-	}
+	// Mesma função da rota de balcão (`/api/v1/store`) de propósito: gerente e
+	// vendedor têm que ver o MESMO número pro mesmo produto.
+	p.MarginPct = marginPct(p.Price, cost)
 
 	if tiers, err := loadTiers(h.db, p.ID); err == nil {
 		p.PriceTiers = tiers
