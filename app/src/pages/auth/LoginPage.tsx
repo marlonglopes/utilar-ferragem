@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Mail, Lock } from 'lucide-react'
+import type { User as AuthUser } from '@/store/authStore'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { Input } from '@/components/ui'
@@ -10,10 +11,9 @@ import { authPost, isAuthEnabled } from '@/lib/api'
 interface LoginResponse {
   accessToken: string
   refreshToken: string
-  user: { id: string; email: string; name: string; role: 'customer' | 'seller' | 'admin'; emailVerified?: boolean }
+  user: { id: string; email: string; name: string; role: AuthUser['role']; emailVerified?: boolean }
 }
 
-const GIFTHY_HUB_URL = import.meta.env.VITE_GIFTHY_HUB_URL ?? 'https://hub.utilar.com.br'
 
 export default function LoginPage() {
   const { t } = useTranslation()
@@ -45,14 +45,35 @@ export default function LoginPage() {
 
       const data = await authPost<LoginResponse>('/api/v1/auth/login', { email, password })
 
-      if (data.user.role === 'seller' || data.user.role === 'admin') {
-        window.location.href = `${GIFTHY_HUB_URL}?from=utilar-customer`
-        return
-      }
-
       setUser({ ...data.user, token: data.accessToken, refreshToken: data.refreshToken })
       mergeCarts([])
+
+      // Cada papel vai para a SUA área, dentro da própria Utilar.
+      //
+      // Antes daqui, `admin` e `seller` eram EXPULSOS para um hub externo
+      // (hub.utilar.com.br, que não existe) — resíduo da arquitetura do gifthy,
+      // onde o admin morava em outro aplicativo. A Utilar tem o próprio /admin
+      // e o próprio /balcao desde então, e o redirecionamento passou a
+      // significar: entrar como administrador jogava a pessoa para fora do
+      // sistema, numa página que não carrega.
+      //
+      // `next` explícito na URL continua ganhando: quem clicou em algo e caiu
+      // no login volta para onde queria ir.
+      if (nextPath && nextPath !== '/') {
+        navigate(nextPath, { replace: true })
+        return
+      }
+      if (data.user.role === 'admin') {
+        navigate('/admin', { replace: true })
+        return
+      }
+      if (data.user.role === 'store_operator') {
+        navigate('/balcao', { replace: true })
+        return
+      }
       navigate(nextPath, { replace: true })
+      return
+
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.invalidCredentials'))
     } finally {

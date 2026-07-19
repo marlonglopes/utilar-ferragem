@@ -5,7 +5,11 @@ export interface User {
   id: string
   email: string
   name: string
-  role: 'customer' | 'seller' | 'admin'
+  // Espelha o enum user_role do auth-service. `store_operator` é o VENDEDOR
+  // DE BALCÃO — não confundir com `seller`, que é lojista do marketplace.
+  // O tipo ficou desatualizado quando o papel foi criado no backend, e o
+  // resultado é que o operador caía no ramo genérico do redirecionamento.
+  role: 'customer' | 'seller' | 'admin' | 'store_operator'
   token: string           // JWT access token (expires em 15min quando vindo do auth-service)
   refreshToken?: string   // opaco, revogável (30 dias)
   emailVerified?: boolean
