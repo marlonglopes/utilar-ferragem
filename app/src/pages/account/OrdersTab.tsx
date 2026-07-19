@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Package, ChevronRight, Loader2 } from 'lucide-react'
 import { useOrders } from '@/hooks/useOrders'
+import { BuyAgainButton } from '@/components/orders/BuyAgainButton'
 import { formatCurrency } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import type { Order, OrderStatus } from '@/lib/mockOrders'
@@ -31,18 +32,25 @@ function OrderCard({ order }: { order: Order }) {
   })
 
   return (
-    <Link
-      to={`/conta/pedidos/${order.id}`}
-      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-sm transition-all"
-    >
+    /*
+      Card com "link esticado": o <a> do número do pedido cobre o card inteiro
+      via ::after, então o toque em qualquer ponto abre o detalhe — mas o botão
+      "Comprar novamente" continua sendo um alvo independente (z-10 no próprio
+      botão). Antes o card era um <Link> por fora; aninhar <button> dentro de
+      <a> é HTML inválido e faz o teclado ativar os dois de uma vez.
+    */
+    <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-sm transition-all">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-xl flex-shrink-0">
           {order.items[0]?.icon ?? '📦'}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-900">
+          <Link
+            to={`/conta/pedidos/${order.id}`}
+            className="text-sm font-semibold text-gray-900 after:absolute after:inset-0 hover:text-brand-orange focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange rounded"
+          >
             {t('orders.number', { number: order.number })}
-          </p>
+          </Link>
           <p className="text-xs text-gray-400 mt-0.5">
             {t('orders.placedOn', { date })} ·{' '}
             {t('orders.items', { count: itemCount })}
@@ -52,14 +60,22 @@ function OrderCard({ order }: { order: Order }) {
           </p>
         </div>
       </div>
-      <div className="flex sm:flex-col items-center sm:items-end gap-3 sm:gap-1 flex-shrink-0">
-        <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', statusColor(order.status))}>
-          {t(`orderStatus.${order.status}`)}
-        </span>
-        <span className="text-sm font-bold text-gray-900">{formatCurrency(order.total)}</span>
-        <ChevronRight className="h-4 w-4 text-gray-300 hidden sm:block" />
+      <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0">
+        <div className="flex flex-col items-start sm:items-end gap-1">
+          <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', statusColor(order.status))}>
+            {t(`orderStatus.${order.status}`)}
+          </span>
+          <span className="text-sm font-bold text-gray-900">{formatCurrency(order.total)}</span>
+        </div>
+        {/*
+          Recompra direto da lista. Ferragem é recompra pura — cimento,
+          argamassa, cabo, parafuso — e obrigar o cliente a abrir o pedido pra
+          repetir a compra cobra dois toques de todo mundo, todo mês.
+        */}
+        <BuyAgainButton order={order} variant="compact" />
+        <ChevronRight className="h-4 w-4 text-gray-300 hidden sm:block" aria-hidden />
       </div>
-    </Link>
+    </div>
   )
 }
 

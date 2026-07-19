@@ -135,6 +135,27 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		switch {
 		case errors.Is(err, catalogclient.ErrNotFound):
 			BadRequest(c, "product not found")
+
+		// DEGRADAÇÃO HONESTA (auditoria 2026-07-18). O disjuntor está aberto: o
+		// catálogo está fora e nem tentamos a chamada.
+		//
+		// A tentação aqui é "aceitar o preço que o cliente mandou e conferir
+		// depois". Isso reabriria O2-H5 — o buraco que a consulta ao catálogo
+		// existe para fechar — e transformaria uma indisponibilidade do
+		// catálogo na senha para comprar furadeira por R$ 0,01. Recusar com uma
+		// mensagem verdadeira é pior para a conversão e melhor para o caixa.
+		//
+		// 503 + Retry-After, e não 502: 503 diz "tente de novo", que é a
+		// verdade — o disjuntor fecha sozinho quando o catálogo voltar.
+		case errors.Is(err, catalogclient.ErrUnavailable):
+			slog.Error("create order RECUSADO: disjuntor do catálogo aberto — "+
+				"preço não pôde ser confirmado",
+				"user_id", userID, "request_id", requestID)
+			c.Header("Retry-After", "15")
+			Respond(c, http.StatusServiceUnavailable, "catalog_unavailable",
+				"não conseguimos confirmar o preço dos produtos agora. "+
+					"Aguarde alguns instantes e tente novamente — nenhum pedido foi criado.")
+
 		default:
 			slog.Error("create order: catalog lookup",
 				"error", err, "request_id", requestID)

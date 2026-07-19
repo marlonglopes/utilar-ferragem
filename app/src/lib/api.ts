@@ -351,6 +351,56 @@ export async function authPost<T>(path: string, body: unknown, token?: string): 
   return handleResponse<T>(res)
 }
 
+/**
+ * Revoga a sessão no SERVIDOR. Best-effort: nunca lança, nunca bloqueia.
+ *
+ * PORQUÊ existe: até aqui, "Sair" limpava só o navegador. O refresh token
+ * (30 dias, revogável) continuava VÁLIDO no banco do auth-service — se ele
+ * tivesse vazado (extensão maliciosa, backup do navegador, terminal
+ * compartilhado da loja), sair não protegia nada: a sessão seguia viva do
+ * outro lado. Limpar o cliente é a garantia mínima; revogar no servidor é a
+ * camada que faltava.
+ *
+ * O endpoint (`POST /api/v1/auth/logout`, grupo autenticado) revoga o refresh
+ * token pelo hash E põe o access token numa deny-list, encurtando a janela dos
+ * 15 minutos restantes de validade.
+ *
+ * Detalhes que o contrato exige e que já custaram bug em outros lugares:
+ * - A resposta é **204 No Content**. `handleResponse` faria `res.json()` num
+ *   corpo vazio e estouraria `SyntaxError` — por isso esta função não passa
+ *   por ele.
+ * - O `refreshToken` é obrigatório no corpo para o servidor revogar (sem ele o
+ *   handler devolve 204 e não revoga nada). O access token vai no header.
+ *
+ * Devolve `true` se o servidor confirmou a revogação — só para teste e log.
+ * Quem chama NUNCA deve condicionar a limpeza local a este retorno.
+ */
+export async function authLogout(
+  accessToken: string | null,
+  refreshToken: string | null,
+): Promise<boolean> {
+  // Sem auth-service (modo mock) ou sem token não há o que revogar.
+  if (!isAuthEnabled || !accessToken) return false
+  try {
+    const res = await fetch(`${AUTH_URL}/api/v1/auth/logout`, {
+      method: 'POST',
+      headers: authHeaders(accessToken, true),
+      body: JSON.stringify({ refreshToken: refreshToken ?? '' }),
+    })
+    if (!res.ok) {
+      // Não é fatal: a sessão local já foi (ou será) encerrada de qualquer
+      // jeito. Mas registrar importa — silêncio aqui esconderia a revogação
+      // parando de funcionar sem ninguém notar.
+      console.warn(`[auth] revogação de sessão falhou: HTTP ${res.status}`)
+      return false
+    }
+    return true
+  } catch (err) {
+    console.warn('[auth] revogação de sessão não pôde ser enviada', err)
+    return false
+  }
+}
+
 export async function authGet<T>(path: string, token: string): Promise<T> {
   const res = await fetch(`${AUTH_URL}${path}`, { headers: authHeaders(token) })
   if (res.status === 404) throw new Error('not_found')

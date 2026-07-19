@@ -1,11 +1,14 @@
 import { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, User, ShoppingCart, Menu, X } from 'lucide-react'
+import { Search, ShoppingCart, Menu, X, Heart, LogOut, User, Package } from 'lucide-react'
 import { LocaleSwitcher } from '@/components/common/LocaleSwitcher'
 import { CartDrawer } from '@/components/cart/CartDrawer'
+import { AccountMenu } from './AccountMenu'
 import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
+import { useFavoritesStore } from '@/store/favoritesStore'
+import { useLogout } from '@/hooks/useLogout'
 import { cn } from '@/lib/cn'
 
 export function Navbar() {
@@ -16,8 +19,9 @@ export function Navbar() {
   const [cartOpen, setCartOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const cartCount = useCartStore((s) => s.items.reduce((sum, i) => sum + i.quantity, 0))
+  const favoritesCount = useFavoritesStore((s) => s.items.length)
   const user = useAuthStore((s) => s.user)
-  const initials = user ? user.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase() : null
+  const doLogout = useLogout()
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -75,19 +79,29 @@ export function Navbar() {
               {searchExpanded ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
             </button>
 
+            {/*
+              Contador de favoritos no cabeçalho: a lista só tem valor se o
+              cliente lembrar que ela existe. Sem o número visível, o coração
+              vira um botão que não parece levar a lugar nenhum.
+            */}
             <Link
-              to={user ? '/conta' : '/entrar'}
-              className="flex items-center justify-center h-8 w-8 rounded-lg text-white hover:bg-white/10"
-              aria-label={t('account')}
+              to="/favoritos"
+              className="relative flex items-center justify-center h-8 w-8 rounded-lg text-white hover:bg-white/10"
+              aria-label={
+                favoritesCount > 0
+                  ? `${t('favorites.nav')} (${favoritesCount})`
+                  : t('favorites.nav')
+              }
             >
-              {initials ? (
-                <span className="w-6 h-6 rounded-full bg-brand-blue flex items-center justify-center text-[10px] font-bold text-white leading-none">
-                  {initials}
+              <Heart className="h-5 w-5" aria-hidden />
+              {favoritesCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 min-w-4 px-0.5 rounded-full bg-brand-blue text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                  {favoritesCount > 99 ? '99+' : favoritesCount}
                 </span>
-              ) : (
-                <User className="h-5 w-5" aria-hidden />
               )}
             </Link>
+
+            <AccountMenu />
 
             <button
               onClick={() => setCartOpen(true)}
@@ -116,9 +130,80 @@ export function Navbar() {
         </div>
       </div>
 
+      {/*
+        Menu mobile. A maioria dos clientes compra no celular, então tudo que
+        existe no desktop precisa existir aqui — inclusive "Sair da conta", que
+        antes não tinha nenhum caminho em telas pequenas.
+      */}
       {mobileOpen && (
-        <div className="sm:hidden bg-brand-orange-dark border-t border-white/10 px-4 py-3">
-          <LocaleSwitcher />
+        <div className="sm:hidden bg-brand-orange-dark border-t border-white/10 px-4 py-3 flex flex-col gap-1">
+          {user ? (
+            <>
+              <p className="px-1 pb-2 text-xs text-white/70 truncate">
+                {t('nav.greeting', { name: user.name.split(' ')[0] })}
+              </p>
+              <Link
+                to="/conta"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2.5 rounded-lg px-1 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                <User className="h-4 w-4" aria-hidden />
+                {t('nav.myAccount')}
+              </Link>
+              <Link
+                to="/conta?tab=pedidos"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2.5 rounded-lg px-1 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                <Package className="h-4 w-4" aria-hidden />
+                {t('nav.myOrders')}
+              </Link>
+              <Link
+                to="/favoritos"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2.5 rounded-lg px-1 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                <Heart className="h-4 w-4" aria-hidden />
+                {t('nav.favorites')}
+                {favoritesCount > 0 && (
+                  <span className="ml-auto text-xs text-white/70">{favoritesCount}</span>
+                )}
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false)
+                  doLogout()
+                }}
+                className="mt-1 flex items-center gap-2.5 rounded-lg border-t border-white/10 px-1 py-2 pt-3 text-sm font-semibold text-white hover:bg-white/10"
+              >
+                <LogOut className="h-4 w-4" aria-hidden />
+                {t('nav.logout')}
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/entrar"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2.5 rounded-lg px-1 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                <User className="h-4 w-4" aria-hidden />
+                {t('nav.login')}
+              </Link>
+              <Link
+                to="/favoritos"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2.5 rounded-lg px-1 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                <Heart className="h-4 w-4" aria-hidden />
+                {t('nav.favorites')}
+              </Link>
+            </>
+          )}
+          <div className="mt-2 border-t border-white/10 pt-2">
+            <LocaleSwitcher />
+          </div>
         </div>
       )}
 

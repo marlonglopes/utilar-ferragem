@@ -79,8 +79,15 @@ type Product struct {
 	// 2,5 m de cabo e 1,5 m³ de areia. Quantidades inteiras serializam
 	// idênticas ("10"), então o contrato JSON com o frontend não muda.
 	Stock          float64         `json:"stock"`
-	Rating         float64         `json:"rating"`
-	ReviewCount    int             `json:"reviewCount"`
+	Rating      float64 `json:"rating"`
+	ReviewCount int     `json:"reviewCount"`
+	// RatingScore é a média BAYESIANA (products.rating_bayes, migration 015) —
+	// o número que ORDENA a vitrine em `sort=top_rated`. `Rating` continua
+	// sendo a média simples, que é a que o cliente reconhece e a que deve
+	// aparecer nas estrelas. Os dois no payload porque são coisas diferentes:
+	// exibir o bayesiano confundiria (4,17 num produto que só tem 5★), e
+	// ordenar pelo simples mente (ver o comentário em productOrderBy).
+	RatingScore    float64         `json:"ratingScore"`
 	CashbackAmount *float64        `json:"cashbackAmount,omitempty"`
 	Badge          *string         `json:"badge,omitempty"`
 	BadgeLabel     *string         `json:"badgeLabel,omitempty"`

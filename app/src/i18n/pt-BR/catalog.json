@@ -2,7 +2,8 @@
   "searchPlaceholder": "Buscar produtos, marcas e mais...",
   "noResults": "Nenhum produto encontrado",
   "results": "{{count}} resultado",
-  "results_plural": "{{count}} resultados",
+  "results_one": "{{count}} resultado",
+  "results_other": "{{count}} resultados",
   "filters": "Filtros",
   "clearFilters": "Limpar filtros",
   "sort": {
@@ -36,13 +37,23 @@
     "soldBy": "Vendido por",
     "noDescription": "Sem descrição disponível.",
     "reviewsStub": "As avaliações de clientes estarão disponíveis em breve.",
-    "noSpecs": "Especificações não disponíveis para este produto."
+    "noSpecs": "Especificações não disponíveis para este produto.",
+    "relatedSameCategory": "Outros produtos de {{category}}",
+    "relatedSameCategoryGeneric": "Outros produtos desta categoria",
+    "relatedSameCategoryHint": "Estes são outros itens da mesma categoria, ordenados por avaliação — não é uma recomendação baseada no que você viu.",
+    "relatedBoughtTogether": "Quem comprou este levou também",
+    "relatedBoughtTogetherHint": "Baseado em pedidos reais de outros clientes.",
+    "relatedSeeCategory": "Ver a categoria inteira",
+    "relatedEmpty": "Ainda não há outros produtos nesta categoria.",
+    "relatedComplement": "Costuma ir junto",
+    "relatedComplementHint": "Itens que a loja indica para completar este serviço."
   },
   "search": {
     "title": "Resultados para",
     "titleEmpty": "Busca",
     "resultsCount": "{{count}} produto encontrado",
-    "resultsCount_plural": "{{count}} produtos encontrados",
+    "resultsCount_one": "{{count}} produto encontrado",
+    "resultsCount_other": "{{count}} produtos encontrados",
     "emptyTitle": "Nenhum resultado para",
     "emptySubtitle": "Tente termos mais simples ou explore as categorias abaixo.",
     "clearFilters": "Limpar filtros",
@@ -57,7 +68,8 @@
   "category": {
     "allProducts": "Todos os produtos",
     "productsCount": "{{count}} produto",
-    "productsCount_plural": "{{count}} produtos"
+    "productsCount_one": "{{count}} produto",
+    "productsCount_other": "{{count}} produtos"
   },
   "facets": {
     "price": "Faixa de preço",

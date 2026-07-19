@@ -14,7 +14,32 @@
   "prev": "Anterior",
   "search": "Buscar",
   "searchPlaceholder": "Buscar ferramentas, cimento, cabos, tinta...",
-  "account": "Minha conta",
+  "account": {
+    "title": "Minha conta",
+    "profile": "Perfil",
+    "addresses": "Endereços",
+    "paymentMethods": "Formas de pagamento",
+    "orders": "Pedidos",
+    "editProfile": "Editar perfil",
+    "saveProfile": "Salvar",
+    "addAddress": "Adicionar endereço",
+    "editAddress": "Editar",
+    "deleteAddress": "Remover",
+    "defaultAddress": "Padrão",
+    "setDefault": "Definir como padrão",
+    "cep": "CEP",
+    "street": "Rua",
+    "number": "Número",
+    "complement": "Complemento",
+    "neighborhood": "Bairro",
+    "city": "Cidade",
+    "state": "Estado",
+    "cepNotFound": "CEP não encontrado.",
+    "paymentStub": "Formas de pagamento salvas estarão disponíveis em breve.",
+    "noAddresses": "Nenhum endereço cadastrado.",
+    "saveAddress": "Salvar endereço",
+    "cancel": "Cancelar"
+  },
   "cart": "Carrinho",
   "menu": "Menu",
   "language": "Idioma",
@@ -43,10 +68,22 @@
     "seeAll": "Ver todos"
   },
   "trust": {
-    "pix": { "title": "Pix instantâneo", "desc": "Pagamento confirmado na hora. Boleto e cartão em até 12x." },
-    "verified": { "title": "Ferragens verificadas", "desc": "Todos os vendedores com CNPJ validado e nota fiscal." },
-    "delivery": { "title": "Entrega rastreada", "desc": "Correios PAC/SEDEX. Prazo calculado para o seu CEP antes de você confirmar." },
-    "support": { "title": "Suporte brasileiro", "desc": "WhatsApp e e-mail. Atendimento em português, horário comercial." }
+    "pix": {
+      "title": "Pix instantâneo",
+      "desc": "Pagamento confirmado na hora. Boleto e cartão em até 12x."
+    },
+    "verified": {
+      "title": "Ferragens verificadas",
+      "desc": "Todos os vendedores com CNPJ validado e nota fiscal."
+    },
+    "delivery": {
+      "title": "Entrega rastreada",
+      "desc": "Correios PAC/SEDEX. Prazo calculado para o seu CEP antes de você confirmar."
+    },
+    "support": {
+      "title": "Suporte brasileiro",
+      "desc": "WhatsApp e e-mail. Atendimento em português, horário comercial."
+    }
   },
   "taxonomy": {
     "ferramentas": "Ferramentas",
@@ -99,32 +136,6 @@
     "sellerRedirect": "Sua conta é de vendedor. Use o painel UtiLar Hub para acessar.",
     "sendingLink": "Enviando..."
   },
-  "account": {
-    "title": "Minha conta",
-    "profile": "Perfil",
-    "addresses": "Endereços",
-    "paymentMethods": "Formas de pagamento",
-    "orders": "Pedidos",
-    "editProfile": "Editar perfil",
-    "saveProfile": "Salvar",
-    "addAddress": "Adicionar endereço",
-    "editAddress": "Editar",
-    "deleteAddress": "Remover",
-    "defaultAddress": "Padrão",
-    "setDefault": "Definir como padrão",
-    "cep": "CEP",
-    "street": "Rua",
-    "number": "Número",
-    "complement": "Complemento",
-    "neighborhood": "Bairro",
-    "city": "Cidade",
-    "state": "Estado",
-    "cepNotFound": "CEP não encontrado.",
-    "paymentStub": "Formas de pagamento salvas estarão disponíveis em breve.",
-    "noAddresses": "Nenhum endereço cadastrado.",
-    "saveAddress": "Salvar endereço",
-    "cancel": "Cancelar"
-  },
   "orderStatus": {
     "pending_payment": "Aguardando pagamento",
     "paid": "Pago",
@@ -137,11 +148,13 @@
     "number": "Pedido #{{number}}",
     "placedOn": "Feito em {{date}}",
     "items": "{{count}} item",
-    "items_plural": "{{count}} itens",
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} itens",
     "viewDetail": "Ver detalhes",
     "buyAgain": "Comprar novamente",
     "buyAgainPartial": "{{count}} item adicionado ao carrinho (outros sem estoque)",
-    "buyAgainPartial_plural": "{{count}} itens adicionados ao carrinho (outros sem estoque)",
+    "buyAgainPartial_one": "{{count}} item adicionado ao carrinho (outros sem estoque)",
+    "buyAgainPartial_other": "{{count}} itens adicionados ao carrinho (outros sem estoque)",
     "cancelOrder": "Cancelar pedido",
     "cancelConfirm": "Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.",
     "cancelSuccess": "Pedido cancelado.",
@@ -166,8 +179,40 @@
       "paid": "Pagamento confirmado",
       "picking": "Separando pedido",
       "shipped": "A caminho",
-      "delivered": "Entregue"
-    }
+      "delivered": "Entregue",
+      "label": "Andamento do pedido",
+      "placed": "Pedido feito",
+      "cancelled": "Pedido cancelado",
+      "done": "Concluído",
+      "current": "Etapa atual",
+      "pending": "Ainda não iniciado",
+      "noDate": "Data não informada",
+      "trackShipment": "Rastrear nos Correios",
+      "deliveredHint": "Pedido entregue. Obrigado pela preferência!"
+    },
+    "buyAgainRunning": "Verificando disponibilidade...",
+    "buyAgainTitle": "Comprar novamente",
+    "buyAgainAllAdded": "Tudo certo: {{count}} item adicionado ao carrinho.",
+    "buyAgainAllAdded_one": "Tudo certo: {{count}} item adicionado ao carrinho.",
+    "buyAgainAllAdded_other": "Tudo certo: {{count}} itens adicionados ao carrinho.",
+    "buyAgainSummary": "{{added}} de {{total}} itens adicionados ao carrinho.",
+    "buyAgainNothing": "Nenhum item deste pedido pôde ser adicionado ao carrinho.",
+    "buyAgainOutOfStock": "{{count}} sem estoque",
+    "buyAgainDiscontinued": "{{count}} fora de linha",
+    "buyAgainReduced": "{{count}} com quantidade reduzida",
+    "buyAgainFailed": "{{count}} não pôde ser verificado",
+    "buyAgainPriceChanged": "{{count}} mudou de preço desde a sua compra",
+    "buyAgainGoToCart": "Ir para o carrinho",
+    "buyAgainKeepShopping": "Continuar aqui",
+    "buyAgainDetail": "Detalhe por item",
+    "outcome": {
+      "added": "Adicionado",
+      "reduced": "Só {{added}} de {{requested}} disponíveis",
+      "out_of_stock": "Sem estoque",
+      "discontinued": "Fora de linha",
+      "lookup_failed": "Não foi possível verificar agora"
+    },
+    "priceWas": "Era {{old}} · agora {{new}}"
   },
   "cartPage": {
     "title": "Carrinho",
@@ -182,7 +227,8 @@
     "soldBy": "Vendido por",
     "priceChanged": "Preço ou estoque mudou",
     "items": "{{count}} item",
-    "items_plural": "{{count}} itens",
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} itens",
     "shippingEstimate": "Frete estimado"
   },
   "pagination": {
@@ -191,5 +237,35 @@
     "previous": "Anterior",
     "next": "Próximo",
     "page": "Página"
+  },
+  "favorites": {
+    "title": "Favoritos",
+    "nav": "Favoritos",
+    "add": "Salvar nos favoritos",
+    "remove": "Remover dos favoritos",
+    "added": "Salvo nos favoritos",
+    "removed": "Removido dos favoritos",
+    "count": "{{count}} produto salvo",
+    "count_one": "{{count}} produto salvo",
+    "count_other": "{{count}} produtos salvos",
+    "empty": "Sua lista de favoritos está vazia",
+    "emptyHint": "Toque no coração de qualquer produto para guardar aqui e decidir depois.",
+    "explore": "Explorar catálogo",
+    "savedPrice": "Preço quando você salvou",
+    "savedOn": "Salvo em {{date}}",
+    "priceNote": "O preço pode ter mudado. Confira no produto antes de comprar.",
+    "clearAll": "Limpar lista",
+    "clearConfirm": "Remover todos os produtos da sua lista de favoritos?",
+    "localOnly": "Sua lista fica salva neste dispositivo."
+  },
+  "nav": {
+    "myAccount": "Minha conta",
+    "myOrders": "Meus pedidos",
+    "favorites": "Favoritos",
+    "logout": "Sair da conta",
+    "login": "Entrar",
+    "register": "Criar conta",
+    "greeting": "Olá, {{name}}",
+    "accountMenu": "Menu da conta"
   }
 }

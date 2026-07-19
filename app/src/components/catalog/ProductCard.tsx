@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 import { formatCurrency } from '@/lib/format'
 import { Skeleton } from '@/components/ui'
+import { FavoriteButton } from './FavoriteButton'
 import type { Product } from '@/types/product'
 
 export interface ProductCardProps {
@@ -89,6 +90,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
             Últimas {stock}
           </span>
         )}
+        <FavoriteButton product={product} variant="card" />
       </div>
 
       <div className="flex flex-col gap-1 p-3 flex-1">

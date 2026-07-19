@@ -22,6 +22,7 @@ const AccountPage = lazy(() => import('@/pages/account/AccountPage'))
 const CheckoutPage = lazy(() => import('@/pages/checkout/CheckoutPage'))
 const OrderConfirmationPage = lazy(() => import('@/pages/checkout/OrderConfirmationPage'))
 const OrderDetailPage = lazy(() => import('@/pages/orders/OrderDetailPage'))
+const FavoritesPage = lazy(() => import('@/pages/favorites/FavoritesPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 
 // Institucionais e legais
@@ -63,6 +64,7 @@ const router = createBrowserRouter([
         element: <ProtectedRoute>{page(<CheckoutPage />)}</ProtectedRoute>,
       },
       { path: 'pedido/:id', element: page(<OrderConfirmationPage />) },
+      { path: 'favoritos', element: page(<FavoritesPage />) },
       {
         path: 'conta/pedidos/:id',
         element: <ProtectedRoute>{page(<OrderDetailPage />)}</ProtectedRoute>,

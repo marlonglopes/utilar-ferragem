@@ -92,7 +92,8 @@ const productColumns = `
 	  p.stock, p.rating, p.review_count, p.cashback_amount, p.badge::text, p.badge_label, p.installments,
 	  p.description, p.specs, p.created_at, p.updated_at,
 	  p.sku, p.barcode, p.unit_of_measure, p.qty_step,
-	  p.weight_kg, p.length_cm, p.width_cm, p.height_cm`
+	  p.weight_kg, p.length_cm, p.width_cm, p.height_cm,
+	  p.rating_bayes`
 
 // List GET /api/v1/products
 // Query params: category, q, brand, price_min, price_max, in_stock, sort, page, per_page
@@ -253,7 +254,18 @@ func productOrderBy(params productsQuery, f productFilters) string {
 	case "price_desc":
 		return "p.price DESC"
 	case "top_rated":
-		return "p.rating DESC, p.review_count DESC"
+		// ⚠️ ORDENA PELA MÉDIA BAYESIANA, não pela média pura (migration 015).
+		//
+		// `p.rating DESC` colocava no topo o produto com UMA avaliação 5★, à
+		// frente de um 4,8★ com 400 — ou seja, "mais bem avaliado" ordenava, na
+		// prática, por "menos avaliado". `rating_bayes` puxa a nota de quem tem
+		// pouca amostra na direção de uma nota neutra, então nota alta COM
+		// volume vence nota alta de uma pessoa só.
+		//
+		// `p.id ASC` no fim dá ordem TOTAL: sem ele, produtos empatados (e no
+		// começo da loja todos empatam em 0) podem trocar de posição entre a
+		// página 1 e a 2, e o usuário vê o mesmo item duas vezes.
+		return "p.rating_bayes DESC, p.review_count DESC, p.id ASC"
 	case "newest":
 		return "p.created_at DESC"
 	}
@@ -948,45 +960,14 @@ func (h *ProductHandler) attributeFacets(c *gin.Context, params productsQuery, w
 	return out
 }
 
-// Related GET /api/v1/products/:slug/related?limit=4
-// Produtos da mesma categoria, excluindo o slug atual.
-func (h *ProductHandler) Related(c *gin.Context) {
-	start := time.Now()
-	defer padToMinElapsed(start, slugLookupMinElapsed)
-
-	slug := c.Param("slug")
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "4"))
-	if limit < 1 || limit > 24 {
-		limit = 4
-	}
-
-	rows, err := h.db.Query(`
-		SELECT `+productColumns+`
-		FROM products p
-		JOIN sellers s ON s.id = p.seller_id
-		WHERE p.category_id = (SELECT category_id FROM products WHERE slug = $1 LIMIT 1)
-		  AND p.slug != $1
-		  AND p.status = 'published'
-		ORDER BY p.rating DESC, p.review_count DESC
-		LIMIT $2
-	`, slug, limit)
-	if err != nil {
-		DBError(c, err)
-		return
-	}
-	defer rows.Close()
-
-	out := make([]model.Product, 0)
-	for rows.Next() {
-		p, err := scanProduct(rows)
-		if err != nil {
-			DBError(c, err)
-			return
-		}
-		out = append(out, p)
-	}
-	c.JSON(http.StatusOK, gin.H{"data": out})
-}
+// `Related` MUDOU DE ARQUIVO: virou RecommendationHandler.Related, em
+// recommendation.go.
+//
+// O que havia aqui era `mesma categoria ORDER BY rating DESC LIMIT 4` — que
+// devolvia os mesmos 4 produtos para toda a categoria, ordenados por um número
+// que o seed inventou. Aquilo continua existindo, mas como TERCEIRA opção e
+// marcado no payload como fallback, atrás de co-compra agregada e de regra
+// técnica de complemento. Ver o cabeçalho de recommendation.go.
 
 // -- helpers -----------------------------------------------------------------
 
@@ -1211,15 +1192,46 @@ type scanner interface {
 // bater com a ordem das colunas lá.
 func scanProduct(row scanner) (model.Product, error) {
 	var p model.Product
-	err := row.Scan(
+	err := row.Scan(productScanTargets(&p)...)
+	return p, err
+}
+
+// productScanTargets é a lista de destinos de Scan correspondente, NA ORDEM, à
+// projeção `productColumns`.
+//
+// Extraída de scanProduct quando as consultas de recomendação passaram a
+// carregar colunas EXTRAS depois da projeção pública (o número de pedidos que
+// sustenta a co-compra, a nota da regra técnica): elas precisam da mesma lista
+// com um sufixo. Duplicar a ordem num segundo lugar era garantir que a próxima
+// coluna nova entrasse só num dos dois — e o modo de falha de scan fora de
+// ordem é dado ERRADO no card, não erro.
+func productScanTargets(p *model.Product) []any {
+	return []any{
 		&p.ID, &p.Slug, &p.Name, &p.Category, &p.Price, &p.OriginalPrice, &p.Currency, &p.Icon, &p.Brand,
 		&p.Seller, &p.SellerID, &p.SellerRating, &p.SellerReviewCt,
 		&p.Stock, &p.Rating, &p.ReviewCount, &p.CashbackAmount, &p.Badge, &p.BadgeLabel, &p.Installments,
 		&p.Description, &p.Specs, &p.CreatedAt, &p.UpdatedAt,
 		&p.SKU, &p.Barcode, &p.UnitOfMeasure, &p.QtyStep,
 		&p.WeightKg, &p.LengthCm, &p.WidthCm, &p.HeightCm,
-	)
-	return p, err
+		&p.RatingScore,
+	}
+}
+
+// adminProductScanTargets é o equivalente para a projeção de ADMIN
+// (`productColumns` + custo + fiscais + status), usada por admin_catalog.go e
+// admin_product_list.go.
+//
+// 🐛 BUG REAL que motivou a extração: as duas rotas de admin repetiam a lista de
+// 32 destinos À MÃO. Ao acrescentar uma coluna em `productColumns`, o `Scan`
+// público foi atualizado e os dois de admin não — resultado:
+// `sql: expected 41 destination arguments in Scan, not 40`, e a tela de gestão
+// de produtos abrindo com 500. Foi barato porque a contagem não bateu; o modo
+// de falha CARO da mesma classe é uma coluna nova do MESMO tipo entrar na
+// posição errada, e aí não há erro nenhum — só custo aparecendo no campo de
+// preço. Uma lista, um lugar.
+func adminProductScanTargets(p *model.AdminProduct, cost **float64) []any {
+	return append(productScanTargets(&p.Product),
+		cost, &p.SupplierID, &p.SupplierSKU, &p.NCM, &p.CFOP, &p.CEST, &p.Origem, &p.Status)
 }
 
 // loadTiers carrega as faixas de atacado de um produto.

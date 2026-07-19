@@ -38,7 +38,8 @@
     "standard": "PAC — Correios",
     "express": "SEDEX — Correios",
     "days": "{{count}} dia útil",
-    "days_plural": "{{count}} dias úteis",
+    "days_one": "{{count}} dia útil",
+    "days_other": "{{count}} dias úteis",
     "stub": "Integração com Correios disponível em breve. Frete fixo aplicado.",
     "continue": "Continuar para pagamento"
   },
@@ -95,7 +96,8 @@
     "success": "Pedido realizado!",
     "number": "Pedido #{{number}}",
     "items": "{{count}} item",
-    "items_plural": "{{count}} itens",
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} itens",
     "soldBy": "Vendido por"
   },
   "confirmation": {

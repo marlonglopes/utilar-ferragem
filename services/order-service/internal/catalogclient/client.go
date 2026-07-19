@@ -49,6 +49,9 @@ type Client struct {
 	// A1: é o SERVICE_JWT_SECRET, distinto do JWT_SECRET de usuário — ver
 	// reservation.go e pkg/servicetoken.
 	serviceSecret string
+	// res é o disjuntor + retry. nil = comportamento original (chamada direta).
+	// Ver resilience.go.
+	res *Resilience
 }
 
 // New cria um cliente. baseURL ex.: "http://localhost:8091" (sem trailing slash).
@@ -79,33 +82,57 @@ func NewWithSecret(baseURL, serviceSecret string) *Client {
 //   - 404 Not Found  → ErrNotFound (id inválido ou produto removido)
 //   - outros status  → ErrUpstream
 //   - timeout/conn   → ErrUpstream
+//   - catálogo fora  → ErrUnavailable (disjuntor aberto, nem foi à rede)
+//
+// A chamada roda sob disjuntor + retry quando WithResilience foi configurado.
+// GET é idempotente, então repetir é seguro — ver resilience.go, readPolicy.
 func (c *Client) GetByID(ctx context.Context, productID string) (*Product, error) {
 	if productID == "" {
 		return nil, fmt.Errorf("%w: empty productID", ErrUpstream)
 	}
 
+	var p Product
+	err := c.guard(ctx, readPolicy, func() error {
+		return c.getByIDOnce(ctx, productID, &p)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+// getByIDOnce é UMA tentativa. Separada para que o retry possa repeti-la sem
+// duplicar a montagem do request nem vazar o corpo da resposta anterior.
+func (c *Client) getByIDOnce(ctx context.Context, productID string, out *Product) error {
 	url := fmt.Sprintf("%s/api/v1/products/by-id/%s", c.baseURL, productID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("%w: build request: %v", ErrUpstream, err)
+		return fmt.Errorf("%w: build request: %v", ErrUpstream, err)
 	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrUpstream, err)
+		return fmt.Errorf("%w: %v", ErrUpstream, err)
 	}
 	defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var p Product
-		if err := json.NewDecoder(resp.Body).Decode(&p); err != nil {
-			return nil, fmt.Errorf("%w: decode: %v", ErrUpstream, err)
+	switch {
+	case resp.StatusCode == http.StatusOK:
+		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+			// Decode quebrado é resposta corrompida, não erro de negócio:
+			// conta para o disjuntor.
+			return fmt.Errorf("%w: decode: %v", ErrUpstream, err)
 		}
-		return &p, nil
-	case http.StatusNotFound:
-		return nil, ErrNotFound
+		return nil
+	case resp.StatusCode == http.StatusNotFound:
+		// Resposta CORRETA do catálogo. Não abre circuito, não é retentada.
+		return ErrNotFound
+	case retryableStatus(resp.StatusCode):
+		return fmt.Errorf("%w: status=%d", ErrUpstream, resp.StatusCode)
 	default:
-		return nil, fmt.Errorf("%w: status=%d", ErrUpstream, resp.StatusCode)
+		// 4xx que não é 404: request nosso está errado. Repetir não conserta,
+		// mas também não é o catálogo estando fora — por isso não conta como
+		// falha de infraestrutura.
+		return fmt.Errorf("%w: status=%d", ErrNotRetryable, resp.StatusCode)
 	}
 }

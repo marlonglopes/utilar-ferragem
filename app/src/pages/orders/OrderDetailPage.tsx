@@ -1,70 +1,16 @@
 import { useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft, Package, Check, Truck, MapPin, CreditCard,
-  RotateCcw, X, ExternalLink, Loader2, AlertTriangle,
+  ArrowLeft, Package, MapPin, CreditCard,
+  X, ExternalLink, Loader2, AlertTriangle,
 } from 'lucide-react'
 import { useOrder, useOrders } from '@/hooks/useOrders'
-import { useCartStore } from '@/store/cartStore'
+import { OrderTimeline } from '@/components/orders/OrderTimeline'
+import { BuyAgainButton } from '@/components/orders/BuyAgainButton'
 import { formatCurrency } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import type { OrderStatus } from '@/lib/mockOrders'
-
-// ─── Status timeline ─────────────────────────────────────────────────────────
-
-const TIMELINE_STEPS: OrderStatus[] = ['pending_payment', 'paid', 'picking', 'shipped', 'delivered']
-
-function Timeline({ status }: { status: OrderStatus }) {
-  const { t } = useTranslation()
-  if (status === 'cancelled') {
-    return (
-      <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-        <X className="h-4 w-4 flex-shrink-0" />
-        {t('orderStatus.cancelled')}
-      </div>
-    )
-  }
-
-  const currentIdx = TIMELINE_STEPS.indexOf(status)
-
-  return (
-    <div className="flex items-start gap-0 overflow-x-auto pb-1">
-      {TIMELINE_STEPS.map((step, idx) => {
-        const done = idx < currentIdx
-        const active = idx === currentIdx
-        return (
-          <div key={step} className="flex items-center gap-0 flex-1 min-w-[80px]">
-            <div className="flex flex-col items-center gap-1 flex-1">
-              <div className={cn(
-                'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0',
-                done && 'bg-green-500',
-                active && 'bg-brand-orange',
-                !done && !active && 'bg-gray-100'
-              )}>
-                {done
-                  ? <Check className="h-3.5 w-3.5 text-white" />
-                  : active
-                    ? <div className="w-2.5 h-2.5 rounded-full bg-white" />
-                    : <div className="w-2.5 h-2.5 rounded-full bg-gray-300" />
-                }
-              </div>
-              <span className={cn(
-                'text-[10px] text-center leading-tight px-1',
-                active ? 'text-brand-orange font-semibold' : done ? 'text-green-600' : 'text-gray-400'
-              )}>
-                {t(`orders.timeline.${step}`)}
-              </span>
-            </div>
-            {idx < TIMELINE_STEPS.length - 1 && (
-              <div className={cn('h-0.5 flex-1 mx-1 -mt-5', idx < currentIdx ? 'bg-green-400' : 'bg-gray-200')} />
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -127,9 +73,7 @@ function CancelModal({
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const { order, loading, error } = useOrder(id ?? '')
-  const addItem = useCartStore((s) => s.addItem)
   const [cancelling, setCancelling] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [cancelDone, setCancelDone] = useState(false)
@@ -142,23 +86,6 @@ export default function OrderDetailPage() {
     setCancelling(false)
     setShowCancelModal(false)
     if (ok) setCancelDone(true)
-  }
-
-  function handleBuyAgain() {
-    if (!order) return
-    for (const item of order.items) {
-      addItem({
-        productId: item.productId,
-        sellerId: item.sellerId,
-        sellerName: item.sellerName,
-        name: item.name,
-        icon: item.icon,
-        priceSnapshot: item.unitPrice,
-        quantity: 1,
-        stock: 99,
-      })
-    }
-    navigate('/carrinho')
   }
 
   if (loading) {
@@ -218,7 +145,7 @@ export default function OrderDetailPage() {
       <div className="flex flex-col gap-5">
         {/* Timeline */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <Timeline status={cancelDone ? 'cancelled' : order.status} />
+          <OrderTimeline order={cancelDone ? { ...order, status: 'cancelled' } : order} />
           <p className="text-xs text-gray-400 mt-3">{t('orders.lastUpdate', { date: updatedDate })}</p>
         </div>
 
@@ -295,32 +222,6 @@ export default function OrderDetailPage() {
             <p className="text-sm text-gray-700">{order.paymentInfo}</p>
           </div>
 
-          {/* Tracking */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-              <Truck className="h-3.5 w-3.5" />
-              {t('orders.tracking')}
-            </p>
-            {order.trackingCode ? (
-              <div className="flex items-center gap-2">
-                <code className="text-sm font-mono bg-gray-50 px-2 py-1 rounded text-gray-700">
-                  {order.trackingCode}
-                </code>
-                <a
-                  href={`https://rastreamento.correios.com.br/app/index.php?objeto=${order.trackingCode}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-brand-orange hover:underline text-xs flex items-center gap-1"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Rastrear
-                </a>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">{t('orders.noTracking')}</p>
-            )}
-          </div>
-
           {/* Support */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col justify-between gap-3">
             <p className="text-sm text-gray-500">{t('orders.support')}</p>
@@ -336,13 +237,7 @@ export default function OrderDetailPage() {
 
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={handleBuyAgain}
-            className="flex-1 h-11 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
-          >
-            <RotateCcw className="h-4 w-4" />
-            {t('orders.buyAgain')}
-          </button>
+          <BuyAgainButton order={order} variant="full" />
 
           {(order.status === 'pending_payment' && !cancelDone) && (
             <button

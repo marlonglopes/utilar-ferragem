@@ -45,15 +45,7 @@ func (h *CatalogAdminHandler) GetProduct(c *gin.Context) {
 		FROM products p
 		JOIN sellers s ON s.id = p.seller_id
 		WHERE p.id = $1
-	`, id).Scan(
-		&p.ID, &p.Slug, &p.Name, &p.Category, &p.Price, &p.OriginalPrice, &p.Currency, &p.Icon, &p.Brand,
-		&p.Seller, &p.SellerID, &p.SellerRating, &p.SellerReviewCt,
-		&p.Stock, &p.Rating, &p.ReviewCount, &p.CashbackAmount, &p.Badge, &p.BadgeLabel, &p.Installments,
-		&p.Description, &p.Specs, &p.CreatedAt, &p.UpdatedAt,
-		&p.SKU, &p.Barcode, &p.UnitOfMeasure, &p.QtyStep,
-		&p.WeightKg, &p.LengthCm, &p.WidthCm, &p.HeightCm,
-		&cost, &p.SupplierID, &p.SupplierSKU, &p.NCM, &p.CFOP, &p.CEST, &p.Origem, &p.Status,
-	)
+	`, id).Scan(adminProductScanTargets(&p, &cost)...)
 	if err == sql.ErrNoRows {
 		NotFound(c, "product not found")
 		return

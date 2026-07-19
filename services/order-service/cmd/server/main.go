@@ -20,6 +20,7 @@ import (
 	"github.com/utilar/order-service/internal/handler"
 	"github.com/utilar/order-service/internal/paymentclient"
 	"github.com/utilar/order-service/internal/shipping"
+	"github.com/utilar/pkg/circuitbreaker"
 	"github.com/utilar/pkg/idempotency"
 	"github.com/utilar/pkg/metrics"
 	"github.com/utilar/pkg/ratelimit"
@@ -48,10 +49,23 @@ func main() {
 	}
 	slog.Info("migrations applied")
 
+	// Métricas. Sem isto o painel de observabilidade mostra o order-service
+	// "de pé" e nada mais — e o order-service é onde o pedido trava depois de
+	// pago, exatamente o incidente que o painel existe para pegar.
+	//
+	// Criado ANTES do catalogclient porque o disjuntor se registra nele.
+	mreg := metrics.New("order-service")
+	cbMetrics := circuitbreaker.NewMetrics(mreg.Registerer(), "order-service")
+
 	// NewWithSecret: o mesmo cliente serve pra consultar preço (rota pública) e
 	// pra reservar estoque (rotas /internal, que exigem token role=service
-	// assinado com o JWT_SECRET compartilhado).
-	catalog := catalogclient.NewWithSecret(cfg.CatalogServiceURL, cfg.ServiceJWTSecret)
+	// assinado com o SERVICE_JWT_SECRET).
+	//
+	// WithResilience: disjuntor + retry. Sem isso, uma lentidão momentânea do
+	// catálogo empilha requisições de checkout até derrubar o serviço inteiro
+	// (auditoria arquitetural 2026-07-18). Ver internal/catalogclient/resilience.go.
+	catalog := catalogclient.NewWithSecret(cfg.CatalogServiceURL, cfg.ServiceJWTSecret).
+		WithResilience(catalogclient.NewResilience(cbMetrics.Instrument, cbMetrics.Rejected))
 	rates := shipping.NewStore(database)
 
 	// authclient: de onde sai o TETO DE DESCONTO autoritativo do operador de
@@ -71,6 +85,13 @@ func main() {
 		WithLedger(paymentc)
 	shippingH := handler.NewShippingHandler(rates)
 
+	// Devolução e troca. O estorno vai ao livro contábil pela MESMA rota
+	// interna de serviço que a liquidação externa já usa; o estoque volta ao
+	// catálogo — e só quando a mercadoria é CONFERIDA, nunca na solicitação.
+	returnH := handler.NewReturnHandler(database).
+		WithRefundLedger(paymentc).
+		WithRestock(catalog)
+
 	// Consumer dos eventos de pagamento — é ele que faz o pedido virar 'paid'.
 	// Sem KAFKA_BROKERS o loop pagamento→pedido fica aberto: o cliente paga e o
 	// pedido não sai de pending_payment. Por isso o aviso é gritado no boot.
@@ -87,11 +108,6 @@ func main() {
 		slog.Warn("KAFKA_BROKERS not set — payment consumer DISABLED; " +
 			"orders will stay in pending_payment after payment confirmation")
 	}
-
-	// Métricas. Sem isto o painel de observabilidade mostra o order-service
-	// "de pé" e nada mais — e o order-service é onde o pedido trava depois de
-	// pago, exatamente o incidente que o painel existe para pegar.
-	mreg := metrics.New("order-service")
 
 	r := gin.New()
 	r.Use(
@@ -150,6 +166,13 @@ func main() {
 		api.GET("/orders/:id", orderH.Get)
 		api.PATCH("/orders/:id/cancel", orderH.Cancel)
 
+		// DEVOLUÇÃO — obrigação legal (CDC arts. 26 e 49), não feature.
+		// O cliente abre e acompanha; a decisão e o estorno ficam nas rotas
+		// internas abaixo. Contrato em docs/devolucao-e-troca.md.
+		api.POST("/orders/:id/returns", returnH.Create)
+		api.GET("/orders/:id/returns", returnH.ListForOrder)
+		api.GET("/returns/:rid", returnH.Get)
+
 		// Cotação de frete — o carrinho chama com o CEP antes do checkout.
 		// Contrato em docs/shipping-api.md.
 		api.POST("/shipping/quote", shippingH.Quote)
@@ -183,6 +206,20 @@ func main() {
 		ops.PATCH("/orders/:id/shipped", orderH.MarkShipped)
 		ops.PATCH("/orders/:id/delivered", orderH.MarkDelivered)
 		ops.PATCH("/orders/:id/cancel", orderH.AdminCancel)
+
+		// Devolução — o lado da loja.
+		//
+		// Fica em `ops` (admin OU operator) e não no painel do dono: quem
+		// confere a mercadoria que voltou é a mesma pessoa que separa pedido.
+		//
+		// ⚠️ /receive é onde o ESTOQUE volta e /refund é onde o DINHEIRO sai.
+		// A ordem é imposta pela máquina de estados (internal/returns), não
+		// pela ordem das linhas aqui.
+		ops.GET("/returns", returnH.ListQueue)
+		ops.PATCH("/returns/:rid/approve", returnH.Approve)
+		ops.PATCH("/returns/:rid/reject", returnH.Reject)
+		ops.PATCH("/returns/:rid/receive", returnH.Receive)
+		ops.PATCH("/returns/:rid/refund", returnH.Refund)
 	}
 
 	// Painel do dono — grupo SEPARADO do `ops` acima, e de propósito.

@@ -49,6 +49,10 @@ export interface Order {
   updatedAt: string
 }
 
+// Os `productId` apontam para ids reais de MOCK_PRODUCTS, exceto 'p-broca' e
+// 'p-nivel', deixados sem correspondência de propósito: são eles que fazem a
+// recompra em modo mock exercitar o caminho "saiu de linha" e o resumo parcial
+// ("1 de 2 itens adicionados"), que é o caso que a UI precisa acertar.
 export const MOCK_ORDERS: Order[] = [
   {
     id: 'pay-mock-001',
@@ -58,7 +62,7 @@ export const MOCK_ORDERS: Order[] = [
     paymentInfo: 'Pix · pago em 10/04 14:32',
     items: [
       {
-        productId: 'p-furadeira',
+        productId: '1',
         name: 'Furadeira Bosch GSB 13 RE',
         icon: '🔧',
         sellerId: 's1',
@@ -104,7 +108,7 @@ export const MOCK_ORDERS: Order[] = [
     paymentInfo: 'Cartão de crédito · 3x de R$ 43,30',
     items: [
       {
-        productId: 'p-martelo',
+        productId: '5',
         name: 'Martelo de Borracha 500g',
         icon: '🔨',
         sellerId: 's2',
@@ -148,7 +152,7 @@ export const MOCK_ORDERS: Order[] = [
     paymentInfo: 'Boleto bancário · pago em 20/04',
     items: [
       {
-        productId: 'p-fita',
+        productId: '31',
         name: 'Fita Isolante Profissional 10m',
         icon: '🔌',
         sellerId: 's3',
@@ -157,7 +161,7 @@ export const MOCK_ORDERS: Order[] = [
         unitPrice: 8.9,
       },
       {
-        productId: 'p-disjuntor',
+        productId: '14',
         name: 'Disjuntor Bipolar 20A',
         icon: '⚡',
         sellerId: 's3',
@@ -189,7 +193,7 @@ export const MOCK_ORDERS: Order[] = [
     paymentInfo: 'Pix · aguardando pagamento',
     items: [
       {
-        productId: 'p-cimento',
+        productId: '9',
         name: 'Cimento CP II 50kg',
         icon: '🧱',
         sellerId: 's4',

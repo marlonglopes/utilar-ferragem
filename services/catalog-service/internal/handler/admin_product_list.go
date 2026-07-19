@@ -139,15 +139,7 @@ func (h *CatalogAdminHandler) ListProducts(c *gin.Context) {
 			p    model.AdminProduct
 			cost *float64
 		)
-		if err := rows.Scan(
-			&p.ID, &p.Slug, &p.Name, &p.Category, &p.Price, &p.OriginalPrice, &p.Currency, &p.Icon, &p.Brand,
-			&p.Seller, &p.SellerID, &p.SellerRating, &p.SellerReviewCt,
-			&p.Stock, &p.Rating, &p.ReviewCount, &p.CashbackAmount, &p.Badge, &p.BadgeLabel, &p.Installments,
-			&p.Description, &p.Specs, &p.CreatedAt, &p.UpdatedAt,
-			&p.SKU, &p.Barcode, &p.UnitOfMeasure, &p.QtyStep,
-			&p.WeightKg, &p.LengthCm, &p.WidthCm, &p.HeightCm,
-			&cost, &p.SupplierID, &p.SupplierSKU, &p.NCM, &p.CFOP, &p.CEST, &p.Origem, &p.Status,
-		); err != nil {
+		if err := rows.Scan(adminProductScanTargets(&p, &cost)...); err != nil {
 			DBError(c, err)
 			return
 		}

@@ -71,7 +71,17 @@ func (c *Client) serviceToken() (string, error) {
 // Reserve reserva os itens de um pedido. All-or-nothing do lado do catalog.
 //
 // ttl é a validade da reserva; zero usa o default do catalog-service (30min).
+//
+// Roda sob disjuntor + retry (ver resilience.go). O retry é seguro porque a
+// reserva é deduplicada no catalog-service pelo índice único
+// (order_id, product_id) — não por otimismo nosso.
 func (c *Client) Reserve(ctx context.Context, orderID string, items []ReservationItem, ttl time.Duration) error {
+	return c.guard(ctx, reservationPolicy, func() error {
+		return c.reserveOnce(ctx, orderID, items, ttl)
+	})
+}
+
+func (c *Client) reserveOnce(ctx context.Context, orderID string, items []ReservationItem, ttl time.Duration) error {
 	body := map[string]any{
 		"orderId": orderID,
 		"items":   items,
@@ -100,7 +110,10 @@ func (c *Client) Reserve(ctx context.Context, orderID string, items []Reservatio
 	case http.StatusNotFound:
 		return ErrNotFound
 	default:
-		return fmt.Errorf("%w: reserve status=%d", ErrUpstream, resp.StatusCode)
+		if retryableStatus(resp.StatusCode) {
+			return fmt.Errorf("%w: reserve status=%d", ErrUpstream, resp.StatusCode)
+		}
+		return fmt.Errorf("%w: reserve status=%d", ErrNotRetryable, resp.StatusCode)
 	}
 }
 
@@ -114,7 +127,15 @@ func (c *Client) Release(ctx context.Context, orderID string) error {
 	return c.settle(ctx, orderID, "release")
 }
 
+// settle roda commit/release sob disjuntor + retry. As duas são convergentes
+// por order_id no catalog-service: repetir leva ao mesmo estado final.
 func (c *Client) settle(ctx context.Context, orderID, action string) error {
+	return c.guard(ctx, reservationPolicy, func() error {
+		return c.settleOnce(ctx, orderID, action)
+	})
+}
+
+func (c *Client) settleOnce(ctx context.Context, orderID, action string) error {
 	path := fmt.Sprintf("/api/v1/internal/reservations/%s/%s", orderID, action)
 	resp, err := c.doInternal(ctx, http.MethodPost, path, nil)
 	if err != nil {
@@ -123,7 +144,10 @@ func (c *Client) settle(ctx context.Context, orderID, action string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%w: %s status=%d", ErrUpstream, action, resp.StatusCode)
+		if retryableStatus(resp.StatusCode) {
+			return fmt.Errorf("%w: %s status=%d", ErrUpstream, action, resp.StatusCode)
+		}
+		return fmt.Errorf("%w: %s status=%d", ErrNotRetryable, action, resp.StatusCode)
 	}
 	return nil
 }

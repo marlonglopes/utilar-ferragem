@@ -16,6 +16,7 @@ import (
 	"github.com/utilar/catalog-service/internal/config"
 	"github.com/utilar/catalog-service/internal/db"
 	"github.com/utilar/catalog-service/internal/handler"
+	"github.com/utilar/catalog-service/internal/reco"
 	"github.com/utilar/catalog-service/internal/reservation"
 	"github.com/utilar/catalog-service/internal/storage"
 	"github.com/utilar/pkg/metrics"
@@ -63,6 +64,9 @@ func main() {
 	importH := handler.NewImportHandler(database)
 	storeCostH := handler.NewStoreCostHandler(database)
 	productImageH := handler.NewProductImageHandler(database, mediaStore)
+	reviewH := handler.NewReviewHandler(database, cfg.ServiceJWTSecret)
+	recoH := handler.NewRecommendationHandler(database)
+	copurchase := reco.New(database)
 
 	if cfg.DevMode {
 		slog.Warn("DEV_MODE=true — /admin aceita fallback X-User-Role; nunca use em produção")
@@ -126,11 +130,31 @@ func main() {
 		}
 		api.GET("/products/by-id/:id", detailCache, productH.GetByID)
 		api.GET("/products/:slug", detailCache, productH.GetBySlug)
-		api.GET("/products/:slug/related", listCache, productH.Related)
+		api.GET("/products/:slug/related", listCache, recoH.Related)
+		// Avaliações publicadas do produto. `listCache` (1 min) é folgado: uma
+		// avaliação nova não precisa aparecer no mesmo segundo, e a aba é lida
+		// muito mais do que escrita.
+		api.GET("/products/:slug/reviews", listCache, reviewH.ListByProduct)
 		// Registry de atributos da categoria: contrato de forma da ficha
 		// técnica (rótulo, tipo, unidade). Sem dado sensível — é o que o
 		// frontend precisa pra montar os filtros técnicos.
 		api.GET("/categories/:id/attributes", listCache, catalogAdminH.CategoryAttributes)
+	}
+
+	// Escrita de avaliação — cliente autenticado. A autorização REAL desta rota
+	// é o comprovante de compra assinado pelo order-service, verificado dentro
+	// do handler (internal/review/grant.go); o middleware só estabelece QUEM é
+	// quem está falando. Ver docs/reviews-e-recomendacao.md.
+	//
+	// ⚠️ NÃO está sob /admin nem sob /internal de propósito: é a única rota de
+	// escrita da API pública, e por isso a única que precisava de uma barreira
+	// que não é o papel do usuário.
+	me := r.Group("/api/v1", handler.RequireAnyUser(cfg.JWTSecret, cfg.DevMode))
+	{
+		me.POST("/products/by-id/:id/reviews", reviewH.Create)
+		me.GET("/products/by-id/:id/reviews/mine", reviewH.GetMine)
+		me.PUT("/products/by-id/:id/reviews/mine", reviewH.UpdateMine)
+		me.DELETE("/products/by-id/:id/reviews/mine", reviewH.DeleteMine)
 	}
 
 	// Alvos do agregador de observabilidade. O próprio catalog entra na lista
@@ -211,6 +235,25 @@ func main() {
 		// store_operator tomam 403. Ver internal/handler/observability.go
 		// para o PORQUÊ de a rota morar aqui e não no payment-service.
 		admin.GET("/observability", obsH.Snapshot)
+
+		// Fila de moderação de avaliações. Só entra aqui o que a triagem
+		// automática segurou (link, contato, caixa alta) — ver a justificativa
+		// da política em internal/review/moderation.go.
+		admin.GET("/reviews", reviewH.AdminList)
+		admin.POST("/reviews/:id/approve", reviewH.AdminApprove)
+		admin.POST("/reviews/:id/reject", reviewH.AdminReject)
+
+		// Reconstrução do agregado de co-compra. Operação manual porque o job
+		// incremental não consegue se corrigir sozinho: se uma rodada somar
+		// errado, recontar do zero é a única saída.
+		admin.POST("/recommendations/copurchase/rebuild", func(c *gin.Context) {
+			n, err := copurchase.Rebuild(c.Request.Context())
+			if err != nil {
+				handler.DBError(c, err)
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"data": gin.H{"pairs": n}})
+		})
 	}
 
 	// Rotas internas de reserva de estoque — chamadas pelo order-service, não
@@ -245,6 +288,13 @@ func main() {
 	sweeperCtx, stopSweeper := context.WithCancel(context.Background())
 	defer stopSweeper()
 	go reservation.NewSweeper(database).Run(sweeperCtx)
+
+	// Refresh incremental da co-compra. Roda FORA do caminho da requisição por
+	// desenho: o self-join de cestas cresce com o histórico de vendas, então
+	// fazê-lo por visualização de produto deixaria a página de produto mais
+	// lenta a cada pedido que a loja fecha. Ver docs/reviews-e-recomendacao.md
+	// para o custo medido dos dois caminhos.
+	go copurchase.Run(sweeperCtx)
 
 	// Servir mídia pelo próprio serviço é MODO DE DESENVOLVIMENTO. Em produção
 	// o driver é S3 e quem serve é o CloudFront — a rota nem existe, porque

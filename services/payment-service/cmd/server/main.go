@@ -209,9 +209,16 @@ func main() {
 		extH := handler.NewExternalSettlementHandler(poster)
 		internal := r.Group("/internal/v1", handler.RequireService(cfg.ServiceJWTSecret))
 		internal.POST("/ledger/external-settlement", extH.Post)
+
+		// Estorno de devolução (CDC). Mesma fronteira de confiança: a decisão
+		// é do order-service (é ele que tem o pedido, o prazo legal e a trilha
+		// de quem aprovou); aqui só cai a partida dobrada.
+		refH := handler.NewReturnRefundHandler(poster)
+		internal.POST("/ledger/return-refund", refH.Post)
 	} else {
 		slog.Warn("SERVICE_JWT_SECRET não configurado — /internal DESABILITADO; " +
-			"liquidação externa de balcão não será lançada no livro contábil")
+			"liquidação externa de balcão e estorno de devolução não serão " +
+			"lançados no livro contábil")
 	}
 
 	// Vigia da credencial do PSP. Sem isto, uma chave expirada só aparecia na

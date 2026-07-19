@@ -38,7 +38,8 @@
     "standard": "PAC — Correios",
     "express": "SEDEX — Correios",
     "days": "{{count}} business day",
-    "days_plural": "{{count}} business days",
+    "days_one": "{{count}} business day",
+    "days_other": "{{count}} business days",
     "stub": "Correios integration coming soon. Fixed shipping applied.",
     "continue": "Continue to payment"
   },
@@ -95,7 +96,8 @@
     "success": "Order placed!",
     "number": "Order #{{number}}",
     "items": "{{count}} item",
-    "items_plural": "{{count}} items",
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} items",
     "soldBy": "Sold by"
   },
   "confirmation": {

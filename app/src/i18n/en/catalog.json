@@ -2,7 +2,8 @@
   "searchPlaceholder": "Search products, brands and more...",
   "noResults": "No products found",
   "results": "{{count}} result",
-  "results_plural": "{{count}} results",
+  "results_one": "{{count}} result",
+  "results_other": "{{count}} results",
   "filters": "Filters",
   "clearFilters": "Clear filters",
   "sort": {
@@ -36,13 +37,23 @@
     "soldBy": "Sold by",
     "noDescription": "No description available.",
     "reviewsStub": "Customer reviews will be available soon.",
-    "noSpecs": "Specifications not available for this product."
+    "noSpecs": "Specifications not available for this product.",
+    "relatedSameCategory": "More from {{category}}",
+    "relatedSameCategoryGeneric": "More from this category",
+    "relatedSameCategoryHint": "These are other items in the same category, sorted by rating — not a recommendation based on what you viewed.",
+    "relatedBoughtTogether": "People who bought this also bought",
+    "relatedBoughtTogetherHint": "Based on real orders from other customers.",
+    "relatedSeeCategory": "See the whole category",
+    "relatedEmpty": "There are no other products in this category yet.",
+    "relatedComplement": "Usually bought together",
+    "relatedComplementHint": "Items the store recommends to complete this job."
   },
   "search": {
     "title": "Results for",
     "titleEmpty": "Search",
     "resultsCount": "{{count}} product found",
-    "resultsCount_plural": "{{count}} products found",
+    "resultsCount_one": "{{count}} product found",
+    "resultsCount_other": "{{count}} products found",
     "emptyTitle": "No results for",
     "emptySubtitle": "Try simpler terms or explore categories below.",
     "clearFilters": "Clear filters",
@@ -57,7 +68,8 @@
   "category": {
     "allProducts": "All products",
     "productsCount": "{{count}} product",
-    "productsCount_plural": "{{count}} products"
+    "productsCount_one": "{{count}} product",
+    "productsCount_other": "{{count}} products"
   },
   "facets": {
     "price": "Price range",

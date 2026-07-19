@@ -8,7 +8,8 @@ import { ImageGallery } from '@/components/catalog/ImageGallery'
 import { StockBadge } from '@/components/catalog/StockBadge'
 import { SellerCard } from '@/components/catalog/SellerCard'
 import { SpecSheet } from '@/components/catalog/SpecSheet'
-import { ProductCard, ProductCardSkeleton } from '@/components/catalog/ProductCard'
+import { RelatedProducts } from '@/components/catalog/RelatedProducts'
+import { FavoriteButton } from '@/components/catalog/FavoriteButton'
 import { Breadcrumb, Skeleton } from '@/components/ui'
 import { Seo } from '@/components/seo/Seo'
 import { useCartStore } from '@/store/cartStore'
@@ -96,8 +97,11 @@ export default function ProductDetailPage() {
 
   const category = product ? TOP_LEVEL_CATEGORIES.find((c) => c.slug === product.category) : undefined
 
-  const { data: relatedData } = useRelatedProducts(slug, product?.category, 4)
-  const related = relatedData ?? []
+  const { data: relatedData, isLoading: relatedLoading } = useRelatedProducts(
+    slug,
+    product?.category,
+    4
+  )
 
   if (isLoading) return <DetailSkeleton />
   if (isError || product === null) return <Navigate to="/404" replace />
@@ -128,7 +132,7 @@ export default function ProductDetailPage() {
     // `taxonomy.*` vive no namespace common, mas o default aqui é catalog —
     // sem o prefixo, o breadcrumb renderizava a chave crua ("taxonomy.ferramentas").
     ...(category
-      ? [{ label: t(`common:${category.labelKey}`), href: `/categoria/${category.slug}` }]
+      ? [{ label: t(category.labelKey), href: `/categoria/${category.slug}` }]
       : []),
     { label: product.name },
   ]
@@ -170,7 +174,7 @@ export default function ProductDetailPage() {
           breadcrumbListSchema([
             { name: 'Início', path: '/' },
             ...(category
-              ? [{ name: t(`common:${category.labelKey}`), path: `/categoria/${category.slug}` }]
+              ? [{ name: t(category.labelKey), path: `/categoria/${category.slug}` }]
               : []),
             { name: product.name },
           ]),
@@ -227,22 +231,29 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* CTA */}
-            <button
-              onClick={handleAddToCart}
-              disabled={product.stock === 0}
-              className={cn(
-                'flex items-center justify-center gap-2 h-12 rounded-xl font-semibold text-base transition-colors',
-                product.stock === 0
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : added
-                  ? 'bg-green-600 text-white'
-                  : 'bg-brand-orange hover:bg-brand-orange-dark text-white'
-              )}
-            >
-              <ShoppingCart className="h-5 w-5" />
-              {added ? 'Adicionado!' : t('catalog:product.addToCart')}
-            </button>
+            {/* CTA — comprar + salvar pra decidir depois */}
+            <div className="flex items-stretch gap-2">
+              <button
+                onClick={handleAddToCart}
+                disabled={product.stock === 0}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-2 h-12 rounded-xl font-semibold text-base transition-colors',
+                  product.stock === 0
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : added
+                    ? 'bg-green-600 text-white'
+                    : 'bg-brand-orange hover:bg-brand-orange-dark text-white'
+                )}
+              >
+                <ShoppingCart className="h-5 w-5" />
+                {added ? 'Adicionado!' : t('catalog:product.addToCart')}
+              </button>
+              {/*
+                Favoritar continua disponível com estoque zero — de propósito.
+                "Acabou" é justamente quando o cliente quer marcar pra voltar.
+              */}
+              <FavoriteButton product={product} variant="detail" />
+            </div>
 
             {/* Seller card */}
             <SellerCard
@@ -289,20 +300,14 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        {/* Related products */}
-        {related.length > 0 && (
-          <div className="mt-12">
-            <h2 className="font-display font-bold text-lg text-gray-900 mb-4">
-              {t('catalog:product.relatedProducts')}
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {isLoading
-                ? Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)
-                : related.map((p) => <ProductCard key={p.id} product={p} />)
-              }
-            </div>
-          </div>
-        )}
+        <RelatedProducts
+          products={relatedData?.products ?? []}
+          strategy={relatedData?.strategy ?? 'category_fallback'}
+          fallback={relatedData?.fallback}
+          loading={relatedLoading}
+          categoryLabel={category ? t(category.labelKey) : undefined}
+          categorySlug={category?.slug}
+        />
       </div>
 
       {/* Mobile fixed CTA */}

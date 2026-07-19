@@ -20,6 +20,57 @@ func RequireAdmin(jwtSecret string, devMode bool) gin.HandlerFunc {
 	return RequireRole(jwtSecret, devMode, "admin")
 }
 
+// RequireAnyUser exige um usuário AUTENTICADO, sem exigir papel nenhum.
+//
+// Serve a escrita de avaliação: quem avalia é cliente comum, e a lista de
+// papéis que podem comprar não é do catálogo saber — hoje é `customer`, amanhã
+// pode ser `customer` e `pro`, e uma lista fixa aqui viraria um 403 misterioso
+// para um papel novo que o auth-service passou a emitir.
+//
+// A autorização de verdade desta rota NÃO é o papel: é o comprovante de compra
+// (internal/review/grant.go). O papel só responde "quem é você"; o comprovante
+// responde "você pode falar deste produto". Exigir também um papel específico
+// daria falsa sensação de proteção sem adicionar nenhuma.
+//
+// `role=service` continua RECUSADO: o token de usuário não pode se declarar
+// serviço (auditoria A1), e serviço não avalia produto.
+func RequireAnyUser(jwtSecret string, devMode bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+			sub, role, err := parseJWTClaims(strings.TrimPrefix(auth, "Bearer "), jwtSecret)
+			if err != nil {
+				slog.Warn("auth: invalid jwt", "error", err.Error(), "request_id", c.GetString("request_id"))
+				Unauthorized(c, "invalid token")
+				c.Abort()
+				return
+			}
+			if role == servicetoken.Role {
+				slog.Warn("auth: token de usuário com role=service recusado",
+					"sub", sub, "request_id", c.GetString("request_id"))
+				Unauthorized(c, "invalid token")
+				c.Abort()
+				return
+			}
+			c.Set("user_id", sub)
+			c.Set("user_role", role)
+			c.Next()
+			return
+		}
+
+		if devMode {
+			if id := c.GetHeader("X-User-Id"); id != "" && c.GetHeader("X-User-Role") != servicetoken.Role {
+				c.Set("user_id", id)
+				c.Set("user_role", c.GetHeader("X-User-Role"))
+				c.Next()
+				return
+			}
+		}
+
+		Unauthorized(c, "missing or invalid Authorization header")
+		c.Abort()
+	}
+}
+
 // RequireRole é a versão genérica de RequireAdmin: aceita qualquer uma das
 // roles listadas. Extraído quando as rotas internas de reserva de estoque
 // passaram a precisar de `role=service` (token que o order-service assina com
