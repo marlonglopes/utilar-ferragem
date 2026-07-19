@@ -24,6 +24,16 @@ const (
 	// Ativo
 	AcctCaixaPSP Account = "1.1.1" // dinheiro capturado pelo PSP, ainda não sacado
 	AcctBanco    Account = "1.1.2" // saldo já liquidado na conta da empresa
+	// AcctCaixaAdquirenteExterno é o dinheiro que entrou pela MAQUININHA DA
+	// LOJA — adquirente próprio, fora da Appmax.
+	//
+	// PORQUÊ uma conta separada e não a 1.1.1: 1.1.1 é conciliada contra o
+	// extrato do PSP (ver reconcile.go). Todo centavo que cai lá e não existe
+	// no extrato da Appmax vira divergência — para sempre, porque nunca vai
+	// existir. Misturar a maquininha na 1.1.1 transformaria a conciliação num
+	// relatório permanentemente vermelho, que é o mesmo que não ter
+	// conciliação: ninguém olha um alerta que sempre toca.
+	AcctCaixaAdquirenteExterno Account = "1.1.3"
 
 	// Passivo
 	AcctRepasseVendedor Account = "2.1.1" // o que devemos ao vendedor pelo split
@@ -53,7 +63,14 @@ const (
 type Kind string
 
 const (
-	KindSale             Kind = "sale"              // captura do pedido
+	KindSale Kind = "sale" // captura do pedido
+	// KindExternalSale é a venda de balcão paga na MAQUININHA DA LOJA. Kind
+	// próprio (e não `sale` com outro método) porque a pergunta contábil é
+	// diferente: `sale` significa "a Appmax tem esse dinheiro e nos deve";
+	// `external_sale` significa "o dinheiro já é da loja, o adquirente
+	// próprio deposita direto". Relatório por método precisa saber separar,
+	// e a conciliação com a Appmax precisa saber ignorar.
+	KindExternalSale     Kind = "external_sale"
 	KindPSPFee           Kind = "psp_fee"           // MDR/taxa fixa do gateway
 	KindRefund           Kind = "refund"            // estorno ao comprador
 	KindChargeback       Kind = "chargeback"        // contestação perdida
@@ -76,6 +93,12 @@ const (
 	SourceRecipient    SourceType = "recipient"
 	SourceLedgerTx     SourceType = "ledger_transaction" // usado por reversões
 	SourceManual       SourceType = "manual"
+	// SourceExternalSettlement — o documento de origem é a liquidação externa
+	// registrada no order-service (o pedido + o NSU do comprovante). Não é
+	// `payment`: não existe linha em `payments`, porque não existe transação
+	// de PSP nenhuma. Não é `order` puro para que um lançamento futuro que
+	// tenha o pedido como origem não colida na chave de idempotência.
+	SourceExternalSettlement SourceType = "external_settlement"
 )
 
 // AccountMeta descreve uma conta pro relatório e pra exportação ao contador.
@@ -92,6 +115,7 @@ type AccountMeta struct {
 var ChartOfAccounts = []AccountMeta{
 	{AcctCaixaPSP, "Caixa em trânsito no PSP", "asset", Debit},
 	{AcctBanco, "Banco - conta movimento", "asset", Debit},
+	{AcctCaixaAdquirenteExterno, "Caixa em trânsito no adquirente externo", "asset", Debit},
 	{AcctRepasseVendedor, "Repasses a vendedores", "liability", Credit},
 	{AcctReceitaBruta, "Receita bruta de vendas", "revenue", Credit},
 	{AcctEstornos, "Estornos e devoluções", "revenue", Debit},

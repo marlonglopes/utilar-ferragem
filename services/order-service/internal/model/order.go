@@ -18,6 +18,21 @@ const (
 	MethodPix    PaymentMethod = "pix"
 	MethodBoleto PaymentMethod = "boleto"
 	MethodCard   PaymentMethod = "card"
+	// MethodExternal — venda de balcão paga na MAQUININHA DA LOJA, de um
+	// adquirente próprio, fora da Appmax. O dinheiro entra por fora do nosso
+	// PSP e nenhuma cobrança é criada.
+	//
+	// PORQUÊ um método próprio e não `card`: a venda de balcão na maquininha
+	// era gravada como `card` — valor e desconto certos, meio de pagamento
+	// errado. Com isso o livro contábil registrava uma transação de PSP que
+	// nunca existiu, a conciliação com a Appmax acusava divergência para
+	// sempre e o relatório por método de pagamento mentia.
+	//
+	// Este enum é fechado em TRÊS lugares que precisam andar juntos:
+	//   1. esta constante;
+	//   2. o binding `oneof` de CreateOrderRequest, logo abaixo;
+	//   3. o tipo Postgres `payment_method` (migrations 001, estendido pela 004).
+	MethodExternal PaymentMethod = "external"
 )
 
 // Canal de venda. Default 'web' em todo lugar: nenhum pedido histórico e
@@ -86,27 +101,37 @@ type Order struct {
 
 	// -- balcão --------------------------------------------------------------
 	// Todos omitempty: a resposta de um pedido web não muda de forma.
-	Channel          OrderChannel    `json:"channel"`
-	StoreID          *string         `json:"storeId,omitempty"`
-	OperatorID       *string         `json:"operatorId,omitempty"`
-	CustomerID       *string         `json:"customerId,omitempty"`
-	CustomerName     *string         `json:"customerName,omitempty"`
-	CustomerDocument *string         `json:"customerDocument,omitempty"`
-	CustomerPhone    *string         `json:"customerPhone,omitempty"`
-	DiscountPct      float64         `json:"discountPct"`
-	DiscountAmount   float64         `json:"discountAmount"`
-	ApprovalStatus   string          `json:"approvalStatus"`
-	ApprovedBy       *string         `json:"approvedBy,omitempty"`
-	ApprovedAt       *time.Time      `json:"approvedAt,omitempty"`
-	ApprovalNote     *string         `json:"approvalNote,omitempty"`
-	TrackingEvents   []TrackingEvent `json:"trackingEvents,omitempty"`
-	CreatedAt        time.Time       `json:"createdAt"`
-	PaidAt           *time.Time      `json:"paidAt,omitempty"`
-	PickedAt         *time.Time      `json:"pickedAt,omitempty"`
-	ShippedAt        *time.Time      `json:"shippedAt,omitempty"`
-	DeliveredAt      *time.Time      `json:"deliveredAt,omitempty"`
-	CancelledAt      *time.Time      `json:"cancelledAt,omitempty"`
-	UpdatedAt        time.Time       `json:"updatedAt"`
+	Channel          OrderChannel `json:"channel"`
+	StoreID          *string      `json:"storeId,omitempty"`
+	OperatorID       *string      `json:"operatorId,omitempty"`
+	CustomerID       *string      `json:"customerId,omitempty"`
+	CustomerName     *string      `json:"customerName,omitempty"`
+	CustomerDocument *string      `json:"customerDocument,omitempty"`
+	CustomerPhone    *string      `json:"customerPhone,omitempty"`
+	DiscountPct      float64      `json:"discountPct"`
+	DiscountAmount   float64      `json:"discountAmount"`
+	ApprovalStatus   string       `json:"approvalStatus"`
+	ApprovedBy       *string      `json:"approvedBy,omitempty"`
+	ApprovedAt       *time.Time   `json:"approvedAt,omitempty"`
+	ApprovalNote     *string      `json:"approvalNote,omitempty"`
+
+	// -- liquidação externa (maquininha da loja) ------------------------------
+	// Todos omitempty: pedido web e pedido de balcão pago pelo PSP continuam
+	// com a mesma forma de JSON de antes.
+	ExternalNSU           *string    `json:"externalNsu,omitempty"`
+	ExternalBrand         *string    `json:"externalBrand,omitempty"`
+	ExternalAuthorization *string    `json:"externalAuthorizationCode,omitempty"`
+	ExternalSettledBy     *string    `json:"externalSettledBy,omitempty"`
+	ExternalSettledAt     *time.Time `json:"externalSettledAt,omitempty"`
+
+	TrackingEvents []TrackingEvent `json:"trackingEvents,omitempty"`
+	CreatedAt      time.Time       `json:"createdAt"`
+	PaidAt         *time.Time      `json:"paidAt,omitempty"`
+	PickedAt       *time.Time      `json:"pickedAt,omitempty"`
+	ShippedAt      *time.Time      `json:"shippedAt,omitempty"`
+	DeliveredAt    *time.Time      `json:"deliveredAt,omitempty"`
+	CancelledAt    *time.Time      `json:"cancelledAt,omitempty"`
+	UpdatedAt      time.Time       `json:"updatedAt"`
 }
 
 // CreateOrderRequest — payload de POST /api/v1/orders.
@@ -131,7 +156,12 @@ type Order struct {
 //	         sempre derivado no servidor (balcao.ResolveDiscount). Não existe
 //	         campo para o cliente informar o valor do desconto — de propósito.
 type CreateOrderRequest struct {
-	PaymentMethod   PaymentMethod `json:"paymentMethod" binding:"required,oneof=pix boleto card"`
+	// `external` é aceito no binding, mas NÃO é liberado por ele: o handler
+	// exige canal `balcao` e operador autenticado (ver resolveSaleContext).
+	// Um cliente do site que mande paymentMethod=external leva 400 — e o
+	// pedido continua nascendo em pending_payment de qualquer forma. Quem o
+	// marca como pago é o endpoint de liquidação, nunca a criação.
+	PaymentMethod   PaymentMethod `json:"paymentMethod" binding:"required,oneof=pix boleto card external"`
 	Items           []OrderItem   `json:"items" binding:"required,min=1,max=100,dive"`
 	ShippingCost    float64       `json:"shippingCost" binding:"gte=0,lte=99999.99"`
 	ShippingService string        `json:"shippingService" binding:"omitempty,oneof=standard express"`
@@ -161,6 +191,28 @@ type CreateOrderRequest struct {
 // ao gerente para saber o que fazer, e não deixa rastro do porquê na auditoria.
 type ApprovalRequest struct {
 	Note *string `json:"note" binding:"omitempty,max=500"`
+}
+
+// SettleExternalRequest — payload de POST /api/v1/balcao/orders/:id/settle-external.
+//
+// Não existe campo de VALOR, e a ausência é deliberada: o valor liquidado é o
+// total do pedido, calculado pelo servidor. Deixar o operador informar quanto
+// entrou permitiria liquidar um pedido de R$ 2.000 declarando R$ 20 — e a
+// diferença sairia pela porta como mercadoria.
+//
+// Também não existe campo de "pago em" que o cliente escolha livremente: o
+// OccurredAt do lançamento é a hora do servidor. Datar a venda para trás é
+// como se maquia o fechamento de um dia que já foi conferido.
+type SettleExternalRequest struct {
+	// NSU é o número do comprovante do adquirente — OBRIGATÓRIO. É o único
+	// campo que amarra esta venda à linha do extrato da maquininha; sem ele a
+	// liquidação vira "o operador disse que pagou", que não é conciliável.
+	NSU string `json:"nsu" binding:"required,max=40"`
+	// Bandeira e código de autorização são opcionais: nem todo comprovante
+	// traz, e a conciliação se faz pelo NSU. Quando vêm, entram na trilha.
+	Brand             string  `json:"brand" binding:"omitempty,max=32"`
+	AuthorizationCode string  `json:"authorizationCode" binding:"omitempty,max=32"`
+	Note              *string `json:"note" binding:"omitempty,max=500"`
 }
 
 // ShippingQuoteRequest — payload de POST /api/v1/shipping/quote.

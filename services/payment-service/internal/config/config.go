@@ -23,6 +23,15 @@ type Config struct {
 	// AuthServiceURL é usado pra buscar CPF/name pro boleto (audit M6).
 	AuthServiceURL string
 
+	// ServiceJWTSecret verifica os tokens `role=service` das rotas /internal
+	// (hoje: o lançamento contábil da liquidação externa, chamado pelo
+	// order-service). Separado do JWTSecret de propósito — ver pkg/servicetoken.
+	//
+	// O payment-service só VERIFICA com este segredo; não emite nada com ele.
+	// Vazio = grupo /internal não é registrado (fail-closed): melhor a rota não
+	// existir do que existir aceitando token assinado com o segredo de usuário.
+	ServiceJWTSecret string
+
 	// PSP selector — qual provider usar.
 	// Valores: "stripe" (recomendado em dev + test mode robusto)
 	//          "mercadopago" (prod BR quando merchant onboarded)
@@ -128,6 +137,11 @@ func Load() (*Config, error) {
 
 		RedisURL:     os.Getenv("REDIS_URL"),
 		MetricsToken: os.Getenv("METRICS_TOKEN"),
+
+		// Lido cru, sem fallback para o JWT_SECRET: aceitar o segredo de
+		// usuário aqui recriaria exatamente o problema que a A1 mitigou —
+		// qualquer serviço com o JWT_SECRET voltaria a poder lançar receita.
+		ServiceJWTSecret: os.Getenv("SERVICE_JWT_SECRET"),
 	}
 
 	// Valida credenciais do provider escolhido + webhook secret fail-closed em prod (audit C5).

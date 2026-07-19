@@ -18,6 +18,7 @@ import (
 	"github.com/utilar/order-service/internal/consumer"
 	"github.com/utilar/order-service/internal/db"
 	"github.com/utilar/order-service/internal/handler"
+	"github.com/utilar/order-service/internal/paymentclient"
 	"github.com/utilar/order-service/internal/shipping"
 	"github.com/utilar/pkg/idempotency"
 	"github.com/utilar/pkg/ratelimit"
@@ -57,10 +58,16 @@ func main() {
 	// para a fila do gerente), nunca fail-open.
 	authc := authclient.New(cfg.AuthServiceURL, cfg.ServiceJWTSecret)
 
+	// paymentclient: por onde a liquidação externa (venda de balcão paga na
+	// maquininha da loja) chega ao livro contábil, que vive no payment-service.
+	// Ver docs/external-settlement.md.
+	paymentc := paymentclient.New(cfg.PaymentServiceURL, cfg.ServiceJWTSecret)
+
 	orderH := handler.NewOrderHandler(database, catalog, cfg.DevMode).
 		WithStock(catalog).
 		WithShipping(rates).
-		WithOperators(authc)
+		WithOperators(authc).
+		WithLedger(paymentc)
 	shippingH := handler.NewShippingHandler(rates)
 
 	// Consumer dos eventos de pagamento — é ele que faz o pedido virar 'paid'.
@@ -145,6 +152,14 @@ func main() {
 		bal.GET("/approvals", orderH.ListPendingApprovals)
 		bal.PATCH("/orders/:id/approve", orderH.Approve)
 		bal.PATCH("/orders/:id/reject", orderH.Reject)
+
+		// Liquidação externa: a venda paga na maquininha da loja (adquirente
+		// próprio, fora da Appmax). É o endpoint que declara um pedido pago
+		// sem que dinheiro nenhum tenha entrado no nosso sistema — a
+		// autorização (só operador da própria loja / admin) é por recurso, em
+		// internal/balcao, e a trilha de auditoria é fail-closed.
+		// Contrato em docs/external-settlement.md.
+		bal.POST("/orders/:id/settle-external", orderH.SettleExternal)
 	}
 
 	// Rotas de operação (separação, despacho, entrega). role=admin ou operator:

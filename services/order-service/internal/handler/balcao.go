@@ -54,6 +54,15 @@ func (h *OrderHandler) resolveSaleContext(c *gin.Context, req *model.CreateOrder
 		channel = model.ChannelWeb
 	}
 
+	// `external` significa "vai ser pago na maquininha da loja". Não existe
+	// maquininha no site: aceitar isso num pedido web criaria um pedido que
+	// nenhum PSP vai cobrar e que o endpoint de liquidação recusaria depois —
+	// um pedido nascido órfão. O binding aceita o valor (o enum é um só); quem
+	// restringe ao balcão é esta checagem.
+	if req.PaymentMethod == model.MethodExternal && channel != model.ChannelBalcao {
+		return nil, saleErrorf("paymentMethod `external` é exclusivo da venda de balcão")
+	}
+
 	if channel == model.ChannelWeb {
 		// Contrato antigo, intacto: pedido web exige endereço. A validação saiu
 		// do `binding:"required"` para cá porque o binding não sabe o canal.

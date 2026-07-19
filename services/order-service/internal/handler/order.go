@@ -59,6 +59,9 @@ type OrderHandler struct {
 	stock   StockReserver
 	rates   ShippingRates
 	auth    OperatorLookup
+	// ledger lança a liquidação externa no livro contábil do payment-service.
+	// Ver WithLedger em external_settlement.go.
+	ledger  LedgerPoster
 	devMode bool
 }
 
@@ -831,7 +834,8 @@ func (h *OrderHandler) loadOrder(id, userID string) (*model.Order, error) {
 		  created_at, paid_at, picked_at, shipped_at, delivered_at, cancelled_at, updated_at,
 		  channel::text, store_id, operator_id, customer_id,
 		  customer_name, customer_document, customer_phone,
-		  discount_pct, discount_amount, approval_status::text, approved_by, approved_at, approval_note
+		  discount_pct, discount_amount, approval_status::text, approved_by, approved_at, approval_note,
+		  external_nsu, external_brand, external_auth_code, external_settled_by, external_settled_at
 		FROM orders WHERE `+where, args...).Scan(
 		&o.ID, &o.Number, &o.UserID, &o.Status, &o.PaymentMethod, &o.PaymentID, &o.PaymentInfo,
 		&o.Subtotal, &o.ShippingCost, &o.ShippingService, &o.Total, &o.TrackingCode,
@@ -839,6 +843,7 @@ func (h *OrderHandler) loadOrder(id, userID string) (*model.Order, error) {
 		&channel, &o.StoreID, &o.OperatorID, &o.CustomerID,
 		&o.CustomerName, &o.CustomerDocument, &o.CustomerPhone,
 		&o.DiscountPct, &o.DiscountAmount, &o.ApprovalStatus, &o.ApprovedBy, &o.ApprovedAt, &o.ApprovalNote,
+		&o.ExternalNSU, &o.ExternalBrand, &o.ExternalAuthorization, &o.ExternalSettledBy, &o.ExternalSettledAt,
 	)
 	if err != nil {
 		return nil, err

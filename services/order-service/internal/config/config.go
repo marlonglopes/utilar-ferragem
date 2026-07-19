@@ -27,7 +27,11 @@ type Config struct {
 	// AuthServiceURL — de onde vem o contexto autoritativo do operador de
 	// balcão (loja, cargo e teto de desconto). Ver internal/authclient.
 	AuthServiceURL string
-	RedisURL       string // O3-M3: vazio = rate limit desabilitado
+	// PaymentServiceURL — para onde vai o lançamento contábil da liquidação
+	// externa (venda de balcão paga na maquininha da loja). O livro contábil é
+	// único e vive no payment-service; ver internal/paymentclient.
+	PaymentServiceURL string
+	RedisURL          string // O3-M3: vazio = rate limit desabilitado
 	// KafkaBrokers — brokers do Redpanda onde o payment-service publica os
 	// eventos do outbox. Vazio desliga o consumer (e o pedido nunca vira 'paid'
 	// automaticamente), então logamos alto no boot.
@@ -82,6 +86,7 @@ func Load() (*Config, error) {
 		AllowedOrigins:    parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		CatalogServiceURL: env("CATALOG_SERVICE_URL", "http://localhost:8091"),
 		AuthServiceURL:    env("AUTH_SERVICE_URL", "http://localhost:8093"),
+		PaymentServiceURL: env("PAYMENT_SERVICE_URL", "http://localhost:8090"),
 		RedisURL:          os.Getenv("REDIS_URL"),
 		KafkaBrokers:      parseOrigins(os.Getenv("KAFKA_BROKERS")),
 	}, nil

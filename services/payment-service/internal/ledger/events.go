@@ -61,6 +61,74 @@ func Sale(in SaleInput) TxInput {
 	}
 }
 
+// -- Liquidação externa (maquininha da loja) ---------------------------------
+
+// MethodExternal é o rótulo de método das partidas de liquidação externa.
+//
+// Ele NÃO é "card". A venda de balcão paga na maquininha era gravada como
+// `card`, com valor e desconto certos — e método errado. Consequência: o livro
+// registrava uma transação de PSP que nunca existiu, a conciliação com a Appmax
+// acusava divergência para sempre e o relatório por método de pagamento mentia.
+const MethodExternal = "external"
+
+// ExternalSaleInput é a venda de balcão liquidada FORA do nosso PSP.
+type ExternalSaleInput struct {
+	// OrderID é o documento de origem: não existe payment_id porque não
+	// existe pagamento nosso. É também a chave de idempotência.
+	OrderID string
+	// NSU é o número sequencial único do comprovante do adquirente — o único
+	// campo que amarra esta venda ao extrato da maquininha. Vai no memo das
+	// duas partidas para que quem confere o extrato ache a linha pelo NSU sem
+	// sair do CSV do contador.
+	NSU           string
+	StoreID       string
+	OperatorID    string
+	Brand         string // bandeira do cartão, quando informada
+	Authorization string // código de autorização do adquirente, quando informado
+	OccurredAt    time.Time
+	GrossCents    Cents
+	RequestID     string
+	SettledBy     string // quem liquidou — vai para created_by do lançamento
+}
+
+// ExternalSale — venda liquidada por adquirente externo.
+//
+//	D 1.1.3 Caixa em trânsito no adquirente externo   bruto
+//	    C 3.1.1 Receita bruta de vendas                   bruto
+//
+// Não há partida de taxa: o MDR da maquininha não passa pelo nosso sistema e é
+// desconhecido no ato da venda. Ele entra depois, na conciliação do extrato do
+// adquirente, como despesa própria — inventar aqui uma taxa estimada seria pôr
+// no livro um número que ninguém pode conferir.
+//
+// A receita entra na MESMA 3.1.1 de propósito: faturamento é faturamento,
+// independente de por onde o dinheiro entrou. O que separa as duas origens é a
+// conta de ativo (1.1.3 vs 1.1.1), o Kind e o rótulo de método — que é
+// exatamente a granularidade que o DRE e o relatório por método precisam.
+func ExternalSale(in ExternalSaleInput) TxInput {
+	memo := "venda de balcão liquidada na maquininha (NSU " + in.NSU + ")"
+	return TxInput{
+		OccurredAt: in.OccurredAt,
+		Kind:       KindExternalSale,
+		SourceType: SourceExternalSettlement,
+		// Chave de idempotência = o pedido. Liquidar duas vezes o mesmo pedido
+		// bate no UNIQUE (kind, source_type, source_id) e vira ErrDuplicate,
+		// tratado como no-op pelo chamador — o mesmo mecanismo que impede o
+		// webhook reentregue de dobrar a receita.
+		SourceID: in.OrderID,
+		Description: fmt.Sprintf("Venda externa (maquininha) do pedido %s — NSU %s, loja %s",
+			in.OrderID, in.NSU, in.StoreID),
+		RequestID: in.RequestID,
+		CreatedBy: in.SettledBy,
+		Postings: []Posting{
+			{Account: AcctCaixaAdquirenteExterno, Side: Debit, Amount: in.GrossCents,
+				PaymentMethod: MethodExternal, Memo: memo},
+			{Account: AcctReceitaBruta, Side: Credit, Amount: in.GrossCents,
+				PaymentMethod: MethodExternal, Memo: "receita bruta do pedido " + in.OrderID},
+		},
+	}
+}
+
 // PSPFeeInput registra a taxa DEPOIS, quando o valor só é conhecido na
 // conciliação (comum em cartão parcelado, onde o MDR efetivo sai no extrato).
 type PSPFeeInput struct {

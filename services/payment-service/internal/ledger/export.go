@@ -143,6 +143,8 @@ func naturezaPT(k Kind) string {
 	switch k {
 	case KindSale:
 		return "Venda"
+	case KindExternalSale:
+		return "Venda externa (maquininha)"
 	case KindPSPFee:
 		return "Taxa do gateway"
 	case KindRefund:
@@ -174,6 +176,11 @@ func metodoPT(m string) string {
 		return "Boleto"
 	case "card":
 		return "Cartao de credito"
+	case MethodExternal:
+		// Rótulo explícito no CSV do contador: "Cartao de credito" aqui faria
+		// a maquininha da loja se confundir com o cartão processado pelo PSP,
+		// que é exatamente o erro que esta feature existe pra corrigir.
+		return "Maquininha da loja (externo)"
 	default:
 		return m
 	}

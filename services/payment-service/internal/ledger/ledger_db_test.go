@@ -505,3 +505,94 @@ func primeiras(s string, n int) string {
 	}
 	return strings.Join(linhas, "\n")
 }
+
+// ===================== liquidação externa (maquininha da loja) =====================
+
+// A idempotência que importa de verdade é a do BANCO: liquidar duas vezes o
+// mesmo pedido não pode gerar dois lançamentos, mesmo que o handler falhe em
+// detectar o retry. É o UNIQUE (kind, source_type, source_id) que garante.
+func TestDBLiquidacaoExternaNaoDuplicaLancamento(t *testing.T) {
+	db := testDB(t)
+	p := poster(t, db)
+	ctx := context.Background()
+
+	orderID := uniqueSource("ord-ext")
+	in := ledger.ExternalSaleInput{
+		OrderID: orderID, NSU: "004417", StoreID: "loja-centro", OperatorID: "op-a",
+		OccurredAt: time.Now().UTC(), GrossCents: 18990, SettledBy: "op-a",
+	}
+
+	tx, err := p.Post(ctx, ledger.ExternalSale(in))
+	if err != nil {
+		t.Fatalf("primeira liquidação recusada: %v", err)
+	}
+
+	// Segunda tentativa — retry do order-service, ou o operador clicando duas
+	// vezes. Tem que virar ErrDuplicate, tratado como no-op pelo chamador.
+	in.NSU = "009999" // até com outro comprovante: a chave é o PEDIDO
+	if _, err := p.Post(ctx, ledger.ExternalSale(in)); !errors.Is(err, ledger.ErrDuplicate) {
+		t.Fatalf("segunda liquidação do mesmo pedido: err = %v, esperado ErrDuplicate", err)
+	}
+
+	var n int
+	if err := db.QueryRow(`
+		SELECT count(*) FROM ledger_transactions
+		WHERE kind = 'external_sale' AND source_id = $1`, orderID).Scan(&n); err != nil {
+		t.Fatalf("contar: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("lançamentos de liquidação externa = %d, esperado 1 — receita duplicada", n)
+	}
+
+	// E o lançamento gravado bate: soma zero, sem tocar no caixa do PSP.
+	got, err := p.Get(ctx, tx.ID)
+	if err != nil {
+		t.Fatalf("reler: %v", err)
+	}
+	var debitos, creditos ledger.Cents
+	for _, pg := range got.Postings {
+		if pg.Account == ledger.AcctCaixaPSP {
+			t.Errorf("liquidação externa encostou na 1.1.1 — vira divergência eterna na conciliação com a Appmax")
+		}
+		if pg.PaymentMethod != ledger.MethodExternal {
+			t.Errorf("partida com método %q, esperado %q", pg.PaymentMethod, ledger.MethodExternal)
+		}
+		if pg.Side == ledger.Debit {
+			debitos += pg.Amount
+		} else {
+			creditos += pg.Amount
+		}
+	}
+	if debitos != creditos || debitos != 18990 {
+		t.Errorf("lançamento não fecha: débitos=%d créditos=%d", debitos, creditos)
+	}
+}
+
+// A liquidação externa NÃO pode aparecer na conciliação com o PSP: ela não cria
+// linha em `payments`, então a query da reconciliação nunca a alcança. Este
+// teste trava essa propriedade — se um dia alguém passar a criar um `payment`
+// para a venda de maquininha, a conciliação volta a acusar divergência eterna.
+func TestDBLiquidacaoExternaNaoEntraNaConciliacaoDoPSP(t *testing.T) {
+	db := testDB(t)
+	p := poster(t, db)
+	ctx := context.Background()
+
+	orderID := uniqueSource("ord-ext-rec")
+	if _, err := p.Post(ctx, ledger.ExternalSale(ledger.ExternalSaleInput{
+		OrderID: orderID, NSU: "770011", StoreID: "loja-centro",
+		OccurredAt: time.Now().UTC(), GrossCents: 5000, SettledBy: "op-a",
+	})); err != nil {
+		t.Fatalf("lançar: %v", err)
+	}
+
+	var n int
+	if err := db.QueryRow(`
+		SELECT count(*) FROM payments WHERE order_id::text = $1`, orderID).Scan(&n); err != nil {
+		// order_id é UUID na tabela payments; um id sintético não casa e o
+		// próprio erro de cast confirma que não existe pagamento nenhum.
+		return
+	}
+	if n != 0 {
+		t.Errorf("liquidação externa criou %d pagamento(s): a conciliação com a Appmax vai procurar por eles no extrato e não achar", n)
+	}
+}

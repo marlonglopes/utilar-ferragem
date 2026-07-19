@@ -198,6 +198,22 @@ func main() {
 		adm.GET("/audit/verify", ledgerH.VerifyAudit)
 	}
 
+	// Rotas SERVIÇO→SERVIÇO. Hoje só o lançamento contábil da liquidação
+	// externa (venda de balcão paga na maquininha da loja), chamado pelo
+	// order-service. Contrato em docs/external-settlement.md.
+	//
+	// FAIL-CLOSED: sem SERVICE_JWT_SECRET o grupo NÃO é registrado. A rota
+	// lança receita no livro sem que dinheiro nenhum tenha passado pelo nosso
+	// PSP — ela não pode existir aceitando token de usuário.
+	if cfg.ServiceJWTSecret != "" {
+		extH := handler.NewExternalSettlementHandler(poster)
+		internal := r.Group("/internal/v1", handler.RequireService(cfg.ServiceJWTSecret))
+		internal.POST("/ledger/external-settlement", extH.Post)
+	} else {
+		slog.Warn("SERVICE_JWT_SECRET não configurado — /internal DESABILITADO; " +
+			"liquidação externa de balcão não será lançada no livro contábil")
+	}
+
 	r.GET("/health", func(c *gin.Context) {
 		if err := database.Ping(); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"db": "down"})
