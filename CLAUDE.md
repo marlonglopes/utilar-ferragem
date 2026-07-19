@@ -2,6 +2,8 @@
 
 Guia para o Claude Code (claude.ai/code) trabalhar neste repositório.
 
+> 📍 **Retomando o projeto? Comece por [`docs/ESTADO-DO-PROJETO.md`](docs/ESTADO-DO-PROJETO.md)** — o que existe, o que está bloqueado (decisões do dono), e como rodar tudo.
+
 ## O que é
 
 **Utilar Ferragem** — loja online de ferragem e material de construção **com PDV de balcão** para a loja física. SPA React + **5 microserviços Go**, cada um com seu próprio Postgres.
