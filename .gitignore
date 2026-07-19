@@ -60,3 +60,13 @@ credentials
 secrets/
 *-secrets.*
 *.secret
+
+# Mídia de produto gravada pelo driver de storage LOCAL (dev/teste).
+# Em produção o driver é S3 e nada disso existe no repo. São binários gerados
+# pelo pipeline de normalização — versioná-los incharia o histórico com
+# artefato reproduzível.
+services/catalog-service/data/
+
+# Python
+__pycache__/
+*.pyc

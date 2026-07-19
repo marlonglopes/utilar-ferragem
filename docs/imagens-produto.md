@@ -174,9 +174,96 @@ Todas sob `/api/v1/admin`, exigindo papel `admin`.
 
 O upload devolve **201 se ao menos um arquivo entrou**, e o corpo traz o motivo
 de cada recusa individualmente — um arquivo ruim não derruba o lote inteiro.
+Se **todos** forem recusados, é **400** com `details` listando cada motivo.
+
+### Contrato de resposta — o que o frontend consome
+
+**`POST .../images/upload`** → `201`
+
+```json
+{
+  "uploaded": [
+    {
+      "id": "af26b939-2270-4ba8-a6a1-53ac4c61de62",
+      "alt": "furadeira de impacto",
+      "sortOrder": 0,
+      "url": "/media/produtos/<id>/1f3a…-large.jpg",
+      "variants": {
+        "thumb":  "/media/produtos/<id>/1f3a…-thumb.jpg",
+        "medium": "/media/produtos/<id>/1f3a…-medium.jpg",
+        "large":  "/media/produtos/<id>/1f3a…-large.jpg"
+      },
+      "width": 1600, "height": 1600,
+      "originalBytes": 4821994, "bytes": 183220,
+      "sourceFormat": "jpeg",
+      "deduplicated": false
+    }
+  ],
+  "rejected": [
+    { "filename": "print.png", "reason": "…", "code": "not_an_image" }
+  ]
+}
+```
+
+`code` da recusa (casar por código, nunca pela mensagem):
+`not_an_image` · `file_too_large` · `image_too_large` (bomba / dimensão) ·
+`image_too_small` · `corrupt_image` · `processing_timeout` · `storage_error`.
+
+`deduplicated: true` significa que a foto **já existia** no produto (mesmo hash
+de conteúdo): o `id` devolvido é o da linha existente, e nenhuma nova entrou.
+
+**`PUT .../images/order`** → corpo `{"order": ["<id>", "<id>", …]}` com a lista
+**completa** na ordem desejada; o primeiro vira a capa. Idempotente.
+
+**`PUT .../images/:imageId/cover`** → promove a capa sem mandar a lista inteira.
+
+**`GET .../images`** → `{"data": [ …mesma forma de `uploaded`… ]}`.
+
+### No payload público de produto
+
+`ProductImage` ganhou campos, **de forma aditiva** — quem já lia `url` continua
+funcionando:
+
+```jsonc
+{
+  "id": "…",
+  "url": "…",          // sempre preenchido: a melhor imagem para o contexto
+  "alt": "…",
+  "variants": {        // AUSENTE em imagem externa (legado Wikimedia)
+    "thumb": "…", "medium": "…", "large": "…"
+  },
+  "width": 1600, "height": 1600
+}
+```
+
+**Como distinguir os dois tipos:** `if (img.variants)` → imagem própria, escolha
+o tamanho pelo contexto (`thumb` no card, `medium` no slide, `large` no zoom).
+Sem `variants` → imagem externa por URL, use `url` como está.
+
+`url` já vem resolvido para o contexto, então o caminho preguiçoso também é o
+certo:
+
+| Rota | `url` aponta para |
+|---|---|
+| `GET /products` (vitrine) | **`thumb`** — o card nunca baixa a imagem de zoom |
+| `GET /products/:slug` (detalhe) | **`medium`** — o slide do carrossel |
 
 Na listagem pública, o card recebe **só a capa** (`loadThumbnails`, uma query por
 página, não N+1). A galeria completa é exclusiva do detalhe do produto.
+
+### Limites em vigor
+
+| Limite | Valor |
+|---|---:|
+| Tamanho por arquivo | 12 MB |
+| Arquivos por requisição | 20 |
+| Imagens por produto | 60 |
+| Pixels da origem (bomba de descompressão) | 50 MP |
+| Dimensão por lado | 12.000 px |
+| Dimensão mínima (maior lado) | 200 px |
+| Timeout por imagem | 20 s |
+| Timeout do lote | 90 s |
+| Corpo multipart | 64 MB |
 
 ---
 
