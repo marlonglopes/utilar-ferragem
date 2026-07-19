@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
 	"github.com/utilar/catalog-service/internal/model"
+	"github.com/utilar/catalog-service/internal/storage"
 )
 
 // slugLookupMinElapsed é o tempo mínimo de resposta de GetBySlug e Related.
@@ -28,9 +30,48 @@ func padToMinElapsed(start time.Time, min time.Duration) {
 	}
 }
 
-type ProductHandler struct{ db *sql.DB }
+type ProductHandler struct {
+	db *sql.DB
+	// media traduz a CHAVE lógica gravada em product_images.variants na URL
+	// pública. É o único ponto de leitura que sabe onde a mídia mora — por isso
+	// migrar disco→S3/CDN é trocar o resolver, não reescrever a tabela.
+	media storage.URLResolver
+}
 
-func NewProductHandler(db *sql.DB) *ProductHandler { return &ProductHandler{db: db} }
+func NewProductHandler(db *sql.DB) *ProductHandler {
+	// Default "/media": é onde o driver local publica. Mantém a assinatura de
+	// antes funcionando (vários testes chamam assim) sem precisar de storage.
+	return &ProductHandler{db: db, media: storage.PrefixResolver("/media")}
+}
+
+// WithMedia troca o resolver de URL de mídia. O main injeta o do storage ativo.
+func (h *ProductHandler) WithMedia(r storage.URLResolver) *ProductHandler {
+	if r != nil {
+		h.media = r
+	}
+	return h
+}
+
+// imageVariants converte o JSONB de variantes (chaves lógicas) no bloco de URLs
+// públicas do payload.
+//
+// Devolve nil para imagem EXTERNA (as 288 fotos CC0 do Wikimedia, sem
+// variantes) — e é essa ausência que o frontend usa pra distinguir os dois
+// tipos: com `variants`, escolhe o tamanho pelo contexto; sem, usa `url`.
+func (h *ProductHandler) imageVariants(raw []byte) *model.ImageVariants {
+	if len(raw) == 0 {
+		return nil
+	}
+	var keys map[string]string
+	if err := json.Unmarshal(raw, &keys); err != nil || len(keys) == 0 {
+		return nil
+	}
+	return &model.ImageVariants{
+		Thumb:  h.media.URL(keys["thumb"]),
+		Medium: h.media.URL(keys["medium"]),
+		Large:  h.media.URL(keys["large"]),
+	}
+}
 
 // productColumns é a projeção PÚBLICA de produto — a única usada pelas rotas
 // abertas.
@@ -747,7 +788,7 @@ func (h *ProductHandler) enrichDetail(c *gin.Context, p *model.Product) {
 // galeria completa.
 func (h *ProductHandler) loadImages(c *gin.Context, p *model.Product) {
 	rows, err := h.db.Query(`
-		SELECT url, alt FROM product_images WHERE product_id=$1 ORDER BY sort_order ASC
+		SELECT id, url, alt, variants FROM product_images WHERE product_id=$1 ORDER BY sort_order ASC
 	`, p.ID)
 	if err != nil {
 		logDetailEnrichFailure(c, p.ID, "images", err)
@@ -758,9 +799,20 @@ func (h *ProductHandler) loadImages(c *gin.Context, p *model.Product) {
 	var imgs []model.ProductImage
 	for rows.Next() {
 		var im model.ProductImage
-		if err := rows.Scan(&im.URL, &im.Alt); err != nil {
+		var rawVariants []byte
+		if err := rows.Scan(&im.ID, &im.URL, &im.Alt, &rawVariants); err != nil {
 			logDetailEnrichFailure(c, p.ID, "images", err)
 			return
+		}
+		// Imagem própria: `url` do banco guarda a CHAVE, não uma URL. Resolver
+		// aqui é o que mantém o banco livre de URL absoluta. Imagem externa já
+		// vem com http(s) e o resolver a devolve intacta.
+		im.Variants = h.imageVariants(rawVariants)
+		if im.Variants != nil {
+			// O detalhe usa a média no carrossel; o zoom pede a grande via
+			// `variants.large`. Mandar a grande em `url` faria o slide baixar
+			// 1600px que a tela não usa.
+			im.URL = im.Variants.Medium
 		}
 		imgs = append(imgs, im)
 	}
@@ -799,7 +851,7 @@ func (h *ProductHandler) loadThumbnails(c *gin.Context, products []model.Product
 	}
 
 	rows, err := h.db.Query(`
-		SELECT DISTINCT ON (product_id) product_id, url, alt
+		SELECT DISTINCT ON (product_id) product_id, url, alt, variants
 		FROM product_images
 		WHERE product_id = ANY($1)
 		ORDER BY product_id, sort_order ASC
@@ -815,10 +867,19 @@ func (h *ProductHandler) loadThumbnails(c *gin.Context, products []model.Product
 	for rows.Next() {
 		var pid string
 		var im model.ProductImage
-		if err := rows.Scan(&pid, &im.URL, &im.Alt); err != nil {
+		var rawVariants []byte
+		if err := rows.Scan(&pid, &im.URL, &im.Alt, &rawVariants); err != nil {
 			slog.Error("product.list_thumbnails_failed",
 				"request_id", c.GetString("request_id"), "error", err.Error())
 			return
+		}
+		// A VITRINE SERVE A MINIATURA. Este `im.URL = Thumb` é a linha que
+		// decide se a listagem no celular carrega em 1s ou em 20s: são ~20
+		// cards por página, e servir a imagem de zoom em cada um são megabytes
+		// para desenhar 150px de tela.
+		im.Variants = h.imageVariants(rawVariants)
+		if im.Variants != nil {
+			im.URL = im.Variants.Thumb
 		}
 		capas[pid] = im
 	}

@@ -21,9 +21,35 @@ type Seller struct {
 	Verified    bool    `json:"verified"`
 }
 
+// ImageVariants são as três resoluções da MESMA foto, já em URL pública.
+//
+// PORQUÊ três: o card da vitrine não pode baixar a imagem de zoom. Com ~20
+// cards por página no celular, servir a `large` em todos são megabytes para
+// desenhar miniaturas de 150px — é o que trava a vitrine no 4G.
+type ImageVariants struct {
+	Thumb  string `json:"thumb"`  // 300px — card da vitrine, miniatura do carrossel
+	Medium string `json:"medium"` // 800px — slide do carrossel no detalhe
+	Large  string `json:"large"`  // 1600px — zoom / tela cheia
+}
+
+// ProductImage é uma foto da galeria.
+//
+// Convivem dois tipos no mesmo modelo:
+//
+//   - PRÓPRIA (upload normalizado): `variants` presente, todas quadradas 1:1.
+//   - EXTERNA (URL de terceiro, o legado Wikimedia): `variants` AUSENTE.
+//
+// É assim que o frontend distingue: `if (img.variants)` usa srcset/tamanho por
+// contexto; senão usa `url` como está. `url` sempre aponta para a melhor imagem
+// disponível, então quem ignorar `variants` continua funcionando — foi de
+// propósito, pra não quebrar nenhum consumidor existente.
 type ProductImage struct {
-	URL string `json:"url"`
-	Alt string `json:"alt"`
+	ID       string         `json:"id,omitempty"`
+	URL      string         `json:"url"`
+	Alt      string         `json:"alt"`
+	Variants *ImageVariants `json:"variants,omitempty"`
+	Width    int            `json:"width,omitempty"`
+	Height   int            `json:"height,omitempty"`
 }
 
 // Product JSON tags seguem o shape do frontend (camelCase).

@@ -16,6 +16,7 @@ import (
 	"github.com/utilar/catalog-service/internal/db"
 	"github.com/utilar/catalog-service/internal/handler"
 	"github.com/utilar/catalog-service/internal/reservation"
+	"github.com/utilar/catalog-service/internal/storage"
 	"github.com/utilar/pkg/ratelimit"
 )
 
@@ -41,7 +42,17 @@ func main() {
 	}
 	slog.Info("migrations applied")
 
-	productH := handler.NewProductHandler(database)
+	// Storage de mídia. A INTERFACE é a fronteira: o handler de upload não sabe
+	// se grava em disco ou no S3. STORAGE_DRIVER=local|s3 decide; local é dev,
+	// S3 é produção (ver internal/storage/s3.go para o que ainda falta).
+	mediaStore, err := storage.FromEnv()
+	if err != nil {
+		slog.Error("storage", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("media storage", "driver", mediaStore.Driver())
+
+	productH := handler.NewProductHandler(database).WithMedia(mediaStore)
 	categoryH := handler.NewCategoryHandler(database)
 	sellerH := handler.NewSellerHandler(database)
 	adminProductH := handler.NewAdminProductHandler(database)
@@ -49,6 +60,7 @@ func main() {
 	reservationH := handler.NewReservationHandler(database)
 	importH := handler.NewImportHandler(database)
 	storeCostH := handler.NewStoreCostHandler(database)
+	productImageH := handler.NewProductImageHandler(database, mediaStore)
 
 	if cfg.DevMode {
 		slog.Warn("DEV_MODE=true — /admin aceita fallback X-User-Role; nunca use em produção")
@@ -110,8 +122,22 @@ func main() {
 		admin.POST("/products", adminProductH.Create)
 		admin.PATCH("/products/by-id/:id", adminProductH.Patch)
 		admin.DELETE("/products/by-id/:id", adminProductH.Delete)
+		// Imagem por URL (legado — o lojista cola o link de terceiro).
 		admin.POST("/products/by-id/:id/images", adminProductH.AddImage)
-		admin.DELETE("/products/by-id/:id/images/:imageId", adminProductH.DeleteImage)
+
+		// UPLOAD de arquivo: multipart, várias imagens por chamada, tudo
+		// normalizado no backend (1:1, letterbox branco, 3 resoluções, EXIF
+		// aplicado e descartado). Ver docs/imagens-produto.md.
+		//
+		// Está sob o mesmo RequireAdmin do grupo: anônimo e `customer` tomam
+		// 401/403 antes de um único byte ser lido. `store_operator` também NÃO
+		// entra — operador de balcão não escreve no catálogo, e imagem de
+		// produto é catálogo.
+		admin.GET("/products/by-id/:id/images", productImageH.List)
+		admin.POST("/products/by-id/:id/images/upload", productImageH.Upload)
+		admin.PUT("/products/by-id/:id/images/order", productImageH.Reorder)
+		admin.PUT("/products/by-id/:id/images/:imageId/cover", productImageH.SetCover)
+		admin.DELETE("/products/by-id/:id/images/:imageId", productImageH.Delete)
 		admin.POST("/products/import", adminProductH.Import)
 
 		// ⚠️ ESTA é a única rota que devolve `cost`/margem. Está sob
@@ -175,6 +201,15 @@ func main() {
 	sweeperCtx, stopSweeper := context.WithCancel(context.Background())
 	defer stopSweeper()
 	go reservation.NewSweeper(database).Run(sweeperCtx)
+
+	// Servir mídia pelo próprio serviço é MODO DE DESENVOLVIMENTO. Em produção
+	// o driver é S3 e quem serve é o CloudFront — a rota nem existe, porque
+	// serviço de aplicação servindo estático desperdiça conexão e CPU.
+	if local, ok := mediaStore.(*storage.Local); ok {
+		mediaH := handler.NewMediaHandler(local)
+		r.GET("/media/*path", mediaH.Serve)
+		slog.Info("servindo mídia local", "root", local.Root(), "rota", "/media")
+	}
 
 	r.GET("/health", func(c *gin.Context) {
 		if err := database.Ping(); err != nil {
