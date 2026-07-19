@@ -185,6 +185,23 @@ func (p *Planner) Plan(t *Table) (*Plan, error) {
 	// milhares de linhas.
 	catCache := map[string]bool{}
 
+	// A planilha TEM coluna de preço? (mapeada no perfil E presente no arquivo)
+	//
+	// É o que separa "esta linha veio sem preço" de "esta planilha não fala de
+	// preço". No segundo caso — o SINAPI, que só traz custo de referência — reter
+	// linha por linha mandaria o lote inteiro para revisão e ensinaria o operador
+	// a aprovar tudo no automático, que é pior que o bug original. Exigir a coluna
+	// PRESENTE NO ARQUIVO (e não só mapeada) evita o mesmo desastre quando o
+	// fornecedor renomeia a coluna: nesse caso o aviso de LOTE já é gerado acima.
+	priceColumnInFile := false
+	for col, m := range p.Profile.Columns {
+		if m.Field == FieldPrice {
+			if _, ok := colIdx[col]; ok {
+				priceColumnInFile = true
+			}
+		}
+	}
+
 	// SKUs duplicados DENTRO do mesmo arquivo: a segunda ocorrência
 	// sobrescreveria a primeira em silêncio e o operador nunca saberia qual
 	// preço venceu. Rejeitamos a duplicata e apontamos a linha original.
@@ -204,7 +221,7 @@ func (p *Planner) Plan(t *Table) (*Plan, error) {
 		if r.SKU != "" {
 			firstSeen[r.SKU] = r.RowNumber
 		}
-		p.decide(r, existing, catCache)
+		p.decide(r, existing, catCache, priceColumnInFile)
 	}
 
 	// Arquivamento por ausência — NUNCA delete.
@@ -510,7 +527,7 @@ func checkMoney(field string, v float64) error {
 }
 
 // decide compara a linha com o estado atual e escolhe a ação.
-func (p *Planner) decide(r *RowResult, existing map[string]ExistingProduct, catCache map[string]bool) {
+func (p *Planner) decide(r *RowResult, existing map[string]ExistingProduct, catCache map[string]bool, priceColumnInFile bool) {
 	// Categoria: obrigatória e tem que existir. FK que estoura no commit
 	// devolveria erro de driver no meio do lote em vez de um relatório.
 	cat, _ := r.Mapped[string(FieldCategory)].(string)
@@ -547,14 +564,33 @@ func (p *Planner) decide(r *RowResult, existing map[string]ExistingProduct, catC
 	if !found {
 		// --- CRIAÇÃO --------------------------------------------------------
 		r.Action = ActionCreate
+		if hasNewPrice {
+			r.NewPrice = &newPrice
+		}
 		if !hasNewPrice || newPrice == 0 {
-			// Produto sem preço de venda é legítimo (é o caso do SINAPI, que
-			// só traz CUSTO de referência) — mas nasce rascunho e sem revisão.
+			if priceColumnInFile {
+				// A planilha TEM coluna de preço e esta linha veio sem valor (ou
+				// com zero). Isso não é o caso legítimo do SINAPI: é uma célula
+				// que deveria ter preço e não tem. Aceitar cria produto sem preço
+				// no catálogo — e produto a R$ 0,00 é o que aparece na vitrine
+				// como brinde. Rejeitar também seria errado (o dado pode estar
+				// certo e o operador perderia o produto sem entender), então
+				// RETÉM: a decisão vai para um humano, que é o princípio do
+				// dry-run.
+				r.Action = ActionReview
+				r.addWarning("price", fmt.Sprintf(
+					"linha %d: produto novo %q com preço de venda %s na coluna de preço — retido para revisão humana. "+
+						"Confira o valor na planilha: produto criado sem preço entra no catálogo valendo R$ 0,00",
+					r.RowNumber, r.SKU, describeMissingPrice(hasNewPrice)))
+				return
+			}
+			// Planilha que NÃO fala de preço (SINAPI: só custo de referência).
+			// Legítimo — o produto nasce rascunho e sem revisão de preço.
 			r.addWarning("price",
 				"sem preço de venda — o produto entra como rascunho e precisa de precificação antes de publicar")
 		}
-		if hasNewPrice {
-			r.NewPrice = &newPrice
+		if p.holdIfPriceBelowCost(r, newPrice, hasNewPrice, nil) {
+			return
 		}
 		return
 	}
@@ -590,6 +626,17 @@ func (p *Planner) decide(r *RowResult, existing map[string]ExistingProduct, catC
 		}
 	}
 
+	// Preço abaixo do custo também numa ATUALIZAÇÃO — e aqui o custo pode vir da
+	// planilha OU do cadastro: a linha que só atualiza preço não traz custo, e é
+	// exatamente essa a que derruba a margem sem ninguém ver.
+	//
+	// Note que a trava de queda percentual acima NÃO cobre este caso: um preço
+	// que cai 20% (dentro do limite) e mesmo assim fica abaixo do custo passaria
+	// batido, porque o limite fala de VARIAÇÃO e este fala de MARGEM.
+	if p.holdIfPriceBelowCost(r, newPrice, hasNewPrice, ex.Cost) {
+		return
+	}
+
 	// Idempotência: rodar o mesmo arquivo duas vezes tem que dar o mesmo
 	// resultado. Se nada mudou, a ação é `skip` — e não um UPDATE que só mexe
 	// no `updated_at` e polui a auditoria com milhares de "mudanças" vazias.
@@ -598,6 +645,75 @@ func (p *Planner) decide(r *RowResult, existing map[string]ExistingProduct, catC
 		return
 	}
 	r.Action = ActionUpdate
+}
+
+// describeMissingPrice traduz o estado da célula para o vocabulário de quem lê o
+// relatório — o comprador da loja, não um programador. "vazio" e "R$ 0,00" são
+// problemas diferentes e pedem conferências diferentes na planilha.
+func describeMissingPrice(hasPrice bool) string {
+	if hasPrice {
+		return "igual a R$ 0,00"
+	}
+	return "vazio"
+}
+
+// holdIfPriceBelowCost retém a linha quando o preço de venda fica abaixo do
+// custo. Devolve true se reteve.
+//
+// POR QUE ISTO EXISTE, já havendo a trava de queda percentual: aquela desconfia
+// da VARIAÇÃO (preço de ontem vs. de hoje) e não enxerga produto NOVO, que não
+// tem "ontem". O erro de vírgula na primeira importação de um item — "123,40"
+// digitado como "1,23" — entra sem nenhum alarme, e o único sinal disponível é
+// o custo estar na mesma linha, dez vezes maior que o preço.
+//
+// RETÉM, não rejeita: vender abaixo do custo é uma decisão comercial real
+// (item de isca, brinde, queima de estoque). Quem faz isso de propósito liga
+// `allowPriceBelowCost` no perfil daquele fornecedor.
+func (p *Planner) holdIfPriceBelowCost(r *RowResult, price float64, hasPrice bool, existingCost *float64) bool {
+	if !hasPrice || p.Profile.Options.AllowPriceBelowCost {
+		return false
+	}
+
+	cost, hasCost := r.Mapped[string(FieldCost)].(float64)
+	origem := "custo da planilha"
+	if !hasCost && existingCost != nil {
+		cost, hasCost, origem = *existingCost, true, "custo cadastrado no produto"
+	}
+	// Custo zero/ausente não é sinal: significa "não sei o custo", e reter por
+	// desconhecimento retém o catálogo inteiro de quem não manda coluna de custo.
+	if !hasCost || cost <= 0 {
+		return false
+	}
+	// Tolerância de meio centavo: preço IGUAL ao custo (margem zero) é decisão
+	// comercial comum e não pode disparar a trava por ruído de float64.
+	if cost-price <= 0.005 {
+		return false
+	}
+
+	r.Action = ActionReview
+	r.addWarning("price", fmt.Sprintf(
+		"linha %d: preço de venda R$ %s abaixo do custo R$ %s (%s) — retido para revisão humana. "+
+			"Confira o separador decimal na coluna de preço (o erro mais caro da importação é '123,40' digitado como '1,23'). "+
+			"Se a venda abaixo do custo for intencional, ligue 'allowPriceBelowCost' no perfil deste fornecedor",
+		r.RowNumber, moneyBR(price), moneyBR(cost), origem))
+	return true
+}
+
+// moneyBR formata dinheiro na convenção brasileira. Existe porque a mensagem é
+// lida pelo comprador da loja, e "R$ 31.40" ao lado de uma planilha que escreve
+// "31,40" faz o operador duvidar se o sistema leu o número certo — exatamente a
+// dúvida que a mensagem deveria eliminar.
+func moneyBR(v float64) string {
+	s := fmt.Sprintf("%.2f", v)
+	intPart, decPart := s[:len(s)-3], s[len(s)-2:]
+	var b strings.Builder
+	for i, c := range intPart {
+		if i > 0 && (len(intPart)-i)%3 == 0 && c != '-' {
+			b.WriteByte('.')
+		}
+		b.WriteRune(c)
+	}
+	return b.String() + "," + decPart
 }
 
 // hasChanges compara o que a linha traz com o que já está gravado.

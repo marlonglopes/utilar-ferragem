@@ -144,6 +144,16 @@ type Options struct {
 	// MaxPriceRisePct: subida absurda também é erro (o mesmo bug ao contrário,
 	// ou custo mapeado na coluna de preço).
 	MaxPriceRisePct float64 `json:"maxPriceRisePct,omitempty"`
+	// AllowPriceBelowCost: aceitar, SEM revisão humana, linha cujo preço de venda
+	// fica abaixo do custo.
+	//
+	// Padrão FALSE (= retém para revisão), pelo mesmo motivo de MaxPriceDropPct:
+	// preço abaixo do custo é a assinatura do erro de vírgula ("123,40" digitado
+	// como "1,23") e passa em toda validação de "número positivo". Mas RETER, e
+	// não rejeitar — há loja que realmente vende item de isca no prejuízo, e
+	// recusar a linha faria o operador perder o produto sem entender por quê.
+	// Quem vive disso liga esta opção no perfil daquele fornecedor.
+	AllowPriceBelowCost bool `json:"allowPriceBelowCost,omitempty"`
 	// ArchiveMissing: arquivar produtos do fornecedor que não vieram nesta
 	// planilha. Padrão FALSE porque fornecedor manda planilha parcial o tempo
 	// todo, e o comportamento "some da planilha = some da loja" evaporaria o

@@ -471,6 +471,202 @@ func TestDryRun_ProdutoNovoSemPrecoAvisaEEntraComoRascunho(t *testing.T) {
 	}
 }
 
+// ============================================================================
+// REGRA: preço ausente/zero e preço abaixo do custo são RETIDOS, não aceitos
+//
+// Estes dois furos foram encontrados rodando uma planilha real pelo dry-run: as
+// duas linhas voltaram com `create` e teriam ido para a vitrine. Reter (e não
+// rejeitar) é deliberado — o dado pode estar certo, e recusar a linha faz o
+// operador perder o produto sem entender o motivo.
+// ============================================================================
+
+func TestDryRun_PrecoAusenteEmCriacaoERetidoNaoCriado(t *testing.T) {
+	// REGRESSÃO: a linha voltava `create` com price=null e o produto nascia
+	// valendo R$ 0,00 no catálogo.
+	cat := newFakeCatalog()
+	plan := planCSV(t, cat, testProfile(),
+		"SKU,NOME,CATEGORIA,PRECO,CUSTO,ESTOQUE\nP-1,Produto sem preço nenhum,ferramentas,,,10\n")
+
+	if plan.Creates != 0 {
+		t.Fatalf("produto novo sem preço NÃO pode ser criado em silêncio; plano = %+v", plan)
+	}
+	if plan.Reviews != 1 {
+		t.Fatalf("reviews = %d, quer 1 — a decisão é humana, não do importador; plano = %+v",
+			plan.Reviews, plan)
+	}
+	if plan.Rejects != 0 {
+		t.Errorf("rejeitar seria errado: o operador perderia o produto sem entender; plano = %+v", plan)
+	}
+}
+
+func TestDryRun_PrecoZeroEmCriacaoERetido(t *testing.T) {
+	// Célula preenchida com 0 é diferente de célula vazia, mas o resultado no
+	// catálogo é o mesmo: item na vitrine valendo nada.
+	cat := newFakeCatalog()
+	plan := planCSV(t, cat, testProfile(),
+		"SKU,NOME,CATEGORIA,PRECO,ESTOQUE\nP-1,Parafuso,fixacao,\"R$ 0,00\",10\n")
+
+	if plan.Reviews != 1 {
+		t.Fatalf("preço zero deveria ser retido; plano = %+v", plan)
+	}
+	if !strings.Contains(strings.Join(warningMessages(plan.Rows[0]), " "), "R$ 0,00") {
+		t.Errorf("a mensagem deveria dizer o valor lido; avisos: %v", plan.Rows[0].Warnings)
+	}
+}
+
+func TestDryRun_PrecoAbaixoDoCustoERetido(t *testing.T) {
+	// REGRESSÃO: "Cimento CP-V ARI saco 50kg" a R$ 1,23 com custo R$ 31,40 —
+	// o erro de vírgula ("123,40" → "1,23") na PRIMEIRA importação do item, onde
+	// a trava de queda percentual não enxerga nada porque não há preço anterior.
+	cat := newFakeCatalog()
+	plan := planCSV(t, cat, testProfile(),
+		"SKU,NOME,CATEGORIA,PRECO,CUSTO,ESTOQUE\nCIM-V,Cimento CP-V ARI saco 50kg,construcao,\"R$ 1,23\",\"R$ 31,40\",80\n")
+
+	if plan.Creates != 0 || plan.Reviews != 1 {
+		t.Fatalf("preço abaixo do custo deveria ser retido, não criado; plano = %+v", plan)
+	}
+	if plan.Rejects != 0 {
+		t.Errorf("preço abaixo do custo pode ser legítimo (item de isca) — reter, nunca rejeitar")
+	}
+}
+
+func TestDryRun_MensagemDePrecoAbaixoDoCustoDizOsDoisValoresEALinha(t *testing.T) {
+	// Quem lê é o comprador da loja: sem o valor lido, o valor comparado e a
+	// linha da planilha, a mensagem não é acionável e vira ruído ignorado.
+	cat := newFakeCatalog()
+	plan := planCSV(t, cat, testProfile(),
+		"SKU,NOME,CATEGORIA,PRECO,CUSTO\nCIM-V,Cimento,construcao,\"R$ 1,23\",\"R$ 31,40\"\n")
+
+	r := plan.Rows[0]
+	msg := strings.Join(warningMessages(r), " ")
+	for _, want := range []string{"1,23", "31,40", "linha 2"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("mensagem sem %q — o comprador não consegue agir sobre ela: %q", want, msg)
+		}
+	}
+	if r.RowNumber != 2 {
+		t.Errorf("rowNumber = %d, quer 2 (a linha da planilha, com cabeçalho)", r.RowNumber)
+	}
+}
+
+func TestDryRun_PrecoAbaixoDoCustoPermitidoPorPerfil(t *testing.T) {
+	// O caso legítimo: loja que vende item de isca no prejuízo de propósito.
+	// Sem esta saída, a trava seria contornada desligando a validação inteira.
+	cat := newFakeCatalog()
+	prof := testProfile()
+	prof.Options.AllowPriceBelowCost = true
+
+	plan := planCSV(t, cat, prof,
+		"SKU,NOME,CATEGORIA,PRECO,CUSTO\nISCA-1,Furadeira de isca,ferramentas,\"R$ 99,00\",\"R$ 140,00\"\n")
+
+	if plan.Creates != 1 || plan.Reviews != 0 {
+		t.Errorf("com allowPriceBelowCost o item de isca deve passar direto; plano = %+v", plan)
+	}
+}
+
+func TestDryRun_PrecoAbaixoDoCustoEmAtualizacaoUsaOCustoCadastrado(t *testing.T) {
+	// A planilha que só atualiza preço não traz custo — e é justamente a que
+	// derruba a margem sem ninguém ver. A queda de 20% cabe dentro do limite de
+	// 30%, então só a comparação com o custo pega este caso.
+	cat := newFakeCatalog()
+	cost := 90.00
+	cat.products["P-1"] = ExistingProduct{
+		ID: "1", SKU: "P-1", Name: "Furadeira", Price: 100.00, Cost: &cost, Status: "published",
+	}
+	prof := testProfile()
+	delete(prof.Columns, "CUSTO")
+
+	tbl, _ := Read("x.csv", []byte(
+		"SKU,NOME,CATEGORIA,PRECO\nP-1,Furadeira,ferramentas,\"R$ 80,00\"\n"), "", 0)
+	planner := &Planner{Profile: prof, Catalog: cat}
+	plan, err := planner.Plan(tbl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if plan.Reviews != 1 {
+		t.Fatalf("preço abaixo do custo cadastrado deveria reter mesmo dentro do limite de queda; plano = %+v", plan)
+	}
+	if !strings.Contains(strings.Join(warningMessages(plan.Rows[0]), " "), "90,00") {
+		t.Errorf("mensagem deveria citar o custo cadastrado; avisos: %v", plan.Rows[0].Warnings)
+	}
+}
+
+func TestDryRun_MargemZeroNaoERetida(t *testing.T) {
+	// Falso positivo é pior que o bug: se a trava reter demais, o operador
+	// aprende a ignorá-la. Vender pelo custo é decisão comercial banal.
+	cat := newFakeCatalog()
+	plan := planCSV(t, cat, testProfile(),
+		"SKU,NOME,CATEGORIA,PRECO,CUSTO\nP-1,Parafuso,fixacao,\"R$ 10,00\",\"R$ 10,00\"\n")
+
+	if plan.Creates != 1 || plan.Reviews != 0 {
+		t.Errorf("preço igual ao custo não é erro de vírgula; plano = %+v", plan)
+	}
+}
+
+func TestDryRun_SemColunaDeCustoNaoRetemNada(t *testing.T) {
+	// Custo desconhecido não é sinal de nada. Reter por desconhecimento seguraria
+	// o catálogo inteiro de todo fornecedor que não manda coluna de custo.
+	cat := newFakeCatalog()
+	prof := testProfile()
+	delete(prof.Columns, "CUSTO")
+
+	tbl, _ := Read("x.csv", []byte(
+		"SKU,NOME,CATEGORIA,PRECO\nP-1,Parafuso,fixacao,\"R$ 1,00\"\n"), "", 0)
+	planner := &Planner{Profile: prof, Catalog: cat}
+	plan, _ := planner.Plan(tbl)
+
+	if plan.Creates != 1 || plan.Reviews != 0 {
+		t.Errorf("sem custo não há comparação a fazer; plano = %+v", plan)
+	}
+}
+
+func TestDryRun_PlanilhaSemColunaDePrecoNaoRetemOLoteInteiro(t *testing.T) {
+	// REGRESSÃO ao contrário: o SINAPI só traz CUSTO de referência. Reter linha a
+	// linha mandaria 4.000 itens para revisão e ensinaria o operador a aprovar
+	// tudo no automático — pior que o bug que a trava conserta.
+	cat := newFakeCatalog()
+	prof := testProfile()
+	delete(prof.Columns, "PRECO")
+
+	tbl, _ := Read("x.csv", []byte(
+		"SKU,NOME,CATEGORIA,CUSTO\nS-1,Cimento,construcao,\"R$ 30,00\"\nS-2,Areia,construcao,\"R$ 80,00\"\n"), "", 0)
+	planner := &Planner{Profile: prof, Catalog: cat}
+	plan, _ := planner.Plan(tbl)
+
+	if plan.Creates != 2 || plan.Reviews != 0 {
+		t.Errorf("planilha só de custo não pode reter o lote inteiro; plano = %+v", plan)
+	}
+}
+
+func TestDryRun_ColunaDePrecoVaziaNaoZeraOPrecoExistente(t *testing.T) {
+	// Mesmo princípio de TestImport_NaoApagaCustoQuandoAPlanilhaNaoTrazAColuna:
+	// ausência significa "não sei", nunca "zere". Uma planilha que só atualiza
+	// estoque não pode derrubar o preço de quem já está na vitrine.
+	cat := newFakeCatalog()
+	cat.products["P-1"] = ExistingProduct{
+		ID: "1", SKU: "P-1", Name: "Parafuso", Price: 42.90, Stock: 10, Status: "published",
+	}
+	plan := planCSV(t, cat, testProfile(),
+		"SKU,NOME,CATEGORIA,PRECO,ESTOQUE\nP-1,Parafuso,fixacao,,99\n")
+
+	r := plan.Rows[0]
+	if r.Action != ActionUpdate {
+		t.Fatalf("ação = %q, quer update (só o estoque mudou); plano = %+v", r.Action, plan)
+	}
+	if _, ok := r.Mapped["price"]; ok {
+		t.Errorf("preço ausente na planilha não pode entrar no UPDATE: mapped[price] = %v", r.Mapped["price"])
+	}
+}
+
+func warningMessages(r RowResult) []string {
+	out := make([]string, 0, len(r.Warnings))
+	for _, w := range r.Warnings {
+		out = append(out, w.Message)
+	}
+	return out
+}
+
 func TestSuggestMapping_SugereMasNaoDecide(t *testing.T) {
 	header := []string{"CODIGO", "DESCRICAO DO PRODUTO", "VLR VENDA", "ESTOQUE", "UNIDADE"}
 	m := SuggestMapping(header)
