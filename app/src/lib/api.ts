@@ -8,9 +8,61 @@ export const isCatalogEnabled = CATALOG_URL !== ''
 export const isOrderEnabled = ORDER_URL !== ''
 export const isAuthEnabled = AUTH_URL !== ''
 
-interface ApiError {
+/** Envelope de erro do backend: `{error, code, requestId, details?}`. */
+interface ApiErrorEnvelope {
   error: string
+  code?: string
+  requestId?: string
+  details?: unknown
   messages?: string[]
+}
+
+/**
+ * Erro de API que preserva `code` e `details` do envelope do backend.
+ *
+ * PORQUÊ: antes daqui, `handleResponse` fazia `throw new Error(body.error)` e
+ * jogava fora `code` e `details`. Quem precisava distinguir um erro do outro
+ * tinha que casar TEXTO da mensagem — foi o que aconteceu no PDV do balcão com
+ * `insufficient_stock`, que chega com o item e o saldo em `details` e só era
+ * reconhecido por substring. Funciona até alguém reescrever a mensagem.
+ *
+ * Estende Error de propósito: todo `catch (err) { err.message }` e
+ * `err instanceof Error` que já existe continua funcionando igual.
+ */
+export class ApiError extends Error {
+  readonly code?: string
+  readonly status: number
+  readonly requestId?: string
+  readonly details?: unknown
+
+  constructor(envelope: ApiErrorEnvelope, status: number) {
+    super(envelope.messages?.join(', ') ?? envelope.error ?? `HTTP ${status}`)
+    this.name = 'ApiError'
+    this.code = envelope.code
+    this.status = status
+    this.requestId = envelope.requestId
+    this.details = envelope.details
+  }
+
+  /** `true` se o backend classificou o erro com este código. */
+  is(code: string): boolean {
+    return this.code === code
+  }
+}
+
+/** Type guard — evita `instanceof` espalhado com import de tipo. */
+export function isApiError(err: unknown): err is ApiError {
+  return err instanceof ApiError
+}
+
+/**
+ * Lê `details` com um formato esperado, sem `any`.
+ * Devolve `undefined` se o erro não for ApiError ou o código não bater — assim
+ * quem consome não precisa encadear checagem.
+ */
+export function apiErrorDetails<T>(err: unknown, code: string): T | undefined {
+  if (!isApiError(err) || !err.is(code)) return undefined
+  return err.details as T | undefined
 }
 
 // Hooks injetados pelo App em runtime — evita ciclo de dependência com o store
@@ -160,8 +212,10 @@ export function __resetIdempotencyMemo(): void {
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    const body: ApiError = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-    throw new Error(body.messages?.join(', ') ?? body.error)
+    const body: ApiErrorEnvelope = await res
+      .json()
+      .catch(() => ({ error: `HTTP ${res.status}` }))
+    throw new ApiError(body, res.status)
   }
   return res.json() as Promise<T>
 }

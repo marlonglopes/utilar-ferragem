@@ -19,7 +19,11 @@ import { computeBalcaoPricing } from '@/store/balcaoStore'
 
 const orderPostWithJWT = vi.fn()
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  // ApiError, isApiError e apiErrorDetails são puros e são justamente o que
+  // describeOrderError usa pra classificar o erro pelo `code`. Mockar isso
+  // esvaziaria o teste — importamos o original e substituímos só o transporte.
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   isOrderEnabled: true,
   isApiEnabled: false,
   isAuthEnabled: true,

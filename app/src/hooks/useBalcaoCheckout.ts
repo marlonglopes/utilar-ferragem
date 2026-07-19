@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { usePayment, type PaymentMethod, type PaymentResult } from '@/hooks/usePayment'
-import { isOrderEnabled, orderPostWithJWT } from '@/lib/api'
+import { isOrderEnabled, orderPostWithJWT, isApiError, apiErrorDetails } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 import type { BalcaoCustomer, BalcaoItem, BalcaoPricing } from '@/store/balcaoStore'
 
@@ -96,7 +96,50 @@ interface CreatedOrder {
  * Então `insufficient_stock` — que chega com o item e o saldo em `details` — só
  * pode ser reconhecido pelo texto. Funciona, mas é frágil: ver o relatório.
  */
+/** Detalhe do 409 de estoque insuficiente, como o catalog-service devolve. */
+interface FaltaDeEstoque {
+  productId?: string
+  requested?: number
+  available?: number
+}
+
+/**
+ * Traduz o erro do backend para uma frase que o vendedor entende no balcão.
+ *
+ * Classifica pelo `code` do envelope, não pelo texto. Antes daqui o casamento
+ * era por substring da mensagem (`/estoque insuficiente/i`), o que quebrava
+ * silenciosamente se alguém reescrevesse a mensagem no backend — o vendedor
+ * passaria a ver o erro cru, no meio de uma venda, com o cliente esperando.
+ *
+ * O casamento por texto continua como ÚLTIMO recurso: rota antiga que ainda não
+ * classifica com `code`, e erro de rede, que não tem envelope nenhum.
+ */
 export function describeOrderError(err: unknown): string {
+  // Estoque: o backend manda item e saldo em `details`. Usar o número real é o
+  // que transforma "não deu" em "tem 3, você pediu 5" — acionável no balcão.
+  const falta = apiErrorDetails<FaltaDeEstoque>(err, 'insufficient_stock')
+  if (falta) {
+    return typeof falta.available === 'number'
+      ? `Estoque insuficiente: restam ${falta.available}${
+          typeof falta.requested === 'number' ? ` e você pediu ${falta.requested}` : ''
+        }. Ajuste a quantidade.`
+      : 'Estoque insuficiente — ajuste a quantidade.'
+  }
+
+  if (isApiError(err)) {
+    switch (err.code) {
+      case 'unauthorized':
+        return 'Sessão expirada. Entre de novo para continuar a venda.'
+      case 'forbidden':
+        return 'Sua conta não tem permissão para vender nesta loja. Fale com o gerente.'
+      case 'validation_error':
+      case 'bad_request':
+        break // cai no texto abaixo: a mensagem do campo é mais útil que o código
+      case 'db_error':
+        return 'Falha no servidor ao registrar o pedido. Tente de novo.'
+    }
+  }
+
   const raw = err instanceof Error ? err.message : ''
   if (!raw) return 'Erro ao registrar o pedido.'
 
