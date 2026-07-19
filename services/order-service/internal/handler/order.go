@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 	"github.com/utilar/order-service/internal/authclient"
 	"github.com/utilar/order-service/internal/balcao"
 	"github.com/utilar/order-service/internal/catalogclient"
@@ -460,16 +461,15 @@ func (h *OrderHandler) List(c *gin.Context) {
 		DBError(c, err)
 		return
 	}
-	// loadOrder só depois de fechar o cursor: fazer as consultas de itens e
-	// tracking com o cursor aberto prende duas conexões do pool por pedido.
-	orders := make([]model.Order, 0, len(ids))
-	for _, id := range ids {
-		o, err := h.loadOrder(id, "")
-		if err != nil {
-			DBError(c, err)
-			return
-		}
-		orders = append(orders, *o)
+	// loadOrders só depois de fechar o cursor: consultar com o cursor aberto
+	// prende duas conexões do pool ao mesmo tempo.
+	//
+	// Em lote, e não um loadOrder por id: o laço fazia 4 consultas POR PEDIDO
+	// (4×20 = 80 numa página default, 400 no teto de 100). Agora são 4 fixas.
+	orders, err := h.loadOrders(ids)
+	if err != nil {
+		DBError(c, err)
+		return
 	}
 
 	// count total
@@ -910,4 +910,156 @@ func (h *OrderHandler) loadOrder(id, userID string) (*model.Order, error) {
 	}
 
 	return &o, nil
+}
+
+// loadOrders é o loadOrder em lote: monta N pedidos completos com 4 consultas
+// FIXAS, em vez das 4 POR PEDIDO que o loop de loadOrder fazia.
+//
+// O motivo é o custo da listagem. `List` buscava só os ids e chamava loadOrder
+// num laço; com per_page=20 isso era 1 + 4×20 + 1 = 82 idas ao banco pra montar
+// UMA página. No teto (per_page=100) eram 402. A fila de aprovação do balcão
+// (ListPendingApprovals, per_page=50) fazia 202 — e é tela que o gerente deixa
+// recarregando.
+//
+// Agora são 6 consultas, independente do tamanho da página. O ganho não é só
+// tempo de banco: cada ida gasta uma conexão do pool, e o pool encolheu pra 10
+// por serviço (ver internal/db/db.go). 402 consultas seriadas numa página
+// competiam com o resto da loja pelo pool inteiro.
+//
+// A ordem dos ids é preservada — quem chama já ordenou por created_at DESC, e
+// `WHERE id = ANY(...)` não garante ordem nenhuma. Reordenar aqui evita que a
+// listagem volte embaralhada.
+//
+// Mesmo padrão de loadThumbnails no catalog-service.
+func (h *OrderHandler) loadOrders(ids []string) ([]model.Order, error) {
+	if len(ids) == 0 {
+		return []model.Order{}, nil
+	}
+
+	byID := make(map[string]*model.Order, len(ids))
+
+	// 1) cabeçalhos
+	rows, err := h.db.Query(`
+		SELECT
+		  id, number, user_id, status, payment_method, payment_id, payment_info,
+		  subtotal, shipping_cost, shipping_service, total, tracking_code,
+		  created_at, paid_at, picked_at, shipped_at, delivered_at, cancelled_at, updated_at,
+		  channel::text, store_id, operator_id, customer_id,
+		  customer_name, customer_document, customer_phone,
+		  discount_pct, discount_amount, approval_status::text, approved_by, approved_at, approval_note,
+		  external_nsu, external_brand, external_auth_code, external_settled_by, external_settled_at
+		FROM orders WHERE id = ANY($1)
+	`, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var o model.Order
+		var channel string
+		if err := rows.Scan(
+			&o.ID, &o.Number, &o.UserID, &o.Status, &o.PaymentMethod, &o.PaymentID, &o.PaymentInfo,
+			&o.Subtotal, &o.ShippingCost, &o.ShippingService, &o.Total, &o.TrackingCode,
+			&o.CreatedAt, &o.PaidAt, &o.PickedAt, &o.ShippedAt, &o.DeliveredAt, &o.CancelledAt, &o.UpdatedAt,
+			&channel, &o.StoreID, &o.OperatorID, &o.CustomerID,
+			&o.CustomerName, &o.CustomerDocument, &o.CustomerPhone,
+			&o.DiscountPct, &o.DiscountAmount, &o.ApprovalStatus, &o.ApprovedBy, &o.ApprovedAt, &o.ApprovalNote,
+			&o.ExternalNSU, &o.ExternalBrand, &o.ExternalAuthorization, &o.ExternalSettledBy, &o.ExternalSettledAt,
+		); err != nil {
+			return nil, err
+		}
+		o.Channel = model.OrderChannel(channel)
+		// Items nunca nil: o JSON tem que sair `[]`, não `null` — o app itera
+		// direto e quebraria com null.
+		o.Items = make([]model.OrderItem, 0)
+		byID[o.ID] = &o
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// 2) itens — ORDER BY order_id junto com created_at porque agora as linhas
+	// de vários pedidos vêm no mesmo cursor.
+	itRows, err := h.db.Query(`
+		SELECT order_id, product_id, name, icon, seller_id, seller_name, quantity, unit_price
+		FROM order_items WHERE order_id = ANY($1) ORDER BY order_id, created_at ASC
+	`, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer itRows.Close()
+	for itRows.Next() {
+		var oid string
+		var it model.OrderItem
+		if err := itRows.Scan(&oid, &it.ProductID, &it.Name, &it.Icon, &it.SellerID, &it.SellerName, &it.Quantity, &it.UnitPrice); err != nil {
+			return nil, err
+		}
+		if o := byID[oid]; o != nil {
+			o.Items = append(o.Items, it)
+		}
+	}
+	// Sem rows.Err() um erro no meio da leitura viraria pedido sem itens — o
+	// cliente veria um pedido vazio e acharia que perdeu a compra.
+	if err := itRows.Err(); err != nil {
+		return nil, err
+	}
+
+	// 3) endereços — ausentes em venda de balcão; quem não tiver linha fica com
+	// Address nil e sai omitido do JSON.
+	adRows, err := h.db.Query(`
+		SELECT order_id, street, number, complement, neighborhood, city, state, cep
+		FROM shipping_addresses WHERE order_id = ANY($1)
+	`, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer adRows.Close()
+	for adRows.Next() {
+		var oid string
+		var addr model.OrderAddress
+		if err := adRows.Scan(&oid, &addr.Street, &addr.Number, &addr.Complement,
+			&addr.Neighborhood, &addr.City, &addr.State, &addr.CEP); err != nil {
+			return nil, err
+		}
+		if o := byID[oid]; o != nil {
+			a := addr
+			o.Address = &a
+		}
+	}
+	if err := adRows.Err(); err != nil {
+		return nil, err
+	}
+
+	// 4) tracking
+	evRows, err := h.db.Query(`
+		SELECT order_id, status, location, description, occurred_at
+		FROM tracking_events WHERE order_id = ANY($1) ORDER BY order_id, occurred_at ASC
+	`, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer evRows.Close()
+	for evRows.Next() {
+		var oid string
+		var ev model.TrackingEvent
+		if err := evRows.Scan(&oid, &ev.Status, &ev.Location, &ev.Description, &ev.OccurredAt); err != nil {
+			return nil, err
+		}
+		if o := byID[oid]; o != nil {
+			o.TrackingEvents = append(o.TrackingEvents, ev)
+		}
+	}
+	if err := evRows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Remonta na ordem pedida. Id que sumiu entre o SELECT dos ids e este
+	// (pedido apagado no meio) é pulado em vez de virar item nil.
+	out := make([]model.Order, 0, len(ids))
+	for _, id := range ids {
+		if o := byID[id]; o != nil {
+			out = append(out, *o)
+		}
+	}
+	return out, nil
 }

@@ -104,7 +104,7 @@ O caminho do dinheiro é o mais bem feito do sistema. Preserve estas invariantes
 - **O cliente nunca dita valor.** Preço vem do catálogo, frete da tabela, desconto do teto do cargo, valor do pagamento do order-service. O corpo da requisição não é fonte de verdade.
 - **Webhook não é fonte de verdade.** A Appmax não assina postback. O corpo é só um *gatilho*; status e valor vêm da reconsulta autenticada ao PSP. (Já houve falha grave aqui: o status vinha do corpo e dava pra confirmar pagamento sem pagar.)
 - **Zero IDOR.** Toda leitura é escopada pelo JWT. No balcão o escopo é a loja — e o escopo do cliente comum nunca foi afrouxado.
-- **`cost` não existe no modelo público.** Mora só em `model.AdminProduct`. Teste trava isso.
+- **`cost` não existe no modelo público.** Mora só em `model.AdminProduct` (rota `/admin`) e `model.ProductCost` (rota `/store`, do balcão — `store_operator`/`admin`/`service`). Teste trava isso (`TestPublicAPI_NuncaVazaCusto`, `TestBalcao_CustoNuncaRespondeParaClienteOuAnonimo`).
 - **Lock de HS256** em todo ponto de verificação de JWT.
 - **Auditoria append-only** com hash encadeado, garantida por trigger no banco. Contábil com partidas dobradas e soma-zero por constraint.
 
@@ -178,6 +178,7 @@ docs/                # arquitetura, ADRs, APIs, segurança, orçamento
 | Contábil | `docs/ledger-api.md` |
 | Frete | `docs/shipping-api.md` |
 | Dashboard | `docs/admin-dashboard-api.md` |
+| Custo no balcão (PDV) | `docs/store-cost-api.md` |
 | Alice | `docs/alice-conhecimento.md` |
 | Ingestão | `docs/ingestao-de-produtos.md` |
 | Custos / infra | `docs/orcamento-utilar-aws-2026-07.md`, `docs/aws-build-utilar.md` |

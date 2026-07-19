@@ -255,14 +255,13 @@ func (h *OrderHandler) ListPendingApprovals(c *gin.Context) {
 		return
 	}
 
-	out := make([]model.Order, 0, len(ids))
-	for _, id := range ids {
-		o, err := h.loadOrder(id, "")
-		if err != nil {
-			DBError(c, err)
-			return
-		}
-		out = append(out, *o)
+	// Em lote: o laço com loadOrder fazia 4 consultas por pedido, e esta é a
+	// fila que o gerente deixa recarregando (per_page default 50 = 200 idas ao
+	// banco por refresh). Agora são 4, independente do tamanho da fila.
+	out, err := h.loadOrders(ids)
+	if err != nil {
+		DBError(c, err)
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": out})
 }

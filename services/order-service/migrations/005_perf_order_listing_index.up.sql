@@ -1,0 +1,36 @@
+-- "Meus pedidos" (`SELECT id FROM orders WHERE user_id=$1 ORDER BY created_at
+-- DESC LIMIT ...`, order.go List) só tinha idx_orders_user_id, em user_id puro.
+-- Isso resolve o filtro mas NÃO a ordenação: o Postgres ainda precisa ler todos
+-- os pedidos do usuário e ordenar.
+--
+-- Medido em base de 208.000 pedidos. Com a distribuição achatada do seed (~40
+-- pedidos por usuário) o problema não aparece — é preciso um cliente pesado,
+-- que é exatamente o caso que dói: construtora/lojista recomprando.
+--
+--   Usuário com 8.000 pedidos (cliente B2B recorrente), primeira página:
+--     ANTES:  Index Scan em idx_orders_created_at varrendo a tabela inteira
+--             em ordem de data e descartando quem não é o usuário
+--             1,28 ms / 398 buffers
+--     DEPOIS: Index Scan em idx_orders_user_created
+--             0,12 ms /  23 buffers        → 10x mais rápido, 17x menos I/O
+--
+--   Usuário comum (40 pedidos): 21 buffers, sem regressão.
+--
+-- O ganho cresce com o histórico do cliente: o custo do plano ANTES é
+-- proporcional ao TOTAL de pedidos da loja, não aos do usuário. Com 2 milhões
+-- de pedidos a mesma consulta lê ~10x mais páginas; com o índice, continua
+-- lendo ~23.
+--
+-- NOTA: idx_orders_user_id (user_id) vira prefixo estrito deste índice e
+-- passa a ser redundante — todo plano que o usa é atendido por
+-- idx_orders_user_created. NÃO foi removido aqui de propósito: remoção de
+-- índice é decisão do dono. Fica registrado em docs/performance-banco.md.
+--
+-- ⚠️ PRODUÇÃO: CREATE INDEX (não CONCURRENTLY) porque golang-migrate roda a
+-- migration dentro de uma transação. Trava escrita em orders enquanto constrói
+-- (~500 ms em 208k linhas). Para aplicar sem parar a venda, veja o
+-- procedimento manual em services/catalog-service/migrations/013_*.up.sql,
+-- trocando o índice e a versão (5).
+
+CREATE INDEX IF NOT EXISTS idx_orders_user_created
+  ON orders (user_id, created_at DESC);
