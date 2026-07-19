@@ -12,18 +12,20 @@ import { ShieldAlert } from 'lucide-react'
  * URL externa (o hub). Um operador de loja logado seria chutado para fora do
  * próprio PDV. Aquele arquivo é de outro dono, então o balcão traz o seu.
  *
- * TODO(backend): o auth-service não tem papel de operador de loja. O enum é
- * `customer | seller | admin` e `seller` significa *lojista do marketplace*
- * (quem anuncia no site) — reusar `seller` aqui colide semanticamente e daria
- * acesso ao PDV a todo vendedor do marketplace. Precisa de um papel novo, ex.
- * `store_operator`, com vínculo a uma loja física (`store_id`) e um teto de
- * desconto por cargo vindo do backend em vez de hardcoded no front.
+ * Papéis liberados espelham o `RequireRole("store_operator", "admin")` do
+ * auth-service em `/api/v1/store/*`:
  *
- * Enquanto isso: em dev/mock o acesso é liberado (para dar para demonstrar sem
- * backend); com auth real, só `admin` passa — `customer` é barrado.
+ *   store_operator → o vendedor no caixa, com vínculo a uma loja física.
+ *   admin          → entra junto, para suporte.
+ *
+ * `seller` continua FORA e isso é intencional: no auth-service `seller` é o
+ * lojista do marketplace (quem anuncia no site), não o vendedor de balcão.
+ * Liberar `seller` aqui daria o PDV a todo lojista do marketplace.
+ *
+ * Em dev/mock o acesso é liberado, para o PDV ser demonstrável sem backend.
  */
 
-const BALCAO_ROLES_ALLOWED = ['admin'] as const
+const BALCAO_ROLES_ALLOWED = ['store_operator', 'admin'] as const
 
 /** Sem auth-service configurado (modo mock) ou build de dev → libera. */
 function isDevBypass(): boolean {

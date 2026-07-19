@@ -99,6 +99,82 @@ acontecem numa equipe pequena com pressa — abre tudo.
 
 ---
 
+## A3 — LGPD · A trilha de auditoria gravava o IP completo do usuário ✅ CORRIGIDO
+
+**Onde:** `pkg/audit.Record.ActorIP`, alimentado por `c.ClientIP()` nos
+chamadores (`payment-service/internal/handler/ledger.go:300,327`,
+`internal/ledger/period.go:180`).
+
+**O problema.** IP é dado pessoal sob a LGPD — com o horário, o provedor chega
+ao assinante. O dashboard admin mascarava o último octeto na exibição
+(`app/src/lib/adminAdapters.ts:388`), mas isso é mitigação cosmética: o dado
+completo já estava no banco, já tinha cruzado a rede e apareceria em backup,
+em dump e em qualquer `SELECT` ad-hoc. Pior, `audit_log` é **append-only por
+trigger**: gravar o IP completo é irreversível — não existe UPDATE que
+conserte depois.
+
+**O que foi feito.** Mascaramento **na gravação**, em `pkg/audit/ip.go`
+(`MaskIP`), aplicado em `RecordTx` antes do `ComputeHash` e do INSERT. IPv4 →
+prefixo `/24`, IPv6 → `/48`, em notação CIDR. Entrada vazia continua vazia;
+entrada não-parseável vira o sentinela `unparsed` (fail-**closed**, ao
+contrário do resto do pacote — devolver o valor cru seria exatamente o
+vazamento que a função existe para impedir).
+
+**Por que mascarar e não reter com prazo.** A alternativa — IP completo com
+base legal, prazo e expurgo — foi descartada porque o expurgo é
+*estruturalmente impossível* aqui: a tabela não aceita DELETE por trigger e a
+app não tem o GRANT, e é justamente essa propriedade que dá valor à trilha.
+Abrir DELETE para atender retenção destruiria a garantia de integridade. E o
+prefixo preserva a utilidade forense real ("vieram da mesma rede?"), perdendo
+só a capacidade de individualizar o assinante — que é o que a minimização
+(art. 6º, III) pede que não se guarde.
+
+**Cadeia de hash — o cuidado que fez a mudança ser segura.** `ActorIP` entra no
+`canonical()` e portanto no hash. O mascaramento acontece em **um único ponto
+do caminho de escrita**, nunca na leitura: o hash sempre foi e continua sendo
+calculado sobre exatamente o que está na coluna. Registro antigo tem
+`203.0.113.7` gravado e hash calculado sobre `203.0.113.7` → verifica.
+Registro novo tem `203.0.113.0/24` e hash sobre `203.0.113.0/24` → verifica. A
+cadeia fica heterogênea no formato do IP e íntegra mesmo assim.
+
+O erro a nunca cometer está documentado em `ip.go`: aplicar `MaskIP` dentro de
+`canonical()`, no `scanRecords` ou em qualquer caminho de leitura normalizaria
+o valor legado ao recomputar, e **toda a trilha anterior à mudança apareceria
+como adulterada** — falso positivo em massa, que destrói a confiança na única
+ferramenta capaz de detectar adulteração de verdade.
+
+**Testes:** `pkg/audit/ip_test.go` — mascaramento IPv4 e IPv6, IPv4 mapeado em
+v6, formatos de proxy (`host:port`, zona de link-local), fail-closed para lixo,
+registro legado com IP completo continua verificável, cadeia mista
+legado+mascarado verifica inteira, adulterar o prefixo ainda quebra a cadeia
+(o IP não saiu do hash), e um teste que **falha se um IP completo sobreviver
+ao mascaramento**.
+
+**Não corrigido — fora do escopo desta mudança.** O mascaramento vale só para
+`pkg/audit`. Três tabelas de auditoria próprias dos serviços continuam
+gravando `c.ClientIP()` completo, e nenhuma delas tem expurgo:
+
+- `auth_events` — `auth-service/internal/handler/audit.go:52`
+- `store_audit_events` — `auth-service/internal/handler/store.go:601`
+- `balcao_audit_events` — `order-service/internal/handler/balcao.go:394`
+
+Devem reusar `audit.MaskIP`. Registrado como item 3 da prioridade em
+`docs/lgpd-dados-pessoais.md`.
+
+**Dado legado.** As linhas gravadas antes desta mudança carregam IP completo e,
+sendo append-only, **não podem ser corrigidas**. `audit.IsFullIP` serve para
+medir o volume num dump. A única remediação real é o fim de vida da tabela.
+
+**Varredura de dado pessoal.** Feita junto com esta correção e registrada em
+`docs/lgpd-dados-pessoais.md`: mapa completo de onde mora cada dado pessoal,
+base legal proposta, retenção e o que falta para atender o art. 18. O achado
+mais grave que ela levantou não é o IP — é que **não existe política de
+retenção nem expurgo para nenhuma tabela de dado pessoal** exceto tokens
+vencidos, e que `webhook_events.raw_payload` guarda o payload do PSP íntegro
+(nome, CPF, e-mail e telefone do pagador) indefinidamente.
+
+---
+
 ## O que foi verificado e está correto
 
 Registrado porque auditoria que só lista problema não ajuda a priorizar:
@@ -145,6 +221,9 @@ balcão.
 | 1 | A2 — impedir `DEV_MODE` em produção | ~2 h | antes do primeiro deploy |
 | 2 | A1 (mitigação) — segredo separado para serviço | ~4 h | antes do primeiro deploy |
 | 3 | A1 (definitivo) — assinatura assimétrica | ~16 h | antes de escalar a equipe |
+| — | A3 — mascarar IP na trilha | ~3 h | ✅ feito |
+| 4 | A3 (resto) — mascarar IP nas 3 tabelas de auditoria dos serviços | ~2 h | antes do primeiro deploy |
+| 5 | Retenção/expurgo de dado pessoal + redação do `raw_payload` | ~2 d | antes do primeiro deploy |
 
 Os dois primeiros somam menos de um dia e removem os dois caminhos de
 comprometimento total que existem hoje.

@@ -32,6 +32,12 @@ export interface NegotiationBlockProps {
   pricing: BalcaoPricing
   onDiscountChange: (pct: number) => void
   disabled?: boolean
+  /**
+   * O teto exibido veio mesmo de `GET /api/v1/store/me`? Quando `false` o
+   * número é fallback de demonstração ou fail-closed, e dizer isso evita que o
+   * vendedor negocie contra um limite que a loja não reconhece.
+   */
+  ceilingFromBackend?: boolean
 }
 
 /**

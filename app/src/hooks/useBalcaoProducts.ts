@@ -38,13 +38,32 @@ export function deriveBarcode(product: Product): string {
 }
 
 /**
- * TODO(backend): `Product` não tem `cost`. A barra de margem é o coração do
- * bloco de negociação e hoje ela opera sobre um custo ESTIMADO
- * (preço × {@link ASSUMED_COST_RATIO}). Até o catalog-service expor custo real
- * (idealmente custo médio por seller), os números de margem são ilustrativos.
+ * Custo unitário para a barra de margem.
+ *
+ * O catálogo AGORA tem `cost`, mas só na rota de admin
+ * (`GET /api/v1/admin/products/by-id/:id`, atrás de `RequireAdmin` no
+ * catalog-service). O operador de balcão é `store_operator`, não admin — logo o
+ * custo real NÃO chega até aqui, e forjar permissão de admin no PDV para buscá-lo
+ * seria trocar uma barra de margem imprecisa por um furo de autorização.
+ *
+ * Então: se o produto vier com `cost` (rota pública que passe a expor, ou um
+ * chamador com permissão), usa o real. Senão, estima por
+ * preço × {@link ASSUMED_COST_RATIO} e marca `estimated: true` — e a UI é
+ * obrigada a dizer isso ao vendedor. Margem apresentada como fato quando é chute
+ * faz o vendedor conceder desconto que a loja não banca.
+ *
+ * FALTA NO BACKEND: uma rota de custo autorizada para `store_operator`, ex.
+ * `GET /api/v1/store/products/by-id/:id/cost` ou o campo `cost` no produto
+ * quando quem pede é operador de loja.
  */
-export function deriveUnitCost(product: Product): number {
-  return round2(product.price * ASSUMED_COST_RATIO)
+export function deriveUnitCost(product: Product): { unitCost: number; estimated: boolean } {
+  // `Product` não declara `cost`; a leitura é defensiva justamente para o dia em
+  // que o catálogo passar a mandá-lo sem precisar de mudança aqui.
+  const real = (product as Product & { cost?: number }).cost
+  if (typeof real === 'number' && Number.isFinite(real) && real > 0) {
+    return { unitCost: round2(real), estimated: false }
+  }
+  return { unitCost: round2(product.price * ASSUMED_COST_RATIO), estimated: true }
 }
 
 const UNIT_BY_CATEGORY: Record<string, string> = {
@@ -62,6 +81,7 @@ export function deriveUnit(product: Product): string {
 
 /** Converte um `Product` do catálogo em item pronto para a comanda. */
 export function toBalcaoItem(product: Product, quantity = 1): NewBalcaoItem {
+  const { unitCost, estimated } = deriveUnitCost(product)
   return {
     productId: product.id,
     sku: deriveSku(product),
@@ -70,7 +90,8 @@ export function toBalcaoItem(product: Product, quantity = 1): NewBalcaoItem {
     icon: product.icon,
     unit: deriveUnit(product),
     unitPrice: product.price,
-    unitCost: deriveUnitCost(product),
+    unitCost,
+    costIsEstimated: estimated,
     quantity,
     stock: product.stock,
   }

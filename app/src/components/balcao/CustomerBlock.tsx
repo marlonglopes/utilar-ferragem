@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { UserPlus, UserCheck, X, Search } from 'lucide-react'
+import { UserPlus, UserCheck, X, Search, ArrowLeft } from 'lucide-react'
 import { Modal, Button, Input, Select } from '@/components/ui'
 import { formatCPF, formatCNPJ, formatPhone } from '@/lib/format'
+import { useBalcaoCustomers } from '@/hooks/useBalcaoCustomers'
 import { isCNPJ, type BalcaoCustomer, type CustomerSegment } from '@/store/balcaoStore'
 
 const SEGMENT_LABEL: Record<CustomerSegment, string> = {
@@ -20,33 +21,80 @@ export interface CustomerBlockProps {
 }
 
 /**
- * Identificação do cliente no balcão.
+ * Identificação do cliente no balcão — ligada em `/api/v1/store/customers`.
  *
- * TODO(backend): não existe busca de cliente por documento. O auth-service tem
- * `POST /auth/register` e `GET /auth/me`, mas nada como
- * `GET /api/v1/customers?document=`. Por isso o "Buscar" abre direto o cadastro
- * rápido pré-preenchido em vez de consultar a base — e o cliente cadastrado aqui
- * vive só na comanda (não vira usuário). Precisa de lookup por CPF/CNPJ + um
- * cadastro leve de cliente de balcão (sem senha/e-mail obrigatórios).
+ * O fluxo tem dois passos e a ordem importa: BUSCA primeiro, cadastro só se não
+ * achar. Antes o botão "Buscar" abria direto o cadastro, o que fazia o vendedor
+ * redigitar um cliente que já existia na base a cada visita — e criava um
+ * cliente que vivia só na comanda.
+ *
+ * 404 não é erro: o contrato do backend é "um ou nenhum", e "nenhum" é o
+ * caminho normal para abrir o cadastro rápido já com o documento preenchido.
  */
 export function CustomerBlock({ customer, onChange }: CustomerBlockProps) {
+  const { lookup, create, searching, saving } = useBalcaoCustomers()
+
   const [open, setOpen] = useState(false)
+  const [step, setStep] = useState<'search' | 'form'>('search')
   const [doc, setDoc] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [segment, setSegment] = useState<CustomerSegment>('varejo')
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
-  function openQuickAdd() {
+  function openSearch() {
+    setStep('search')
+    setDoc(customer ? maskDocument(customer.document) : '')
+    setError('')
+    setNotice('')
+    setOpen(true)
+  }
+
+  /** Editar um cliente já identificado pula a busca: o documento já é conhecido. */
+  function openEdit() {
+    setStep('form')
     setDoc(customer ? maskDocument(customer.document) : '')
     setName(customer?.name ?? '')
     setPhone(customer ? formatPhone(customer.phone) : '')
     setSegment(customer?.segment ?? 'varejo')
     setError('')
+    setNotice('')
     setOpen(true)
   }
 
-  function save() {
+  async function search() {
+    const digits = doc.replace(/\D/g, '')
+    if (digits.length !== 11 && digits.length !== 14) {
+      return setError('CPF (11 dígitos) ou CNPJ (14 dígitos).')
+    }
+    setError('')
+    setNotice('')
+    try {
+      const result = await lookup(digits)
+      if (result.found) {
+        onChange(result.customer)
+        setOpen(false)
+        return
+      }
+      // Não achou → cadastro rápido, já com o documento digitado.
+      setName('')
+      setPhone('')
+      setSegment('varejo')
+      setNotice('Cliente não encontrado. Faça o cadastro rápido abaixo.')
+      setStep('form')
+    } catch (err) {
+      setError(
+        err instanceof Error && /failed to fetch|networkerror|load failed/i.test(err.message)
+          ? 'Sem conexão para consultar. Cadastre manualmente ou tente de novo.'
+          : err instanceof Error
+            ? err.message
+            : 'Não foi possível consultar o cliente.'
+      )
+    }
+  }
+
+  async function save() {
     const digitsDoc = doc.replace(/\D/g, '')
     const digitsPhone = phone.replace(/\D/g, '')
     if (!name.trim()) return setError('Informe o nome do cliente.')
@@ -56,8 +104,23 @@ export function CustomerBlock({ customer, onChange }: CustomerBlockProps) {
     // Obrigatório: a Appmax recusa a cobrança sem celular do pagador.
     if (digitsPhone.length < 10) return setError('Telefone é obrigatório para cobrar (Appmax).')
 
-    onChange({ name: name.trim(), document: digitsDoc, phone: digitsPhone, segment })
-    setOpen(false)
+    setError('')
+    try {
+      const created = await create({
+        document: digitsDoc,
+        name: name.trim(),
+        phone: digitsPhone,
+        segment,
+      })
+      onChange(created)
+      setOpen(false)
+    } catch (err) {
+      // Falhar o cadastro não pode travar a venda: o pedido de balcão aceita o
+      // snapshot do cliente sem `customerId`. Registra local e segue.
+      onChange({ name: name.trim(), document: digitsDoc, phone: digitsPhone, segment })
+      setOpen(false)
+      void err
+    }
   }
 
   return (
@@ -80,7 +143,7 @@ export function CustomerBlock({ customer, onChange }: CustomerBlockProps) {
           <div className="flex shrink-0 gap-1">
             <button
               type="button"
-              onClick={openQuickAdd}
+              onClick={openEdit}
               aria-label="Editar cliente"
               className="flex h-12 w-12 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
             >
@@ -99,7 +162,7 @@ export function CustomerBlock({ customer, onChange }: CustomerBlockProps) {
       ) : (
         <button
           type="button"
-          onClick={openQuickAdd}
+          onClick={openSearch}
           className="flex min-h-[56px] w-full items-center gap-3 rounded-lg border border-dashed border-gray-300 px-3 text-left hover:border-brand-orange hover:bg-orange-50"
         >
           <Search className="h-5 w-5 shrink-0 text-gray-400" aria-hidden="true" />
@@ -110,43 +173,88 @@ export function CustomerBlock({ customer, onChange }: CustomerBlockProps) {
         </button>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Cliente" size="sm">
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={step === 'search' ? 'Buscar cliente' : 'Cadastro rápido'}
+        size="sm"
+      >
         <div className="flex flex-col gap-3">
           <Input
             label="CPF / CNPJ"
             value={doc}
             inputMode="numeric"
             autoFocus
+            readOnly={step === 'form'}
             onChange={(e) => setDoc(maskDocument(e.target.value))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && step === 'search') void search()
+            }}
             placeholder="000.000.000-00"
             className="h-12 text-base"
           />
-          <Input
-            label="Nome"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nome do cliente"
-            className="h-12 text-base"
-          />
-          <Input
-            label="Telefone"
-            value={phone}
-            inputMode="tel"
-            onChange={(e) => setPhone(formatPhone(e.target.value))}
-            placeholder="(11) 99999-0000"
-            hint="Obrigatório — a operadora exige o celular do pagador."
-            className="h-12 text-base"
-          />
-          <Select
-            label="Segmento"
-            value={segment}
-            onChange={(e) => setSegment(e.target.value as CustomerSegment)}
-            options={(Object.keys(SEGMENT_LABEL) as CustomerSegment[]).map((s) => ({
-              value: s,
-              label: SEGMENT_LABEL[s],
-            }))}
-            className="h-12 text-base"
-          />
+
+          {step === 'search' && (
+            <>
+              <Button
+                size="lg"
+                fullWidth
+                loading={searching}
+                onClick={() => void search()}
+                className="h-12"
+              >
+                <Search className="mr-2 h-5 w-5" aria-hidden="true" />
+                Buscar
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setNotice('')
+                  setError('')
+                  setStep('form')
+                }}
+                className="flex h-12 items-center justify-center rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-100"
+              >
+                Cadastrar sem buscar
+              </button>
+            </>
+          )}
+
+          {step === 'form' && (
+            <>
+              {notice && (
+                <p role="status" className="text-sm font-semibold text-amber-700">
+                  {notice}
+                </p>
+              )}
+              <Input
+                label="Nome"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nome do cliente"
+                className="h-12 text-base"
+              />
+              <Input
+                label="Telefone"
+                value={phone}
+                inputMode="tel"
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
+                placeholder="(11) 99999-0000"
+                hint="Obrigatório — a operadora exige o celular do pagador."
+                className="h-12 text-base"
+              />
+              <Select
+                label="Segmento"
+                value={segment}
+                onChange={(e) => setSegment(e.target.value as CustomerSegment)}
+                options={(Object.keys(SEGMENT_LABEL) as CustomerSegment[]).map((s) => ({
+                  value: s,
+                  label: SEGMENT_LABEL[s],
+                }))}
+                className="h-12 text-base"
+              />
+            </>
+          )}
 
           {error && (
             <p role="alert" className="text-sm font-semibold text-red-600">
@@ -154,9 +262,31 @@ export function CustomerBlock({ customer, onChange }: CustomerBlockProps) {
             </p>
           )}
 
-          <Button size="lg" fullWidth onClick={save} className="mt-1">
-            Salvar cliente
-          </Button>
+          {step === 'form' && (
+            <>
+              <Button
+                size="lg"
+                fullWidth
+                loading={saving}
+                onClick={() => void save()}
+                className="mt-1 h-12"
+              >
+                Salvar cliente
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setNotice('')
+                  setError('')
+                  setStep('search')
+                }}
+                className="flex h-12 items-center justify-center gap-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                Voltar para a busca
+              </button>
+            </>
+          )}
         </div>
       </Modal>
     </div>
