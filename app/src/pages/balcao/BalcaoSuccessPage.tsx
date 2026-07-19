@@ -10,6 +10,10 @@ interface SaleSummary {
   method?: string
   total?: number
   requiresApproval?: boolean
+  /** `not_required | pending | approved | rejected` — resposta do order-service. */
+  approvalStatus?: string
+  discountPct?: number
+  discountAmount?: number
   customerName?: string
   nsu?: string
 }
@@ -73,16 +77,33 @@ export default function BalcaoSuccessPage() {
             )}
           </dl>
 
+          {/*
+            A palavra final é do servidor (`approvalStatus`), não do cálculo
+            local: o teto pode ter mudado no banco entre o login e a venda, e
+            avisar "aprovado" um pedido que o backend segurou faria o vendedor
+            entregar mercadoria de uma venda que ainda não valeu.
+          */}
           {sale.requiresApproval && (
             <div
               role="alert"
               className="mt-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-left"
             >
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
-              <p className="text-sm text-amber-900">
-                Desconto acima do seu teto — o pedido ficou{' '}
-                <strong>pendente de aprovação do gerente</strong>.
-              </p>
+              <div className="text-sm text-amber-900">
+                <p>
+                  Desconto acima do seu teto — o pedido ficou{' '}
+                  <strong>pendente de aprovação do gerente</strong>.
+                </p>
+                {sale.discountAmount != null && sale.discountPct != null && (
+                  <p className="mt-1 text-xs">
+                    Desconto registrado: {sale.discountPct.toFixed(1).replace('.', ',')}% (
+                    {formatCurrency(sale.discountAmount)}).
+                  </p>
+                )}
+                <p className="mt-1 text-xs font-semibold">
+                  Só libere a mercadoria após a homologação.
+                </p>
+              </div>
             </div>
           )}
 

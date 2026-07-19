@@ -4,7 +4,12 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import BalcaoPage from '@/pages/balcao/BalcaoPage'
-import { createComanda, useBalcaoStore, selectActiveComanda } from '@/store/balcaoStore'
+import {
+  createComanda,
+  useBalcaoStore,
+  selectActiveComanda,
+  MOCK_OPERATOR,
+} from '@/store/balcaoStore'
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -19,7 +24,12 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 beforeEach(() => {
   const fresh = createComanda('Comanda 1')
-  useBalcaoStore.setState({ comandas: [fresh], activeId: fresh.id, role: 'operator' })
+  useBalcaoStore.setState({
+    comandas: [fresh],
+    activeId: fresh.id,
+    // Teto de 12% como `GET /api/v1/store/me` entregaria para um operador.
+    operator: { ...MOCK_OPERATOR, fromBackend: true },
+  })
 })
 
 describe('BalcaoPage', () => {
@@ -69,6 +79,7 @@ describe('BalcaoPage', () => {
       unit: 'un',
       unitPrice: 100,
       unitCost: 60,
+      costIsEstimated: false,
       quantity: 1,
       stock: 5,
     })

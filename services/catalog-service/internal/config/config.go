@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/utilar/pkg/devguard"
+	"github.com/utilar/pkg/servicetoken"
 )
 
 type Config struct {
@@ -19,6 +20,16 @@ type Config struct {
 	// fallback X-User-Id/X-User-Role pra dev sem auth-service.
 	JWTSecret string
 	DevMode   bool
+
+	// ServiceJWTSecret valida os tokens `role=service` das rotas
+	// /api/v1/internal (reserva de estoque), emitidos pelo order-service.
+	//
+	// A1 (auditoria 2026-07-18): é DELIBERADAMENTE distinto do JWTSecret. Com um
+	// segredo só, qualquer processo que o tivesse — inclusive o
+	// assistant-service, que é público e recebe texto livre de visitante — podia
+	// assinar `role=service` ou `role=admin` e reescrever o catálogo. Ver
+	// pkg/servicetoken.
+	ServiceJWTSecret string
 }
 
 // #nosec G101 — placeholder dev-only, rejeitado em prod via fail-closed em Load().
@@ -56,13 +67,22 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	// A1 (auditoria 2026-07-18): fail-closed. Fora de DEV_MODE, sem
+	// SERVICE_JWT_SECRET o serviço não sobe — subir aceitando role=service
+	// assinado com o segredo de usuário seria pior que ficar indisponível.
+	serviceSecret, err := servicetoken.SecretFromEnv(devMode, jwt)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
-		Port:           env("PORT", "8091"),
-		DatabaseURL:    env("CATALOG_DB_URL", "postgres://utilar:utilar@localhost:5436/catalog_service?sslmode=disable"),
-		AllowedOrigins: parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
-		RedisURL:       os.Getenv("REDIS_URL"),
-		JWTSecret:      jwt,
-		DevMode:        devMode,
+		Port:             env("PORT", "8091"),
+		DatabaseURL:      env("CATALOG_DB_URL", "postgres://utilar:utilar@localhost:5436/catalog_service?sslmode=disable"),
+		AllowedOrigins:   parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
+		RedisURL:         os.Getenv("REDIS_URL"),
+		JWTSecret:        jwt,
+		DevMode:          devMode,
+		ServiceJWTSecret: serviceSecret,
 	}, nil
 }
 

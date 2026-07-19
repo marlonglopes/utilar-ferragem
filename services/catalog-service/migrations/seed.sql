@@ -10,6 +10,10 @@
 
 BEGIN;
 
+-- CASCADE derruba junto product_price_tiers, product_attributes,
+-- product_price_history e category_attributes (todos com FK para
+-- products/categories). `category_attributes` é recriada abaixo porque o seed
+-- precisa ser reprodutível sozinho, sem depender de reaplicar a migration 008.
 TRUNCATE TABLE product_images, products, sellers, categories RESTART IDENTITY CASCADE;
 
 -- ---------------------------------------------------------------------------
@@ -147,6 +151,188 @@ SELECT p.id,
        p.name || ' — detalhe',
        1
 FROM products p;
+
+-- ---------------------------------------------------------------------------
+-- 6) Domínio de ferragem (migration 005): custo, unidade, código de barras,
+--    peso e fiscal.
+-- ---------------------------------------------------------------------------
+-- PORQUÊ um UPDATE em vez de 14 colunas a mais em cada INSERT acima: as linhas
+-- de produto já são largas demais pra revisar, e a regra "qual unidade cada
+-- categoria usa" fica legível como regra, não diluída em 111 literais.
+--
+-- Custo: margem plausível de ferragem — 28% em ferramenta de marca (giro
+-- lento, preço tabelado), 18% em material básico (cimento, areia: commodity
+-- de giro alto e margem apertada), 35% em elétrica/fixação (item pequeno,
+-- margem maior).
+UPDATE products SET
+    cost = round(price * CASE category_id
+                            WHEN 'construcao'  THEN 0.82   -- commodity, margem apertada
+                            WHEN 'ferramentas' THEN 0.72
+                            WHEN 'eletrica'    THEN 0.65
+                            WHEN 'fixacao'     THEN 0.65
+                            WHEN 'hidraulica'  THEN 0.70
+                            WHEN 'pintura'     THEN 0.74
+                            ELSE 0.70
+                         END, 2),
+    unit_of_measure = 'un',
+    qty_step = 1,
+    -- EAN-13 sintético e estável (derivado do slug) só pra exercitar a leitura
+    -- de scanner no balcão. NÃO são códigos reais de fabricante.
+    barcode = '789' || lpad((abs(hashtext(slug)) % 10000000000)::text, 10, '0'),
+    ncm = '00000000',
+    cfop = '5102',
+    origem = 0,
+    supplier_id = 'fornecedor-padrao',
+    supplier_sku = 'F-' || upper(substr(md5(slug), 1, 8)),
+    weight_kg = 1.0
+WHERE cost IS NULL;
+
+-- Unidade real por produto. É aqui que a loja deixa de ser marketplace
+-- genérico: saco, barra, metro e metro cúbico são o vocabulário do balcão.
+UPDATE products SET unit_of_measure = 'sc',  qty_step = 1,    weight_kg = 50.000, length_cm = 60, width_cm = 40, height_cm = 12, ncm = '25232990'
+    WHERE slug = 'cimento-votoran-50kg';
+UPDATE products SET unit_of_measure = 'sc',  qty_step = 1,    weight_kg = 20.000, ncm = '38245000'
+    WHERE slug = 'argamassa-quartzolit-20kg';
+UPDATE products SET unit_of_measure = 'cto', qty_step = 1,    weight_kg = 250.000, ncm = '69041000'
+    WHERE slug = 'tijolo-ceramico-9-furos';
+UPDATE products SET unit_of_measure = 'rl',  qty_step = 1,    weight_kg = 14.000, ncm = '73143100'
+    WHERE slug = 'tela-soldada-galvanizada';
+UPDATE products SET unit_of_measure = 'rl',  qty_step = 1,    weight_kg = 9.500,  ncm = '85444900'
+    WHERE slug = 'cabo-flexivel-2-5mm-100m';
+UPDATE products SET unit_of_measure = 'l',   qty_step = 1,    weight_kg = 24.000, ncm = '32091010'
+    WHERE slug = 'tinta-suvinil-fosco-18l';
+UPDATE products SET unit_of_measure = 'sc',  qty_step = 1,    weight_kg = 25.000, ncm = '32141000'
+    WHERE slug = 'massa-corrida-pva-25kg-suvinil';
+UPDATE products SET unit_of_measure = 'kg',  qty_step = 0.5,  weight_kg = 1.000,  ncm = '73170090'
+    WHERE slug = 'prego-com-cabeca-17x27-1kg';
+UPDATE products SET unit_of_measure = 'par', qty_step = 1,    weight_kg = 0.150
+    WHERE slug = 'luva-seguranca-vaqueta-m';
+UPDATE products SET unit_of_measure = 'un',  qty_step = 1,    weight_kg = 45.000, ncm = '39251000'
+    WHERE slug = 'caixa-dagua-500l-fortlev';
+
+-- Peso real das ferramentas (vinha só como texto dentro de `specs`).
+UPDATE products SET weight_kg = 1.700 WHERE slug = 'furadeira-bosch-gsb-13-re';
+UPDATE products SET weight_kg = 1.000 WHERE slug = 'parafusadeira-makita-df333';
+UPDATE products SET weight_kg = 1.900 WHERE slug = 'furadeira-bosch-gsb-16-re';
+UPDATE products SET weight_kg = 2.700 WHERE slug = 'martelete-bosch-gbh-2-24';
+UPDATE products SET weight_kg = 1.600 WHERE slug = 'esmerilhadeira-bosch-gws-700';
+UPDATE products SET weight_kg = 5.800 WHERE slug = 'rompedor-bosch-gsh-5-ce';
+
+-- ---------------------------------------------------------------------------
+-- 7) Itens de venda FRACIONADA — a razão de `stock` ter virado NUMERIC
+-- ---------------------------------------------------------------------------
+-- Sem estes o catálogo inteiro é venda por unidade e a mudança de tipo parece
+-- gratuita. Areia sai por m³ com passo de 0,5; cabo e vergalhão por metro.
+INSERT INTO products (sku, slug, name, category_id, seller_id, price, cost, icon, brand, stock,
+                      unit_of_measure, qty_step, weight_kg, ncm, cfop, origem, rating, review_count,
+                      description, specs, status)
+VALUES
+    ('AREIA-M3', 'areia-media-lavada-m3', 'Areia Média Lavada (m³)', 'construcao', 'material-braz',
+     129.00, 98.00, '◫', NULL, 42.500, 'm3', 0.5, 1500.000, '25051000', '5102', 0, 4, 23,
+     'Areia média lavada para concreto e assentamento. Venda mínima de 0,5 m³, entrega por caçamba.',
+     '{"Tipo":"Média lavada","Aplicação":"Concreto e assentamento"}'::jsonb, 'published'),
+
+    ('BRITA1-M3', 'brita-1-m3', 'Brita nº 1 (m³)', 'construcao', 'material-braz',
+     139.00, 106.00, '◫', NULL, 28.000, 'm3', 0.5, 1600.000, '25171000', '5102', 0, 4, 17,
+     'Brita nº 1 granítica para concreto estrutural. Venda mínima de 0,5 m³.',
+     '{"Tipo":"Granítica nº 1","Aplicação":"Concreto estrutural"}'::jsonb, 'published'),
+
+    ('VERG-10-BR', 'vergalhao-ca50-10mm-barra', 'Vergalhão CA-50 10mm Barra 12m Gerdau', 'construcao', 'material-braz',
+     68.90, 56.50, '◫', 'Gerdau', 320.000, 'br', 1, 7.400, '72142000', '5102', 0, 5, 41,
+     'Vergalhão nervurado CA-50 bitola 10mm, barra de 12 metros. Aço Gerdau.',
+     '{"Bitola":"10 mm","Comprimento":"12 m","Tipo":"CA-50"}'::jsonb, 'published'),
+
+    ('CABO-25-M', 'cabo-flexivel-2-5mm-metro', 'Cabo Flexível 2,5mm² Azul (por metro)', 'eletrica', 'eletrica-costa',
+     2.90, 1.95, '⚡', 'Sil', 847.500, 'm', 0.5, 0.024, '85444900', '5102', 0, 5, 96,
+     'Cabo flexível 2,5mm² 750V, cortado na medida. Venda a partir de 0,5 m.',
+     '{"Seção":"2,5 mm²","Cor":"Azul","Norma":"NBR NM 247-3"}'::jsonb, 'published');
+
+-- ---------------------------------------------------------------------------
+-- 8) Faixas de atacado (migration 006) — o cliente profissional
+-- ---------------------------------------------------------------------------
+-- Modelo "a partir de N": é como o balcão negocia ("de 10 pra cima sai por X").
+INSERT INTO product_price_tiers (product_id, min_qty, price)
+SELECT p.id, t.min_qty, t.price
+FROM (VALUES
+    ('cimento-votoran-50kg',          10.0,  39.90),  -- 10 sacos
+    ('cimento-votoran-50kg',          50.0,  36.90),  -- palete
+    ('argamassa-quartzolit-20kg',     20.0,  26.50),
+    ('tijolo-ceramico-9-furos',        5.0,  82.00),  -- 5 centos
+    ('vergalhao-ca50-10mm-barra',     10.0,  64.90),
+    ('vergalhao-ca50-10mm-barra',     50.0,  61.50),
+    ('cabo-flexivel-2-5mm-metro',    100.0,   2.45),  -- rolo fechado sai mais barato
+    ('areia-media-lavada-m3',          5.0, 118.00),
+    ('prego-com-cabeca-17x27-1kg',    10.0,   8.90),
+    ('bucha-nylon-s8-kit-100',        10.0,  19.90),
+    ('fita-veda-rosca-18x50m',        24.0,   6.20),  -- caixa fechada
+    ('tomada-tramontina-liz-10a',     20.0,  10.90)
+) AS t(slug, min_qty, price)
+JOIN products p ON p.slug = t.slug;
+
+-- ---------------------------------------------------------------------------
+-- 9) Registry de atributos por categoria (migration 008) + backfill
+-- ---------------------------------------------------------------------------
+-- Recriado aqui porque o TRUNCATE ... CASCADE acima apaga category_attributes
+-- (FK para categories). Sem isto, `make catalog-db-seed` deixaria o catálogo
+-- sem facetas técnicas até alguém reaplicar a migration.
+INSERT INTO category_attributes (category_id, key, label, data_type, unit, filterable, sort_order, spec_key) VALUES
+    ('ferramentas', 'potencia_w',    'Potência',    'number', 'W',   true,  1, 'Potência'),
+    ('ferramentas', 'tensao',        'Tensão',      'text',   NULL,  true,  2, 'Tensão'),
+    ('ferramentas', 'mandril_mm',    'Mandril',     'number', 'mm',  true,  3, 'Mandril'),
+    ('ferramentas', 'peso_kg',       'Peso',        'number', 'kg',  true,  4, 'Peso'),
+    ('ferramentas', 'garantia',      'Garantia',    'text',   NULL,  false, 5, 'Garantia'),
+    ('eletrica',    'secao_mm2',     'Seção',       'number', 'mm²', true,  1, 'Seção'),
+    ('eletrica',    'tensao',        'Tensão',      'text',   NULL,  true,  2, 'Tensão'),
+    ('eletrica',    'comprimento_m', 'Comprimento', 'number', 'm',   true,  3, 'Comprimento'),
+    ('eletrica',    'cor',           'Cor',         'text',   NULL,  true,  4, 'Cor'),
+    ('construcao',  'peso_kg',       'Peso',        'number', 'kg',  true,  1, 'Peso'),
+    ('construcao',  'tipo',          'Tipo',        'text',   NULL,  true,  2, 'Tipo'),
+    ('construcao',  'bitola_mm',     'Bitola',      'number', 'mm',  true,  3, 'Bitola'),
+    ('construcao',  'aplicacao',     'Aplicação',   'text',   NULL,  false, 4, 'Aplicação'),
+    ('pintura',     'volume_l',      'Volume',      'number', 'L',   true,  1, 'Volume'),
+    ('pintura',     'acabamento',    'Acabamento',  'text',   NULL,  true,  2, 'Acabamento'),
+    ('pintura',     'tipo',          'Tipo',        'text',   NULL,  true,  3, 'Tipo'),
+    ('hidraulica',  'diametro_mm',   'Diâmetro',    'number', 'mm',  true,  1, 'Diâmetro'),
+    ('hidraulica',  'material',      'Material',    'text',   NULL,  true,  2, 'Material'),
+    ('fixacao',     'bitola_mm',     'Bitola',      'number', 'mm',  true,  1, 'Bitola'),
+    ('fixacao',     'comprimento_mm','Comprimento', 'number', 'mm',  true,  2, 'Comprimento'),
+    ('fixacao',     'material',      'Material',    'text',   NULL,  true,  3, 'Material'),
+    ('seguranca',   'ca',            'CA',          'text',   NULL,  true,  1, 'CA'),
+    ('seguranca',   'classe',        'Classe',      'text',   NULL,  true,  2, 'Classe'),
+    ('seguranca',   'material',      'Material',    'text',   NULL,  true,  3, 'Material'),
+    ('jardim',      'peso_kg',       'Peso',        'number', 'kg',  true,  1, 'Peso'),
+    ('jardim',      'material',      'Material',    'text',   NULL,  true,  2, 'Material')
+ON CONFLICT (category_id, key) DO NOTHING;
+
+-- Backfill dos valores tipados a partir de `specs` (mesma lógica da 008).
+INSERT INTO product_attributes (product_id, key, value_num, value_text)
+SELECT p.id,
+       ca.key,
+       CASE WHEN ca.data_type = 'number' THEN catalog_num_from_spec(p.specs->>ca.spec_key) END,
+       CASE WHEN ca.data_type = 'text'   THEN nullif(btrim(p.specs->>ca.spec_key), '') END
+FROM products p
+JOIN category_attributes ca ON ca.category_id = p.category_id AND ca.spec_key IS NOT NULL
+WHERE p.specs ? ca.spec_key
+  AND CASE
+        WHEN ca.data_type = 'number' THEN catalog_num_from_spec(p.specs->>ca.spec_key) IS NOT NULL
+        WHEN ca.data_type = 'text'   THEN nullif(btrim(p.specs->>ca.spec_key), '') IS NOT NULL
+        ELSE false
+      END
+ON CONFLICT (product_id, key) DO NOTHING;
+
+-- O peso já está tipado na coluna `weight_kg`; espelhar no atributo mantém a
+-- faceta "peso" funcionando pra quem não tem a grandeza dentro de `specs`.
+INSERT INTO product_attributes (product_id, key, value_num)
+SELECT p.id, 'peso_kg', p.weight_kg
+FROM products p
+JOIN category_attributes ca ON ca.category_id = p.category_id AND ca.key = 'peso_kg'
+WHERE p.weight_kg IS NOT NULL
+ON CONFLICT (product_id, key) DO NOTHING;
+
+-- Preço inicial no histórico: sem linha de partida, a primeira alteração
+-- aparece como "veio do nada" na auditoria.
+INSERT INTO product_price_history (product_id, price, cost, source)
+SELECT id, price, cost, 'seed' FROM products;
 
 COMMIT;
 

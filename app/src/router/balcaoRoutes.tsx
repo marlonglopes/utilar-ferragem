@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router-dom'
 import { BalcaoRoute } from '@/components/balcao/BalcaoRoute'
 import BalcaoPage from '@/pages/balcao/BalcaoPage'
 import BalcaoSuccessPage from '@/pages/balcao/BalcaoSuccessPage'
+import BalcaoApprovalsPage from '@/pages/balcao/BalcaoApprovalsPage'
 
 /**
  * Rotas do PDV de balcão, prontas para serem espalhadas no router raiz.
@@ -30,6 +31,17 @@ export const balcaoRoutes: RouteObject[] = [
     element: (
       <BalcaoRoute>
         <BalcaoPage />
+      </BalcaoRoute>
+    ),
+  },
+  {
+    // Fila do gerente. O guard é o mesmo do PDV (papel de operador); o poder de
+    // HOMOLOGAR é checado dentro da página, contra `canApproveDiscount` do
+    // vínculo — cargo não é papel, e só o backend sabe o cargo.
+    path: '/balcao/aprovacoes',
+    element: (
+      <BalcaoRoute>
+        <BalcaoApprovalsPage />
       </BalcaoRoute>
     ),
   },

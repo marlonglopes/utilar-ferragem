@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -216,6 +217,86 @@ func (h *ImportHandler) ListProfiles(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": out, "fields": ingest.KnownFields()})
 }
 
+// SuggestColumns — POST /api/v1/admin/import/suggest
+//
+// Passo 2 do fluxo do desenho ("Mapear colunas"): recebe a planilha, detecta o
+// cabeçalho e devolve o palpite de de/para COM grau de confiança, para a tela
+// destacar o que precisa de conferência humana.
+//
+// NÃO cria perfil e NÃO importa nada. O perfil nasce do que o humano CONFIRMA
+// na tela — sugerir não é decidir, e mapear preço na coluna errada é o desastre
+// nº 1 da ingestão.
+func (h *ImportHandler) SuggestColumns(c *gin.Context) {
+	filename, data, err := readUpload(c)
+	if err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+
+	sheet := firstNonEmpty(c.Query("sheet"), c.PostForm("sheet"))
+	headerRow := 0
+	if v := firstNonEmpty(c.Query("headerRow"), c.PostForm("headerRow")); v != "" {
+		headerRow, _ = strconv.Atoi(v)
+	}
+
+	table, err := ingest.Read(filename, data, sheet, headerRow)
+	if err != nil {
+		BadRequest(c, fmt.Sprintf("não foi possível ler o arquivo: %v", err))
+		return
+	}
+
+	suggestions := ingest.SuggestColumns(table.Header)
+
+	// Amostra das primeiras linhas: o operador confirma o mapeamento olhando o
+	// DADO, não só o nome da coluna. "VALOR" vira preço ou custo dependendo do
+	// que tem embaixo, e essa distinção não está no cabeçalho.
+	sample := []map[string]string{}
+	for i := 0; i < len(table.Rows) && i < 5; i++ {
+		row := map[string]string{}
+		for j, hdr := range table.Header {
+			if j < len(table.Rows[i]) {
+				row[hdr] = table.Rows[i][j]
+			}
+		}
+		sample = append(sample, row)
+	}
+
+	// Colunas não reconhecidas são REPORTADAS, não rejeitadas: ficam sem mapear
+	// e são ignoradas na importação. Fornecedor sempre manda coluna interna, e
+	// reprovar o arquivo por causa dela tornaria o importador inutilizável.
+	ignored := []string{}
+	recognized := 0
+	needsReview := []string{}
+	for _, s := range suggestions {
+		switch {
+		case !s.Recognized:
+			ignored = append(ignored, s.Column)
+		default:
+			recognized++
+			if s.Confidence != ingest.ConfidenceExact {
+				needsReview = append(needsReview, s.Column)
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"filename": filename,
+		"format":   table.Format,
+		"header":   table.Header,
+		"columns":  suggestions,
+		"sample":   sample,
+		"summary": gin.H{
+			"columns":     len(table.Header),
+			"recognized":  recognized,
+			"ignored":     ignored,
+			"needsReview": needsReview,
+			"rows":        len(table.Rows),
+		},
+		"fields":   ingest.KnownFields(),
+		"nextStep": "confirme o mapeamento e crie o perfil com POST /api/v1/admin/import/profiles",
+	})
+}
+
 // --- Upload + dry-run -------------------------------------------------------
 
 // CreateBatch — POST /api/v1/admin/import/batches
@@ -289,16 +370,28 @@ func (h *ImportHandler) CreateBatch(c *gin.Context) {
 			fmt.Sprintf("este arquivo (mesmo sha256) já foi importado no lote %s", priorBatch))
 	}
 
+	// MissingSKUs é a única parte do plano que não tem linha em `import_rows`
+	// (ausência não gera linha). Sem persistir aqui, `loadPlan` reconstruiria um
+	// plano sem eles e o arquivamento por ausência nunca aconteceria.
+	var missingJSON any
+	if len(plan.MissingSKUs) > 0 {
+		if b, err := json.Marshal(plan.MissingSKUs); err == nil {
+			missingJSON = b
+		}
+	}
+
 	var batchID string
 	err = h.db.QueryRowContext(ctx, `
 		INSERT INTO import_batches
 			(filename, file_hash, format, profile_id, supplier_id, status,
-			 total_rows, ok_rows, error_rows, create_count, update_count, reject_count, review_count, created_by)
-		VALUES ($1,$2,$3,$4,$5,'validated',$6,$7,$8,$9,$10,$11,$12,$13)
+			 total_rows, ok_rows, error_rows, create_count, update_count, reject_count, review_count,
+			 missing_skus, created_by)
+		VALUES ($1,$2,$3,$4,$5,'validated',$6,$7,$8,$9,$10,$11,$12,$13,$14)
 		RETURNING id`,
 		filename, hash, table.Format, profileID, nullIfEmpty(supplierID),
 		plan.Total, plan.Total-plan.Rejects, plan.Rejects,
-		plan.Creates, plan.Updates, plan.Rejects, plan.Reviews, nullIfEmpty(actorID)).Scan(&batchID)
+		plan.Creates, plan.Updates, plan.Rejects, plan.Reviews,
+		missingJSON, nullIfEmpty(actorID)).Scan(&batchID)
 	if err != nil {
 		DBError(c, err)
 		return
@@ -359,6 +452,79 @@ func (h *ImportHandler) stageRows(ctx context.Context, batchID string, plan *ing
 		}
 	}
 	return tx.Commit()
+}
+
+// ListBatches — GET /api/v1/admin/import/batches
+//
+// A listagem de lotes com status é o que responde "o que foi importado, quando,
+// por quem e com que resultado" — e principalmente "qual importação estragou o
+// catálogo na terça". Sem ela, um lote `validated` esquecido (subido e nunca
+// aprovado) fica invisível: o operador acha que importou e nada foi aplicado.
+//
+// Query: status (filtro), limit.
+func (h *ImportHandler) ListBatches(c *gin.Context) {
+	limit := 50
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 200 {
+			limit = n
+		}
+	}
+	// Filtro por status como parâmetro POSICIONAL, nunca concatenado: valor de
+	// query string não vira SQL. String vazia desliga o filtro.
+	status := c.Query("status")
+
+	rows, err := h.db.Query(`
+		SELECT b.id, b.filename, b.format, b.status,
+		       COALESCE(b.supplier_id,''), COALESCE(b.error,''),
+		       b.total_rows, b.create_count, b.update_count, b.reject_count, b.review_count,
+		       COALESCE(jsonb_array_length(b.missing_skus), 0),
+		       COALESCE(p.name,''), COALESCE(p.version,0),
+		       COALESCE(b.created_by,''), b.created_at, b.committed_at
+		FROM import_batches b
+		LEFT JOIN import_profiles p ON p.id = b.profile_id
+		WHERE ($1 = '' OR b.status = $1)
+		ORDER BY b.created_at DESC
+		LIMIT $2`, status, limit)
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	defer rows.Close()
+
+	out := []gin.H{}
+	for rows.Next() {
+		var id, filename, format, st, supplier, errText, profName, createdBy string
+		var total, creates, updates, rejects, reviews, toArchive, profVersion int
+		var createdAt time.Time
+		var committedAt sql.NullTime
+		if err := rows.Scan(&id, &filename, &format, &st, &supplier, &errText,
+			&total, &creates, &updates, &rejects, &reviews, &toArchive,
+			&profName, &profVersion, &createdBy, &createdAt, &committedAt); err != nil {
+			DBError(c, err)
+			return
+		}
+		b := gin.H{
+			"id": id, "filename": filename, "format": format, "status": st,
+			"supplierId": supplier, "profile": profName, "profileVersion": profVersion,
+			"summary": gin.H{
+				"total": total, "creates": creates, "updates": updates,
+				"rejects": rejects, "reviews": reviews, "toArchive": toArchive,
+			},
+			"createdBy": createdBy, "createdAt": createdAt,
+		}
+		if errText != "" {
+			b["error"] = errText
+		}
+		if committedAt.Valid {
+			b["committedAt"] = committedAt.Time
+		}
+		out = append(out, b)
+	}
+	if err := rows.Err(); err != nil {
+		DBError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": out, "count": len(out)})
 }
 
 // GetBatch — GET /api/v1/admin/import/batches/:id
@@ -766,7 +932,21 @@ func (h *ImportHandler) loadPlan(batchID string) (*ingest.Plan, error) {
 		plan.Rows = append(plan.Rows, r)
 		plan.Total++
 	}
-	return plan, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Recarrega a lista de ausentes aprovada no dry-run. Ela vive no lote (e não
+	// em import_rows) porque um SKU ausente do arquivo, por definição, não tem
+	// linha no arquivo.
+	var missing []byte
+	if err := h.db.QueryRow(`SELECT missing_skus FROM import_batches WHERE id=$1`, batchID).Scan(&missing); err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+	if len(missing) > 0 {
+		_ = json.Unmarshal(missing, &plan.MissingSKUs)
+	}
+	return plan, nil
 }
 
 // normalizeMapped desfaz a perda de tipo do round-trip JSONB.

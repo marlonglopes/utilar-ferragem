@@ -78,6 +78,8 @@ export interface OrderPanelProps {
   onDiscountChange: (pct: number) => void
   onCustomerChange: (customer: BalcaoCustomer | null) => void
   onCharge: () => void
+  /** O teto de desconto exibido foi confirmado por `GET /api/v1/store/me`. */
+  ceilingFromBackend?: boolean
 }
 
 /**
@@ -95,6 +97,7 @@ export function OrderPanel({
   onDiscountChange,
   onCustomerChange,
   onCharge,
+  ceilingFromBackend = true,
 }: OrderPanelProps) {
   const empty = comanda.items.length === 0
   const canCharge = !empty && !pricing.blocked && comanda.customer !== null
@@ -140,6 +143,7 @@ export function OrderPanel({
         pricing={pricing}
         onDiscountChange={onDiscountChange}
         disabled={empty}
+        ceilingFromBackend={ceilingFromBackend}
       />
 
       {/* Totais + Cobrar */}

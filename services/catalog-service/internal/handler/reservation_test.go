@@ -119,9 +119,13 @@ func doSettle(r *gin.Engine, orderID, action string) *httptest.ResponseRecorder 
 	return w
 }
 
-func stockOf(t *testing.T, db *sql.DB, productID string) int {
+// stockOf devolve float64 desde que `products.stock` virou NUMERIC (migration
+// 005) — o driver entrega NUMERIC como texto e um *int falha ao converter
+// "6.000". As asserções seguem comparando com literais inteiros: as reservas
+// continuam sendo de unidades inteiras.
+func stockOf(t *testing.T, db *sql.DB, productID string) float64 {
 	t.Helper()
-	var s int
+	var s float64
 	if err := db.QueryRow(`SELECT stock FROM products WHERE id=$1`, productID).Scan(&s); err != nil {
 		t.Fatalf("read stock: %v", err)
 	}
@@ -183,7 +187,7 @@ func TestReserve_ConcurrentRaceForLastUnit(t *testing.T) {
 		t.Errorf("esperava %d perdedoras com 409, veio %d (outros: %d)", goroutines-1, lost, other)
 	}
 	if s := stockOf(t, db, productID); s != 0 {
-		t.Errorf("estoque final = %d; queria 0 (nunca negativo, nunca sobrando)", s)
+		t.Errorf("estoque final = %g; queria 0 (nunca negativo, nunca sobrando)", s)
 	}
 
 	// E exatamente uma reserva ativa foi criada.
@@ -231,7 +235,7 @@ func TestReserve_ConcurrentNeverOversells(t *testing.T) {
 			stock, goroutines, stock, won)
 	}
 	if s := stockOf(t, db, productID); s != 0 {
-		t.Errorf("estoque final = %d; queria 0", s)
+		t.Errorf("estoque final = %g; queria 0", s)
 	}
 }
 
@@ -245,7 +249,7 @@ func TestReserve_DecrementsStock(t *testing.T) {
 		t.Fatalf("reserva deveria dar 201, veio %d: %s", w.Code, w.Body.String())
 	}
 	if s := stockOf(t, db, productID); s != 7 {
-		t.Errorf("estoque = %d; queria 7", s)
+		t.Errorf("estoque = %g; queria 7", s)
 	}
 }
 
@@ -283,7 +287,7 @@ func TestReserve_InsufficientStockReturnsActionableDetail(t *testing.T) {
 	}
 	// E nada pode ter sido decrementado.
 	if s := stockOf(t, db, productID); s != 2 {
-		t.Errorf("reserva falha não pode mexer no estoque: %d", s)
+		t.Errorf("reserva falha não pode mexer no estoque: %g", s)
 	}
 }
 
@@ -313,7 +317,7 @@ func TestReserve_AllOrNothing(t *testing.T) {
 	}
 	// O item que TINHA saldo não pode ter sido debitado.
 	if s := stockOf(t, db, okProduct); s != 100 {
-		t.Errorf("item com saldo foi debitado numa reserva que falhou: estoque %d, queria 100", s)
+		t.Errorf("item com saldo foi debitado numa reserva que falhou: estoque %g, queria 100", s)
 	}
 }
 
@@ -331,7 +335,7 @@ func TestReserve_IsIdempotentPerOrder(t *testing.T) {
 		}
 	}
 	if s := stockOf(t, db, productID); s != 8 {
-		t.Errorf("5 reservas idênticas deveriam debitar 2 no total: estoque %d, queria 8", s)
+		t.Errorf("5 reservas idênticas deveriam debitar 2 no total: estoque %g, queria 8", s)
 	}
 }
 
@@ -361,7 +365,7 @@ func TestReserve_SumsDuplicateLines(t *testing.T) {
 		t.Fatalf("esperava 201, veio %d: %s", w.Code, w.Body.String())
 	}
 	if s := stockOf(t, db, productID); s != 3 {
-		t.Errorf("3+4 unidades deveriam debitar 7: estoque %d, queria 3", s)
+		t.Errorf("3+4 unidades deveriam debitar 7: estoque %g, queria 3", s)
 	}
 }
 
@@ -373,14 +377,14 @@ func TestRelease_ReturnsStock(t *testing.T) {
 
 	doReserve(r, "rel-1", productID, 4)
 	if s := stockOf(t, db, productID); s != 6 {
-		t.Fatalf("setup: estoque %d, queria 6", s)
+		t.Fatalf("setup: estoque %g, queria 6", s)
 	}
 
 	if w := doSettle(r, "rel-1", "release"); w.Code != http.StatusOK {
 		t.Fatalf("release: %d %s", w.Code, w.Body.String())
 	}
 	if s := stockOf(t, db, productID); s != 10 {
-		t.Errorf("release deveria devolver o saldo: estoque %d, queria 10", s)
+		t.Errorf("release deveria devolver o saldo: estoque %g, queria 10", s)
 	}
 }
 
@@ -397,7 +401,7 @@ func TestRelease_IsIdempotent(t *testing.T) {
 		doSettle(r, "relx-1", "release")
 	}
 	if s := stockOf(t, db, productID); s != 10 {
-		t.Errorf("3 releases deveriam devolver 4 no total: estoque %d, queria 10", s)
+		t.Errorf("3 releases deveriam devolver 4 no total: estoque %g, queria 10", s)
 	}
 }
 
@@ -413,13 +417,13 @@ func TestCommit_KeepsStockDebited(t *testing.T) {
 		t.Fatalf("commit: %d %s", w.Code, w.Body.String())
 	}
 	if s := stockOf(t, db, productID); s != 6 {
-		t.Errorf("commit não devolve estoque: %d, queria 6", s)
+		t.Errorf("commit não devolve estoque: %g, queria 6", s)
 	}
 
 	// E um release posterior (bug de fluxo) não pode ressuscitar o estoque.
 	doSettle(r, "cmt-1", "release")
 	if s := stockOf(t, db, productID); s != 6 {
-		t.Errorf("release após commit não pode devolver estoque: %d, queria 6", s)
+		t.Errorf("release após commit não pode devolver estoque: %g, queria 6", s)
 	}
 }
 
@@ -433,7 +437,7 @@ func TestSweeper_ExpiredReservationReturnsStock(t *testing.T) {
 
 	doReserve(r, "exp-1", productID, 4)
 	if s := stockOf(t, db, productID); s != 6 {
-		t.Fatalf("setup: estoque %d, queria 6", s)
+		t.Fatalf("setup: estoque %g, queria 6", s)
 	}
 
 	// Envelhece a reserva por fora em vez de esperar 30 minutos.
@@ -451,13 +455,13 @@ func TestSweeper_ExpiredReservationReturnsStock(t *testing.T) {
 		t.Errorf("sweeper deveria ter liberado ao menos 1 reserva, liberou %d", n)
 	}
 	if s := stockOf(t, db, productID); s != 10 {
-		t.Errorf("estoque não voltou após expiração: %d, queria 10", s)
+		t.Errorf("estoque não voltou após expiração: %g, queria 10", s)
 	}
 
 	// Rodar de novo não devolve outra vez.
 	_, _ = reservation.NewSweeper(db).SweepOnce(t.Context())
 	if s := stockOf(t, db, productID); s != 10 {
-		t.Errorf("segundo sweep duplicou a devolução: %d, queria 10", s)
+		t.Errorf("segundo sweep duplicou a devolução: %g, queria 10", s)
 	}
 }
 
@@ -477,7 +481,7 @@ func TestSweeper_IgnoresCommittedReservations(t *testing.T) {
 		t.Fatalf("sweep: %v", err)
 	}
 	if s := stockOf(t, db, productID); s != 6 {
-		t.Errorf("reserva confirmada não deveria ser devolvida: %d, queria 6", s)
+		t.Errorf("reserva confirmada não deveria ser devolvida: %g, queria 6", s)
 	}
 }
 

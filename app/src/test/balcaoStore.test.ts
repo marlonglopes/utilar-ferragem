@@ -4,6 +4,7 @@ import {
   createComanda,
   selectActiveComanda,
   balcaoPricingOf,
+  MOCK_OPERATOR,
   type NewBalcaoItem,
   type BalcaoCustomer,
 } from '@/store/balcaoStore'
@@ -18,6 +19,7 @@ function makeItem(overrides: Partial<NewBalcaoItem> = {}): NewBalcaoItem {
     unit: 'un',
     unitPrice: 100,
     unitCost: 60,
+    costIsEstimated: false,
     quantity: 1,
     stock: 10,
     ...overrides,
@@ -37,7 +39,13 @@ function active() {
 
 beforeEach(() => {
   const fresh = createComanda('Comanda 1')
-  useBalcaoStore.setState({ comandas: [fresh], activeId: fresh.id, role: 'operator' })
+  useBalcaoStore.setState({
+    comandas: [fresh],
+    activeId: fresh.id,
+    // Contexto de loja como `useBalcaoOperator` o entregaria: teto vindo do
+    // backend, não derivado do cargo no front.
+    operator: { ...MOCK_OPERATOR, fromBackend: true },
+  })
 })
 
 describe('balcaoStore — itens', () => {
@@ -139,16 +147,28 @@ describe('balcaoStore — negociação e cliente', () => {
     expect(pricing.subtotal).toBe(200)
     expect(pricing.total).toBe(180)
     expect(pricing.cost).toBe(120)
-    expect(pricing.ceilingPct).toBe(12) // cargo operator
+    expect(pricing.ceilingPct).toBe(12) // teto do vínculo, servido pelo backend
   })
 
-  it('o cargo do store alimenta o teto usado no cálculo', () => {
+  it('o teto do vínculo (não o cargo) alimenta o cálculo', () => {
     useBalcaoStore.getState().addItem(makeItem())
     useBalcaoStore.getState().setDiscountPct(18)
     expect(balcaoPricingOf(useBalcaoStore.getState()).requiresApproval).toBe(true)
 
-    useBalcaoStore.getState().setRole('supervisor')
+    // Mesmo cargo, teto maior — é o número do backend que manda.
+    useBalcaoStore.getState().setOperator({ ...MOCK_OPERATOR, discountCeilingPct: 20 })
     expect(balcaoPricingOf(useBalcaoStore.getState()).requiresApproval).toBe(false)
+  })
+
+  it('setOperator(null) cai para fail-closed: teto 0', () => {
+    useBalcaoStore.getState().addItem(makeItem())
+    useBalcaoStore.getState().setDiscountPct(1)
+    useBalcaoStore.getState().setOperator(null)
+
+    const pricing = balcaoPricingOf(useBalcaoStore.getState())
+    expect(pricing.ceilingPct).toBe(0)
+    expect(pricing.requiresApproval).toBe(true)
+    expect(useBalcaoStore.getState().operator.canApproveDiscount).toBe(false)
   })
 })
 

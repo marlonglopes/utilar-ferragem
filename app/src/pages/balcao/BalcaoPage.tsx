@@ -10,6 +10,7 @@ import { ProductSearchPanel } from '@/components/balcao/ProductSearchPanel'
 import { ChargeModal } from '@/components/balcao/ChargeModal'
 import { toBalcaoItem } from '@/hooks/useBalcaoProducts'
 import { useBalcaoCheckout, type BalcaoPaymentMethod } from '@/hooks/useBalcaoCheckout'
+import { useBalcaoOperator } from '@/hooks/useBalcaoOperator'
 import {
   useBalcaoStore,
   selectActiveComanda,
@@ -35,12 +36,20 @@ export default function BalcaoPage() {
   const comandas = useBalcaoStore((s) => s.comandas)
   const activeId = useBalcaoStore((s) => s.activeId)
   const comanda = useBalcaoStore(selectActiveComanda)
-  const role = useBalcaoStore((s) => s.role)
+  // O teto de desconto vem de GET /api/v1/store/me — nunca do front. Enquanto a
+  // resposta não chega, o teto é 0 (fail-closed) e todo desconto aparece como
+  // pendente, que é o erro seguro.
+  const { operator } = useBalcaoOperator()
   // useMemo, não selector: um selector que devolve objeto novo a cada chamada
   // quebra o `getSnapshot` do useSyncExternalStore (loop de render).
   const pricing = useMemo(
-    () => computeBalcaoPricing({ items: comanda.items, discountPct: comanda.discountPct, role }),
-    [comanda.items, comanda.discountPct, role]
+    () =>
+      computeBalcaoPricing({
+        items: comanda.items,
+        discountPct: comanda.discountPct,
+        ceilingPct: operator.discountCeilingPct,
+      }),
+    [comanda.items, comanda.discountPct, operator.discountCeilingPct]
   )
 
   const addItem = useBalcaoStore((s) => s.addItem)
@@ -120,7 +129,11 @@ export default function BalcaoPage() {
             orderNumber: outcome.orderNumber,
             method: outcome.method,
             total: pricing.total,
+            // Direto do servidor: ele reavaliou o desconto contra o teto atual.
             requiresApproval: outcome.requiresApproval,
+            approvalStatus: outcome.approvalStatus,
+            discountPct: outcome.discountPct,
+            discountAmount: outcome.discountAmount,
             customerName: comanda.customer?.name,
             nsu: outcome.external?.nsu,
           }
@@ -138,6 +151,7 @@ export default function BalcaoPage() {
       onDiscountChange={setDiscountPct}
       onCustomerChange={setCustomer}
       onCharge={openCharge}
+      ceilingFromBackend={operator.fromBackend}
     />
   )
 

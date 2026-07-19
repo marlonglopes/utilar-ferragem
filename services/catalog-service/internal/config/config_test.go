@@ -32,6 +32,9 @@ func TestLoadRejectsInsecureJWTSecret(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("DEV_MODE", tc.devMode)
 			t.Setenv("JWT_SECRET", tc.secret)
+			// A1: fora de DEV_MODE o boot exige o segredo de serviço, distinto
+			// do de usuário. Ver service_secret_test.go.
+			t.Setenv("SERVICE_JWT_SECRET", strings.Repeat("s", 64))
 
 			cfg, err := Load()
 

@@ -35,6 +35,7 @@ E a **Alice**, assistente embutida que consulta o catálogo real e calcula mater
 | `ON CONFLICT (sku)` | O índice é **parcial**. Precisa de `ON CONFLICT (sku) WHERE sku IS NOT NULL`. |
 | `NOT NULL DEFAULT` no Postgres | O DEFAULT só vale quando a coluna é **omitida** do INSERT. NULL explícito viola a constraint. |
 | Relatório de subagente | **Verifique você mesmo.** Build, rode a suíte, teste a lógica de risco. Vários bugs sérios saíram daí. |
+| Teste de concorrência falhando do nada | O **catalog-service rodando** tem um sweeper de reservas a cada 60s no mesmo banco. Pare o serviço antes de rodar a suíte, ou trate como flake. |
 
 ## Comandos
 
@@ -111,7 +112,7 @@ O caminho do dinheiro é o mais bem feito do sistema. Preserve estas invariantes
 
 Ver [`docs/security/auditoria-arquitetural-2026-07-18.md`](docs/security/auditoria-arquitetural-2026-07-18.md):
 
-- **A1 — `JWT_SECRET` compartilhado.** Os 5 serviços *emitem* token com o mesmo segredo. A Alice é pública e sem auth obrigatória; comprometê-la dá token de admin do sistema inteiro. Mitigação: segredo separado pra tráfego de serviço (~4h). Definitivo: assinatura assimétrica.
+- **A1 — 🟡 MITIGADO (não fechado).** Existem agora **dois segredos**: `JWT_SECRET` (identidade de usuário, todos verificam) e **`SERVICE_JWT_SECRET`** (identidade de serviço, `role=service`). `pkg/servicetoken` emite e verifica; `role=service` **só** vale assinado com o segredo de serviço, e um token de usuário com essa claim é rejeitado em todos os serviços. **A Alice não recebe `SERVICE_JWT_SECRET`** — é esse o ponto. Distribuição: **catalog, order, auth sim; assistant e payment não**. Boot é fail-closed fora de `DEV_MODE` (ausente ou igual ao `JWT_SECRET` → o serviço não sobe). **Continua aberto o definitivo**: assinatura assimétrica (auth-service assina com chave privada, os demais só verificam com a pública) — quem comprometer o order-service ainda emite token de serviço.
 - **A2 — `DEV_MODE=true` em produção** entrega tudo via header `X-User-Role: admin`. Nada impede a variável de ser ligada por engano (~2h).
 - **Backup nunca restaurado.** Backup não testado é backup que não existe.
 

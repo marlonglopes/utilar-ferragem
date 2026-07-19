@@ -1,4 +1,4 @@
-import { AlertTriangle, Percent, ShieldCheck, TrendingDown } from 'lucide-react'
+import { AlertTriangle, Info, Percent, ShieldCheck, TrendingDown } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { HEALTHY_MARGIN_PCT, type BalcaoPricing } from '@/store/balcaoStore'
@@ -46,9 +46,22 @@ export interface NegotiationBlockProps {
  * Todo o cálculo vem pronto de `computeBalcaoPricing` (função pura, testada).
  * Este componente só pinta — nenhuma regra de negócio mora aqui.
  */
-export function NegotiationBlock({ pricing, onDiscountChange, disabled }: NegotiationBlockProps) {
-  const { discountPct, discountAmount, marginPct, status, belowCost, ceilingPct, overCeiling } =
-    pricing
+export function NegotiationBlock({
+  pricing,
+  onDiscountChange,
+  disabled,
+  ceilingFromBackend = true,
+}: NegotiationBlockProps) {
+  const {
+    discountPct,
+    discountAmount,
+    marginPct,
+    status,
+    belowCost,
+    ceilingPct,
+    overCeiling,
+    costEstimated,
+  } = pricing
 
   // Barra nunca fica negativa visualmente: margem < 0 vira barra cheia vermelha.
   const fillPct =
@@ -61,7 +74,14 @@ export function NegotiationBlock({ pricing, onDiscountChange, disabled }: Negoti
           <Percent className="h-4 w-4" aria-hidden="true" />
           Negociação
         </h3>
-        <span className="text-xs font-medium text-gray-500">Seu teto: {ceilingPct}%</span>
+        <span className="text-xs font-medium text-gray-500">
+          Seu teto: {ceilingPct}%
+          {!ceilingFromBackend && (
+            <span className="ml-1 font-semibold text-amber-700" title="Teto não confirmado pelo servidor">
+              (não confirmado)
+            </span>
+          )}
+        </span>
       </div>
 
       {/* Slider de desconto */}
@@ -113,8 +133,12 @@ export function NegotiationBlock({ pricing, onDiscountChange, disabled }: Negoti
       {/* Barra de margem restante */}
       <div className="mt-4">
         <div className="mb-1 flex items-center justify-between text-xs font-semibold">
-          <span className="text-gray-600">Margem restante</span>
+          <span className="text-gray-600">
+            Margem restante
+            {costEstimated && <span className="ml-1 text-amber-700">(estimada)</span>}
+          </span>
           <span className={STATUS_TEXT[status]}>
+            {costEstimated && '≈ '}
             {marginPct.toFixed(1).replace('.', ',')}%
           </span>
         </div>
@@ -135,6 +159,19 @@ export function NegotiationBlock({ pricing, onDiscountChange, disabled }: Negoti
           {STATUS_LABEL[status]}
           {status === 'warning' && ` · abaixo de ${HEALTHY_MARGIN_PCT}%`}
         </p>
+
+        {/* Honestidade sobre o número: o custo real do catálogo só existe na
+            rota de admin, que o operador de balcão não acessa. Mentir sobre a
+            margem faria o vendedor dar desconto que a loja não banca. */}
+        {costEstimated && (
+          <p className="mt-1 flex items-start gap-1.5 text-[11px] leading-snug text-amber-800">
+            <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>
+              Custo <strong>estimado</strong> — o catálogo não libera o custo real para o balcão.
+              Use a margem como referência, não como número fechado.
+            </span>
+          </p>
+        )}
       </div>
 
       {/* Avisos */}

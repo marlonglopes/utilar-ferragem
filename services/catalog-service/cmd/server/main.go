@@ -45,7 +45,9 @@ func main() {
 	categoryH := handler.NewCategoryHandler(database)
 	sellerH := handler.NewSellerHandler(database)
 	adminProductH := handler.NewAdminProductHandler(database)
+	catalogAdminH := handler.NewCatalogAdminHandler(database)
 	reservationH := handler.NewReservationHandler(database)
+	importH := handler.NewImportHandler(database)
 
 	if cfg.DevMode {
 		slog.Warn("DEV_MODE=true — /admin aceita fallback X-User-Role; nunca use em produção")
@@ -95,6 +97,10 @@ func main() {
 		api.GET("/products/by-id/:id", detailCache, productH.GetByID)
 		api.GET("/products/:slug", detailCache, productH.GetBySlug)
 		api.GET("/products/:slug/related", listCache, productH.Related)
+		// Registry de atributos da categoria: contrato de forma da ficha
+		// técnica (rótulo, tipo, unidade). Sem dado sensível — é o que o
+		// frontend precisa pra montar os filtros técnicos.
+		api.GET("/categories/:id/attributes", listCache, catalogAdminH.CategoryAttributes)
 	}
 
 	// Rotas de escrita (ingestão) — protegidas por role=admin.
@@ -106,12 +112,42 @@ func main() {
 		admin.POST("/products/by-id/:id/images", adminProductH.AddImage)
 		admin.DELETE("/products/by-id/:id/images/:imageId", adminProductH.DeleteImage)
 		admin.POST("/products/import", adminProductH.Import)
+
+		// ⚠️ ESTA é a única rota que devolve `cost`/margem. Está sob
+		// RequireAdmin; nenhuma equivalente existe fora deste grupo.
+		admin.GET("/products/by-id/:id", catalogAdminH.GetProduct)
+		admin.GET("/products/by-id/:id/price-history", catalogAdminH.GetPriceHistory)
+		admin.PUT("/products/by-id/:id/price-tiers", catalogAdminH.SetPriceTiers)
+		admin.PUT("/products/by-id/:id/attributes", catalogAdminH.SetProductAttributes)
+
+		// Pipeline de ingestão multi-formato (CSV / XLSX / JSON / SINAPI).
+		//
+		// Dois passos por desenho: `batches` faz staging + DRY-RUN sem escrever
+		// em `products`; `commit` aplica o que um humano revisou. Ver
+		// internal/handler/admin_import.go e docs/ingestao-de-produtos.md.
+		// `suggest` é o passo de MAPEAMENTO: detecta as colunas e propõe o
+		// de/para com grau de confiança, para o humano confirmar. Não cria
+		// perfil nem importa nada — sugerir não é decidir.
+		admin.POST("/import/suggest", importH.SuggestColumns)
+		admin.POST("/import/profiles", importH.CreateProfile)
+		admin.GET("/import/profiles", importH.ListProfiles)
+		admin.POST("/import/batches", importH.CreateBatch)
+		admin.GET("/import/batches", importH.ListBatches)
+		admin.GET("/import/batches/:id", importH.GetBatch)
+		admin.POST("/import/batches/:id/commit", importH.CommitBatch)
+
+		// ⚠️ SINAPI: o valor importado é CUSTO DE REFERÊNCIA PARA OBRA PÚBLICA
+		// (Caixa/IBGE), carregado em `cost` — NUNCA em `price`. Os itens entram
+		// como rascunho sem preço de venda. Ver docs/base-de-produtos.md.
+		admin.POST("/import/sinapi", importH.ImportSINAPI)
 	}
 
 	// Rotas internas de reserva de estoque — chamadas pelo order-service, não
-	// pelo browser. Aceitam role=service (token assinado pelo order-service com
-	// o JWT_SECRET compartilhado) ou role=admin (para operação manual/debug).
-	internal := r.Group("/api/v1/internal", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, "service", "admin"))
+	// pelo browser. Aceitam role=service (token que o order-service assina com o
+	// SERVICE_JWT_SECRET) ou role=admin (operação manual/debug, token de
+	// usuário). A1 (auditoria 2026-07-18): são segredos DIFERENTES — token de
+	// usuário com a claim role=service não passa por aqui.
+	internal := r.Group("/api/v1/internal", handler.RequireInternal(cfg.JWTSecret, cfg.ServiceJWTSecret, cfg.DevMode))
 	{
 		internal.POST("/reservations", reservationH.Reserve)
 		internal.POST("/reservations/:orderId/commit", reservationH.Commit)

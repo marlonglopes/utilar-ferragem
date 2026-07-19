@@ -22,6 +22,14 @@ const DefaultReservationTTL = 30 * time.Minute
 const maxReservationTTL = 72 * time.Hour
 
 // ReservationItem é um par produto/quantidade a reservar.
+//
+// Quantity segue INT mesmo depois de `products.stock` virar NUMERIC (migration
+// 005). PORQUÊ: reserva fracionada exigiria mudar o contrato com o
+// order-service (e o tipo de `stock_reservations.quantity`), e o ganho real da
+// venda fracionada está no balcão/PDV, que baixa estoque direto. O estoque
+// ACEITA fração — 2,5 m de cabo existem e são exibidos — mas o checkout online
+// só reserva unidades inteiras por enquanto. Quando o order-service suportar,
+// é trocar este tipo e a coluna `quantity`.
 type ReservationItem struct {
 	ProductID string `json:"productId" binding:"required,max=64"`
 	Quantity  int    `json:"quantity" binding:"required,gt=0,lte=999"`
@@ -38,10 +46,14 @@ type ReserveRequest struct {
 // StockShortage descreve exatamente qual item faltou e quanto havia — o
 // order-service repassa isso ao cliente pra ele poder corrigir o carrinho em
 // vez de tomar um "erro" opaco.
+//
+// ⚠️ CONTRATO: `available` virou float64 quando `products.stock` passou a
+// NUMERIC (migration 005) — a loja tem 2,5 m de cabo. Continua serializando
+// como número JSON; quantidades inteiras saem idênticas ("3", não "3.0").
 type StockShortage struct {
-	ProductID string `json:"productId"`
-	Requested int    `json:"requested"`
-	Available int    `json:"available"`
+	ProductID string  `json:"productId"`
+	Requested int     `json:"requested"`
+	Available float64 `json:"available"`
 }
 
 // ReservationHandler cuida do ciclo de vida das reservas de estoque.
@@ -130,7 +142,7 @@ func (h *ReservationHandler) Reserve(c *gin.Context) {
 		// Rollback explícito antes de responder: nenhuma unidade fica presa.
 		_ = tx.Rollback()
 		c.JSON(http.StatusConflict, gin.H{
-			"error":     fmt.Sprintf("insufficient stock for product %s: requested %d, available %d", shortage.ProductID, shortage.Requested, shortage.Available),
+			"error":     fmt.Sprintf("insufficient stock for product %s: requested %d, available %g", shortage.ProductID, shortage.Requested, shortage.Available),
 			"code":      "insufficient_stock",
 			"requestId": c.GetString("request_id"),
 			"details":   shortage,
@@ -175,7 +187,12 @@ func reserveOne(tx *sql.Tx, orderID string, it ReservationItem, expiresAt time.T
 	}
 
 	// Decremento condicional — atômico, ver comentário em Reserve.
-	var remaining int
+	//
+	// `stock` é NUMERIC desde a 005; a atomicidade NÃO muda (vem do row lock +
+	// EvalPlanQual do Postgres, não do tipo). O destino do scan é float64
+	// porque o driver devolve NUMERIC como texto e um *int falharia ao
+	// converter "9.000".
+	var remaining float64
 	err = tx.QueryRow(`
 		UPDATE products
 		SET stock = stock - $2
@@ -186,7 +203,7 @@ func reserveOne(tx *sql.Tx, orderID string, it ReservationItem, expiresAt time.T
 	if errors.Is(err, sql.ErrNoRows) {
 		// Ou o produto não existe/não está publicado, ou faltou saldo.
 		// Distinguir importa: 404 vs 409 mudam a ação do cliente.
-		var available int
+		var available float64
 		qErr := tx.QueryRow(
 			`SELECT stock FROM products WHERE id = $1 AND status = 'published'`,
 			it.ProductID,
