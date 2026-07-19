@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
+import { HelmetProvider } from 'react-helmet-async'
 import i18n from '@/i18n'
 import { Navbar } from '@/components/layout/Navbar'
 import HomePage from '@/pages/home/HomePage'
@@ -15,13 +16,17 @@ const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: fa
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return (
-    <I18nextProvider i18n={i18n}>
-      <QueryClientProvider client={testQueryClient}>
-        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          {children}
-        </MemoryRouter>
-      </QueryClientProvider>
-    </I18nextProvider>
+    // HelmetProvider é obrigatório desde que as páginas passaram a declarar
+    // meta tags por rota via <Seo /> (react-helmet-async).
+    <HelmetProvider>
+      <I18nextProvider i18n={i18n}>
+        <QueryClientProvider client={testQueryClient}>
+          <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            {children}
+          </MemoryRouter>
+        </QueryClientProvider>
+      </I18nextProvider>
+    </HelmetProvider>
   )
 }
 

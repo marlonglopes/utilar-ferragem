@@ -14,24 +14,49 @@
   "prev": "Previous",
   "search": "Search",
   "searchPlaceholder": "Search tools, cement, cables, paint...",
-  "account": "My account",
+  "account": {
+    "title": "My account",
+    "profile": "Profile",
+    "addresses": "Addresses",
+    "paymentMethods": "Payment methods",
+    "orders": "Orders",
+    "editProfile": "Edit profile",
+    "saveProfile": "Save",
+    "addAddress": "Add address",
+    "editAddress": "Edit",
+    "deleteAddress": "Remove",
+    "defaultAddress": "Default",
+    "setDefault": "Set as default",
+    "cep": "ZIP code",
+    "street": "Street",
+    "number": "Number",
+    "complement": "Complement",
+    "neighborhood": "Neighborhood",
+    "city": "City",
+    "state": "State",
+    "cepNotFound": "ZIP code not found.",
+    "paymentStub": "Saved payment methods will be available soon.",
+    "noAddresses": "No addresses on file.",
+    "saveAddress": "Save address",
+    "cancel": "Cancel"
+  },
   "cart": "Cart",
   "menu": "Menu",
   "language": "Language",
   "topbar": {
-    "promo": "Free shipping on orders over R$ 299 · Use coupon OBRA10 ·",
-    "cashback": "Earn cashback on every purchase",
+    "promo": "Sellers with verified CNPJ · Invoice on every order ·",
     "becomeSeller": "Become a seller",
-    "help": "Help center"
+    "help": "Help center",
+    "highlight": "Pix, bank slip or card up to 12x"
   },
   "hero": {
-    "badge": "New · Same-day delivery in São Paulo",
+    "badge": "New · Shipping cost and delivery time calculated for your ZIP code",
     "title": {
       "prefix": "Everything for your",
       "highlight": "project",
       "suffix": ", straight from the hardware store."
     },
-    "description": "Over 5,000 products — tools, construction and electrical — from hundreds of partner sellers, with Pix, bank slip or card payment.",
+    "description": "Tools, construction, electrical and plumbing from partner sellers with verified CNPJ. Pay with Pix, bank slip or card, with an invoice on every order.",
     "cta": {
       "catalog": "Explore catalog",
       "sell": "Sell on Utilar"
@@ -43,10 +68,22 @@
     "seeAll": "See all"
   },
   "trust": {
-    "pix": { "title": "Instant Pix", "desc": "Payment confirmed immediately. Bank slip and card up to 12x." },
-    "verified": { "title": "Verified sellers", "desc": "All sellers with validated CNPJ and invoice." },
-    "delivery": { "title": "24h delivery", "desc": "Greater São Paulo. PAC/SEDEX nationwide." },
-    "support": { "title": "Brazilian support", "desc": "WhatsApp and email. Support in Portuguese, business hours." }
+    "pix": {
+      "title": "Instant Pix",
+      "desc": "Payment confirmed immediately. Bank slip and card up to 12x."
+    },
+    "verified": {
+      "title": "Verified sellers",
+      "desc": "All sellers with validated CNPJ and invoice."
+    },
+    "delivery": {
+      "title": "Tracked delivery",
+      "desc": "Correios PAC/SEDEX. Delivery time calculated for your ZIP code before you confirm."
+    },
+    "support": {
+      "title": "Brazilian support",
+      "desc": "WhatsApp and email. Support in Portuguese, business hours."
+    }
   },
   "taxonomy": {
     "ferramentas": "Tools",
@@ -98,32 +135,6 @@
     "invalidCredentials": "Incorrect email or password.",
     "sellerRedirect": "Your account is a seller account. Use UtiLar Hub to access.",
     "sendingLink": "Sending..."
-  },
-  "account": {
-    "title": "My account",
-    "profile": "Profile",
-    "addresses": "Addresses",
-    "paymentMethods": "Payment methods",
-    "orders": "Orders",
-    "editProfile": "Edit profile",
-    "saveProfile": "Save",
-    "addAddress": "Add address",
-    "editAddress": "Edit",
-    "deleteAddress": "Remove",
-    "defaultAddress": "Default",
-    "setDefault": "Set as default",
-    "cep": "ZIP code",
-    "street": "Street",
-    "number": "Number",
-    "complement": "Complement",
-    "neighborhood": "Neighborhood",
-    "city": "City",
-    "state": "State",
-    "cepNotFound": "ZIP code not found.",
-    "paymentStub": "Saved payment methods will be available soon.",
-    "noAddresses": "No addresses on file.",
-    "saveAddress": "Save address",
-    "cancel": "Cancel"
   },
   "orderStatus": {
     "pending_payment": "Awaiting payment",

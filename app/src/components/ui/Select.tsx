@@ -1,4 +1,4 @@
-import { forwardRef, type SelectHTMLAttributes } from 'react'
+import { forwardRef, useId, type SelectHTMLAttributes } from 'react'
 import { cn } from '@/lib/cn'
 import { ChevronDown } from 'lucide-react'
 
@@ -17,7 +17,16 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, error, hint, options, placeholder, className, id, ...props }, ref) => {
-    const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-')
+    // Ver Input.tsx: id derivado do label colidia entre campos homônimos.
+    const generatedId = useId()
+    const selectId = id ?? generatedId
+    const errorId = `${selectId}-error`
+    const hintId = `${selectId}-hint`
+
+    const describedBy =
+      [error ? errorId : null, hint && !error ? hintId : null].filter(Boolean).join(' ') ||
+      undefined
+
     return (
       <div className="flex flex-col gap-1">
         {label && (
@@ -29,6 +38,9 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
           <select
             ref={ref}
             id={selectId}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy}
+            aria-errormessage={error ? errorId : undefined}
             className={cn(
               'w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-900',
               'focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent',
@@ -54,8 +66,16 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
             aria-hidden
           />
         </div>
-        {error && <p className="text-xs text-red-600">{error}</p>}
-        {hint && !error && <p className="text-xs text-gray-500">{hint}</p>}
+        {error && (
+          <p id={errorId} role="alert" className="text-xs text-red-600">
+            {error}
+          </p>
+        )}
+        {hint && !error && (
+          <p id={hintId} className="text-xs text-gray-500">
+            {hint}
+          </p>
+        )}
       </div>
     )
   }

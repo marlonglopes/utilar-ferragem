@@ -11,6 +11,12 @@ interface FacetSidebarProps {
   priceMin: number
   priceMax: number
   onChange: (updates: Partial<SearchFilters>) => void
+  /**
+   * Esconde o grupo de categorias. Usado na CategoryPage, onde a categoria vem
+   * da própria rota (`/categoria/:slug`) e trocá-la significa navegar, não
+   * filtrar.
+   */
+  showCategoryFacet?: boolean
 }
 
 function FacetGroup({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
@@ -29,7 +35,14 @@ function FacetGroup({ title, defaultOpen = true, children }: { title: string; de
   )
 }
 
-export function FacetSidebar({ filters, brands, priceMin, priceMax, onChange }: FacetSidebarProps) {
+export function FacetSidebar({
+  filters,
+  brands,
+  priceMin,
+  priceMax,
+  onChange,
+  showCategoryFacet = true,
+}: FacetSidebarProps) {
   const { t } = useTranslation(['catalog', 'common'])
 
   const [localMin, setLocalMin] = useState(filters.priceMin)
@@ -47,6 +60,7 @@ export function FacetSidebar({ filters, brands, priceMin, priceMax, onChange }: 
   return (
     <aside className="flex flex-col gap-3">
       {/* Category */}
+      {showCategoryFacet && (
       <FacetGroup title={t('common:home.categories')}>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input
@@ -71,17 +85,31 @@ export function FacetSidebar({ filters, brands, priceMin, priceMax, onChange }: 
           </label>
         ))}
       </FacetGroup>
+      )}
 
-      {/* Brand */}
+      {/* Brand — o filtro aceita UMA marca por vez (o backend recebe `brand`
+          como string única), então a UI usa radio. Antes eram checkboxes, que
+          sugeriam multi-seleção e desmarcavam a anterior a cada clique. */}
       {brands.length > 0 && (
         <FacetGroup title={t('catalog:search.brands')}>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="radio"
+              name="brand"
+              checked={!filters.brand}
+              onChange={() => onChange({ brand: '' })}
+              className="text-brand-orange focus:ring-brand-orange"
+            />
+            <span className="flex-1 text-gray-700">{t('catalog:search.allBrands')}</span>
+          </label>
           {brands.map(({ value, count }) => (
             <label key={value} className="flex items-center gap-2 text-sm cursor-pointer">
               <input
-                type="checkbox"
+                type="radio"
+                name="brand"
                 checked={filters.brand === value}
-                onChange={() => onChange({ brand: filters.brand === value ? '' : value })}
-                className="h-4 w-4 rounded border-gray-300 text-brand-orange focus:ring-brand-orange focus:ring-offset-0"
+                onChange={() => onChange({ brand: value })}
+                className="text-brand-orange focus:ring-brand-orange"
               />
               <span className="flex-1 text-gray-700">{value}</span>
               <span className="text-xs text-gray-400">{count}</span>

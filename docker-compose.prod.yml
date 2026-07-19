@@ -32,7 +32,10 @@ services:
       <<: *svc-env
       ORDER_DB_URL: postgres://${DB_USER}:${DB_PASSWORD}@${RDS_HOST}:5432/order_service?sslmode=require
       CATALOG_SERVICE_URL: http://catalog:8091
-    depends_on: [redis, catalog]
+      # Sem isto o consumer de pagamento não sobe e o pedido nunca sai de
+      # pending_payment depois que o cliente paga.
+      KAFKA_BROKERS: redpanda:9092
+    depends_on: [redis, catalog, redpanda]
 
   auth:
     <<: *svc-common

@@ -16,18 +16,37 @@ import (
 // Espelha o padrão do order-service (RequireUser + lock HS256), estendido pra
 // checar o papel do usuário.
 func RequireAdmin(jwtSecret string, devMode bool) gin.HandlerFunc {
+	return RequireRole(jwtSecret, devMode, "admin")
+}
+
+// RequireRole é a versão genérica de RequireAdmin: aceita qualquer uma das
+// roles listadas. Extraído quando as rotas internas de reserva de estoque
+// passaram a precisar de `role=service` (token que o order-service assina com
+// o JWT_SECRET compartilhado) além de `admin` — duplicar o middleware inteiro
+// só pra trocar a string da role era convite a divergir na próxima mudança de
+// segurança.
+//
+// A mensagem de erro cita as roles aceitas pra o operador não precisar ler o
+// código quando toma 403 num script de integração.
+func RequireRole(jwtSecret string, devMode bool, roles ...string) gin.HandlerFunc {
+	allowed := make(map[string]struct{}, len(roles))
+	for _, r := range roles {
+		allowed[r] = struct{}{}
+	}
+	wanted := strings.Join(roles, " or ")
+
 	return func(c *gin.Context) {
 		// 1) JWT (caminho de produção)
 		if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
 			sub, role, err := parseJWTClaims(strings.TrimPrefix(auth, "Bearer "), jwtSecret)
 			if err != nil {
-				slog.Warn("admin: invalid jwt", "error", err.Error(), "request_id", c.GetString("request_id"))
+				slog.Warn("auth: invalid jwt", "error", err.Error(), "request_id", c.GetString("request_id"))
 				Unauthorized(c, "invalid token")
 				c.Abort()
 				return
 			}
-			if role != "admin" {
-				Forbidden(c, "admin role required")
+			if _, ok := allowed[role]; !ok {
+				Forbidden(c, wanted+" role required")
 				c.Abort()
 				return
 			}
@@ -39,11 +58,13 @@ func RequireAdmin(jwtSecret string, devMode bool) gin.HandlerFunc {
 
 		// 2) Fallback dev — headers explícitos, só quando DevMode=true.
 		if devMode {
-			if c.GetHeader("X-User-Role") == "admin" {
-				c.Set("user_id", c.GetHeader("X-User-Id"))
-				c.Set("user_role", "admin")
-				c.Next()
-				return
+			if hdr := c.GetHeader("X-User-Role"); hdr != "" {
+				if _, ok := allowed[hdr]; ok {
+					c.Set("user_id", c.GetHeader("X-User-Id"))
+					c.Set("user_role", hdr)
+					c.Next()
+					return
+				}
 			}
 		}
 

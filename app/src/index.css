@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap');
+/* As fontes são carregadas via <link rel="stylesheet"> em index.html.
+   O @import que existia aqui foi removido: além de duplicar o download,
+   @import no CSS é render-blocking e atrasa o first paint. */
 
 @tailwind base;
 @tailwind components;

@@ -119,6 +119,81 @@ func RequireUser(jwtSecret string, devMode bool) gin.HandlerFunc {
 	}
 }
 
+// RequireRole protege as rotas de operação (/admin/orders/*). Exige JWT com
+// claim `role` entre as aceitas.
+//
+// Espelha o RequireRole do catalog-service. Em DevMode aceita o fallback
+// X-User-Id + X-User-Role, mesmo padrão do RequireUser acima — e pelo mesmo
+// motivo: rodar smoke test sem subir o auth-service.
+func RequireRole(jwtSecret string, devMode bool, roles ...string) gin.HandlerFunc {
+	allowed := make(map[string]struct{}, len(roles))
+	for _, r := range roles {
+		allowed[r] = struct{}{}
+	}
+	wanted := strings.Join(roles, " or ")
+
+	return func(c *gin.Context) {
+		if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+			sub, role, err := parseJWTSubjectRole(strings.TrimPrefix(auth, "Bearer "), jwtSecret)
+			if err != nil {
+				slog.Warn("invalid jwt", "error", err.Error(), "request_id", c.GetString("request_id"))
+				Unauthorized(c, "invalid token")
+				c.Abort()
+				return
+			}
+			if _, ok := allowed[role]; !ok {
+				Forbidden(c, wanted+" role required")
+				c.Abort()
+				return
+			}
+			c.Set("user_id", sub)
+			c.Set("user_role", role)
+			c.Next()
+			return
+		}
+
+		if devMode {
+			if hdr := c.GetHeader("X-User-Role"); hdr != "" {
+				if _, ok := allowed[hdr]; ok {
+					c.Set("user_id", c.GetHeader("X-User-Id"))
+					c.Set("user_role", hdr)
+					c.Next()
+					return
+				}
+			}
+		}
+
+		Unauthorized(c, "missing or invalid Authorization header")
+		c.Abort()
+	}
+}
+
+// parseJWTSubjectRole extrai `sub` e `role`. Mesmo lock HS256 (A16-M7).
+func parseJWTSubjectRole(tokenStr, secret string) (sub, role string, err error) {
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
+		if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(secret), nil
+	})
+	if err != nil || !token.Valid {
+		if err == nil {
+			err = errors.New("invalid token")
+		}
+		return "", "", err
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", "", errors.New("invalid claims")
+	}
+	sub, _ = claims["sub"].(string)
+	role, _ = claims["role"].(string)
+	if sub == "" {
+		return "", "", errors.New("missing sub claim")
+	}
+	return sub, role, nil
+}
+
 // parseJWTSubject extrai a claim `sub` do JWT HS256 (compatível com auth-service.Claims).
 // A16-M7: lock estrito no algoritmo HS256.
 func parseJWTSubject(tokenStr, secret string) (string, error) {

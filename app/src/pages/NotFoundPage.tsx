@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Seo } from '@/components/seo/Seo'
 
 export default function NotFoundPage() {
   const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
+      <Seo title="Página não encontrada" noIndex />
       <span className="text-7xl select-none">🔩</span>
       <div>
         <h1 className="font-display font-black text-3xl text-gray-900 mb-2">404</h1>

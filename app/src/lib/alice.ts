@@ -1,4 +1,4 @@
-// Cliente da assistente Lara ✨. Base URL independente (VITE_ASSISTANT_URL);
+// Cliente da assistente Alice ✨. Base URL independente (VITE_ASSISTANT_URL);
 // vazio = mock leve no cliente (o assistant-service tem o modo mock próprio, mas
 // aqui garantimos que a bolha funcione mesmo sem backend).
 const ASSISTANT_URL = import.meta.env.VITE_ASSISTANT_URL ?? ''
@@ -34,7 +34,7 @@ export async function sendToLara(message: string, history: LaraTurn[]): Promise<
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, history }),
   })
-  if (!res.ok) throw new Error(`lara ${res.status}`)
+  if (!res.ok) throw new Error(`alice ${res.status}`)
   const data = (await res.json()) as LaraResult
   return { reply: data.reply, products: data.products ?? [], model: data.model }
 }
@@ -44,7 +44,7 @@ function mockReply(message: string): LaraResult {
   const q = message.toLowerCase()
   const greeting = /\b(oi|olá|ola|bom dia|boa tarde|boa noite|ajuda)\b/.test(q)
   const reply = greeting
-    ? 'Oi! Eu sou a Lara ✨, sua ajudante aqui da UtiLar Ferragem. Posso achar ferramentas e materiais, comparar preços e estoque, e montar a lista pra sua obra. O que você procura?'
+    ? 'Oi! Eu sou a Alice ✨, sua ajudante aqui da UtiLar Ferragem. Posso achar ferramentas e materiais, comparar preços e estoque, e montar a lista pra sua obra. O que você procura?'
     : 'Posso te ajudar a encontrar ferramentas e materiais. Me diga o que você precisa — por exemplo "furadeira", "cimento" ou uma categoria como elétrica.'
   return { reply, products: [], model: 'mock-client' }
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/utilar/catalog-service/internal/config"
 	"github.com/utilar/catalog-service/internal/db"
 	"github.com/utilar/catalog-service/internal/handler"
+	"github.com/utilar/catalog-service/internal/reservation"
 	"github.com/utilar/pkg/ratelimit"
 )
 
@@ -44,6 +45,7 @@ func main() {
 	categoryH := handler.NewCategoryHandler(database)
 	sellerH := handler.NewSellerHandler(database)
 	adminProductH := handler.NewAdminProductHandler(database)
+	reservationH := handler.NewReservationHandler(database)
 
 	if cfg.DevMode {
 		slog.Warn("DEV_MODE=true — /admin aceita fallback X-User-Role; nunca use em produção")
@@ -105,6 +107,21 @@ func main() {
 		admin.DELETE("/products/by-id/:id/images/:imageId", adminProductH.DeleteImage)
 		admin.POST("/products/import", adminProductH.Import)
 	}
+
+	// Rotas internas de reserva de estoque — chamadas pelo order-service, não
+	// pelo browser. Aceitam role=service (token assinado pelo order-service com
+	// o JWT_SECRET compartilhado) ou role=admin (para operação manual/debug).
+	internal := r.Group("/api/v1/internal", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, "service", "admin"))
+	{
+		internal.POST("/reservations", reservationH.Reserve)
+		internal.POST("/reservations/:orderId/commit", reservationH.Commit)
+		internal.POST("/reservations/:orderId/release", reservationH.Release)
+	}
+
+	// Sweeper de expiração: devolve à vitrine o estoque de carrinhos abandonados.
+	sweeperCtx, stopSweeper := context.WithCancel(context.Background())
+	defer stopSweeper()
+	go reservation.NewSweeper(database).Run(sweeperCtx)
 
 	r.GET("/health", func(c *gin.Context) {
 		if err := database.Ping(); err != nil {

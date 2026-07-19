@@ -51,7 +51,8 @@
     "priceRange": "Price range",
     "inStockOnly": "In stock only",
     "apply": "Apply",
-    "brands": "Brand"
+    "brands": "Brand",
+    "allBrands": "All brands"
   },
   "category": {
     "allProducts": "All products",

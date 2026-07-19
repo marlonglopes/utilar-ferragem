@@ -25,9 +25,12 @@ const variants: Record<ButtonVariant, string> = {
     'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-600',
 }
 
+// Alvo de toque: o WCAG 2.5.8 (AA) pede no mínimo 24x24 CSS px e o 2.5.5 (AAA)
+// recomenda 44x44 — o padrão de fato em mobile. `md` era 40px e virou 44px;
+// `sm` sobe de 32 para 36px e fica reservado a ações secundárias densas.
 const sizes: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-sm',
-  md: 'h-10 px-4 text-sm',
+  sm: 'h-9 px-3 text-sm',
+  md: 'h-11 px-4 text-sm',
   lg: 'h-12 px-6 text-base',
 }
 

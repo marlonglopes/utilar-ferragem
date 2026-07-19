@@ -3,7 +3,7 @@ import { Topbar } from './Topbar'
 import { Navbar } from './Navbar'
 import { CategoryRail } from './CategoryRail'
 import { Footer } from './Footer'
-import { LaraBubble } from '@/components/assistant/LaraBubble'
+import { AliceBubble } from '@/components/assistant/AliceBubble'
 
 export function PublicLayout() {
   return (
@@ -15,7 +15,7 @@ export function PublicLayout() {
         <Outlet />
       </main>
       <Footer />
-      <LaraBubble />
+      <AliceBubble />
     </div>
   )
 }

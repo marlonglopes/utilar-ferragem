@@ -14,8 +14,10 @@ import (
 
 	"github.com/utilar/order-service/internal/catalogclient"
 	"github.com/utilar/order-service/internal/config"
+	"github.com/utilar/order-service/internal/consumer"
 	"github.com/utilar/order-service/internal/db"
 	"github.com/utilar/order-service/internal/handler"
+	"github.com/utilar/order-service/internal/shipping"
 	"github.com/utilar/pkg/idempotency"
 	"github.com/utilar/pkg/ratelimit"
 )
@@ -43,8 +45,33 @@ func main() {
 	}
 	slog.Info("migrations applied")
 
-	catalog := catalogclient.New(cfg.CatalogServiceURL)
-	orderH := handler.NewOrderHandler(database, catalog, cfg.DevMode)
+	// NewWithSecret: o mesmo cliente serve pra consultar preço (rota pública) e
+	// pra reservar estoque (rotas /internal, que exigem token role=service
+	// assinado com o JWT_SECRET compartilhado).
+	catalog := catalogclient.NewWithSecret(cfg.CatalogServiceURL, cfg.JWTSecret)
+	rates := shipping.NewStore(database)
+
+	orderH := handler.NewOrderHandler(database, catalog, cfg.DevMode).
+		WithStock(catalog).
+		WithShipping(rates)
+	shippingH := handler.NewShippingHandler(rates)
+
+	// Consumer dos eventos de pagamento — é ele que faz o pedido virar 'paid'.
+	// Sem KAFKA_BROKERS o loop pagamento→pedido fica aberto: o cliente paga e o
+	// pedido não sai de pending_payment. Por isso o aviso é gritado no boot.
+	consumerCtx, stopConsumer := context.WithCancel(context.Background())
+	defer stopConsumer()
+	if len(cfg.KafkaBrokers) > 0 {
+		pc, err := consumer.New(database, cfg.KafkaBrokers, catalog)
+		if err != nil {
+			slog.Error("payment consumer init", "error", err)
+			os.Exit(1)
+		}
+		go pc.Run(consumerCtx)
+	} else {
+		slog.Warn("KAFKA_BROKERS not set — payment consumer DISABLED; " +
+			"orders will stay in pending_payment after payment confirmation")
+	}
 
 	r := gin.New()
 	r.Use(
@@ -95,6 +122,20 @@ func main() {
 		api.GET("/orders", orderH.List)
 		api.GET("/orders/:id", orderH.Get)
 		api.PATCH("/orders/:id/cancel", orderH.Cancel)
+
+		// Cotação de frete — o carrinho chama com o CEP antes do checkout.
+		// Contrato em docs/shipping-api.md.
+		api.POST("/shipping/quote", shippingH.Quote)
+	}
+
+	// Rotas de operação (separação, despacho, entrega). role=admin ou operator:
+	// quem embala não precisa de poder de admin sobre o resto do sistema.
+	ops := r.Group("/api/v1/admin", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, "admin", "operator"))
+	{
+		ops.PATCH("/orders/:id/picking", orderH.MarkPicking)
+		ops.PATCH("/orders/:id/shipped", orderH.MarkShipped)
+		ops.PATCH("/orders/:id/delivered", orderH.MarkDelivered)
+		ops.PATCH("/orders/:id/cancel", orderH.AdminCancel)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

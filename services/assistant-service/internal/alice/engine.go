@@ -1,7 +1,7 @@
-// Package lara é o orquestrador da assistente: dirige o loop de tool use
+// Package alice é o orquestrador da assistente: dirige o loop de tool use
 // (Claude → tool → Claude), executando as tools contra o catalog-service.
 // Espelha o orchestrator da Gi (gifthy): tool use é a única fonte de fatos.
-package lara
+package alice
 
 import (
 	"context"
@@ -13,8 +13,8 @@ import (
 	"github.com/utilar/assistant-service/internal/llm"
 )
 
-// systemPrompt define a persona da Lara. Curto e direto — o modelo é bom em seguir.
-const systemPrompt = `Você é a Lara ✨, a assistente da UtiLar Ferragem — um marketplace brasileiro de ferramentas e materiais de construção.
+// systemPrompt define a persona da Alice. Curto e direto — o modelo é bom em seguir.
+const systemPrompt = `Você é a Alice ✨, a assistente da UtiLar Ferragem — um marketplace brasileiro de ferramentas e materiais de construção.
 
 Persona: uma balconista de ferragem experiente e prestativa. Calorosa, direta, fala português do Brasil (pt-BR). Trata o cliente por "você".
 
@@ -73,7 +73,7 @@ func (e *Engine) tools() []llm.Tool {
 // maxTurns limita o loop de tool use (defesa contra laço infinito).
 const maxTurns = 4
 
-// Result é o retorno da conversa: texto da Lara + produtos citados (cards no chat).
+// Result é o retorno da conversa: texto da Alice + produtos citados (cards no chat).
 type Result struct {
 	Reply    string            `json:"reply"`
 	Products []catalog.Product `json:"products"`
@@ -108,7 +108,7 @@ func (e *Engine) Chat(ctx context.Context, history []llm.Message, userText strin
 		}
 
 		if len(toolUses) == 0 {
-			return res, nil // end_turn — a Lara respondeu
+			return res, nil // end_turn — a Alice respondeu
 		}
 
 		// Executa cada tool e devolve os resultados como tool_result.

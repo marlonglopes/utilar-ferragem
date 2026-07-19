@@ -1,4 +1,4 @@
-package lara_test
+package alice_test
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/utilar/assistant-service/internal/catalog"
-	"github.com/utilar/assistant-service/internal/lara"
+	"github.com/utilar/assistant-service/internal/alice"
 	"github.com/utilar/assistant-service/internal/llm"
 )
 
@@ -34,7 +34,7 @@ func TestChat_MockUsesToolAndSurfacesProducts(t *testing.T) {
 	srv := fakeCatalog(t)
 	defer srv.Close()
 
-	eng := lara.New(llm.NewMock(), catalog.New(srv.URL))
+	eng := alice.New(llm.NewMock(), catalog.New(srv.URL))
 	res, err := eng.Chat(context.Background(), nil, "procuro uma furadeira")
 	if err != nil {
 		t.Fatalf("erro: %v", err)
@@ -46,7 +46,7 @@ func TestChat_MockUsesToolAndSurfacesProducts(t *testing.T) {
 		t.Errorf("produto inesperado: %+v", res.Products[0])
 	}
 	if res.Reply == "" {
-		t.Error("Lara deveria responder um texto")
+		t.Error("Alice deveria responder um texto")
 	}
 	if res.Model != "mock" {
 		t.Errorf("model esperado mock, veio %q", res.Model)
@@ -57,7 +57,7 @@ func TestChat_GreetingNoTool(t *testing.T) {
 	srv := fakeCatalog(t)
 	defer srv.Close()
 
-	eng := lara.New(llm.NewMock(), catalog.New(srv.URL))
+	eng := alice.New(llm.NewMock(), catalog.New(srv.URL))
 	res, err := eng.Chat(context.Background(), nil, "oi, quem é você?")
 	if err != nil {
 		t.Fatalf("erro: %v", err)
@@ -65,8 +65,8 @@ func TestChat_GreetingNoTool(t *testing.T) {
 	if len(res.Products) != 0 {
 		t.Errorf("saudação não deveria buscar produtos, veio %d", len(res.Products))
 	}
-	if !strings.Contains(res.Reply, "Lara") {
-		t.Errorf("saudação deveria se apresentar como Lara; veio %q", res.Reply)
+	if !strings.Contains(res.Reply, "Alice") {
+		t.Errorf("saudação deveria se apresentar como Alice; veio %q", res.Reply)
 	}
 }
 
@@ -77,7 +77,7 @@ func TestChat_NoResults(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	eng := lara.New(llm.NewMock(), catalog.New(srv.URL))
+	eng := alice.New(llm.NewMock(), catalog.New(srv.URL))
 	res, err := eng.Chat(context.Background(), nil, "procuro um item-que-nao-existe-zzz")
 	if err != nil {
 		t.Fatalf("erro: %v", err)

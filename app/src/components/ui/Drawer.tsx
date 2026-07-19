@@ -1,8 +1,9 @@
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/cn'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useFocusTrap } from './useFocusTrap'
 
 export type DrawerSide = 'left' | 'right' | 'bottom'
 
@@ -36,6 +37,11 @@ const sideClasses: Record<DrawerSide, { panel: string; enter: string; exit: stri
 function Drawer({ open, onClose, title, side = 'right', className, children }: DrawerProps) {
   const { t } = useTranslation()
   const cfg = sideClasses[side]
+  const panelRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+
+  // Mesmo tratamento do Modal: Tab preso no painel e foco devolvido ao gatilho.
+  useFocusTrap(panelRef, open)
 
   useEffect(() => {
     if (!open) return
@@ -53,22 +59,33 @@ function Drawer({ open, onClose, title, side = 'right', className, children }: D
   if (!open) return null
 
   return createPortal(
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={title ? titleId : undefined}
+      className="fixed inset-0 z-50"
+    >
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className={cn(
-          'absolute bg-white shadow-xl transition-transform duration-300',
+          'absolute bg-white shadow-xl transition-transform duration-300 focus:outline-none',
           cfg.panel,
           open ? cfg.enter : cfg.exit,
           className
         )}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          {title && <h2 className="text-base font-semibold text-gray-900">{title}</h2>}
+          {title && (
+            <h2 id={titleId} className="text-base font-semibold text-gray-900">
+              {title}
+            </h2>
+          )}
           <button
             onClick={onClose}
             className="ml-auto rounded-lg p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-orange"
@@ -77,7 +94,12 @@ function Drawer({ open, onClose, title, side = 'right', className, children }: D
             <X className="h-5 w-5" aria-hidden />
           </button>
         </div>
-        <div className={cn('overflow-y-auto', side === 'bottom' ? 'max-h-[calc(90vh-56px)]' : 'h-[calc(100vh-56px)]')}>
+        <div
+          className={cn(
+            'overflow-y-auto',
+            side === 'bottom' ? 'max-h-[calc(90vh-56px)]' : 'h-[calc(100vh-56px)]'
+          )}
+        >
           <div className="p-4">{children}</div>
         </div>
       </div>

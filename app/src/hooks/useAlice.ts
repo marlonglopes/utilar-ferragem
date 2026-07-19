@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { sendToLara, type LaraProduct, type LaraTurn } from '@/lib/lara'
+import { sendToLara, type LaraProduct, type LaraTurn } from '@/lib/alice'
 
 export interface LaraMessage {
   role: 'user' | 'assistant'
@@ -9,10 +9,10 @@ export interface LaraMessage {
 
 const WELCOME: LaraMessage = {
   role: 'assistant',
-  text: 'Oi! Sou a Lara ✨. O que você está procurando hoje?',
+  text: 'Oi! Sou a Alice ✨. O que você está procurando hoje?',
 }
 
-export function useLara() {
+export function useAlice() {
   const [messages, setMessages] = useState<LaraMessage[]>([WELCOME])
   const [loading, setLoading] = useState(false)
 

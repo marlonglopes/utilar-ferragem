@@ -1,6 +1,6 @@
-// Package catalog é o cliente HTTP que a Lara usa como FONTE DE FATOS.
+// Package catalog é o cliente HTTP que a Alice usa como FONTE DE FATOS.
 // Toda afirmação factual (produto existe, preço, estoque) vem daqui via tool use
-// — a Lara nunca inventa. Espelha o princípio da Gi (gifthy).
+// — a Alice nunca inventa. Espelha o princípio da Gi (gifthy).
 package catalog
 
 import (
@@ -23,7 +23,7 @@ func New(baseURL string) *Client {
 	return &Client{baseURL: baseURL, http: httpclient.New(8 * time.Second)}
 }
 
-// Product é a visão enxuta que a Lara usa/expõe (cards no chat).
+// Product é a visão enxuta que a Alice usa/expõe (cards no chat).
 type Product struct {
 	ID       string   `json:"id"`
 	Slug     string   `json:"slug"`

@@ -38,15 +38,27 @@ var (
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
+	jwtSecret  string // assina o token role=service das rotas /internal (ver reservation.go)
 }
 
 // New cria um cliente. baseURL ex.: "http://localhost:8091" (sem trailing slash).
 // Timeout 5s — catalog é local; lentidão = abortar pedido.
+//
+// Sem segredo: só os endpoints públicos (GetByID) funcionam. As chamadas de
+// reserva falham com erro explícito em vez de silenciosamente pularem o
+// controle de estoque.
 func New(baseURL string) *Client {
 	return &Client{
 		baseURL:    baseURL,
 		httpClient: httpclient.New(5 * time.Second), // L-PAYMENT-1
 	}
+}
+
+// NewWithSecret cria um cliente capaz de chamar as rotas internas de reserva.
+func NewWithSecret(baseURL, jwtSecret string) *Client {
+	c := New(baseURL)
+	c.jwtSecret = jwtSecret
+	return c
 }
 
 // GetByID busca um produto pelo seu UUID via GET /api/v1/products/by-id/:id.

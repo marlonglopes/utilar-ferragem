@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { COMPANY, formattedAddress } from '@/lib/company'
 
 function PixIcon() {
   return (
@@ -103,10 +104,30 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-blue-300">
-          <span>
-            © {year} UtiLar Ferragem. {t('footer.rights')}.
-          </span>
+        {/* Identificação do fornecedor. O Decreto 7.962/2013, art. 2º, I e II,
+            obriga o e-commerce a exibir razão social, CNPJ e endereço físico de
+            forma ostensiva — os valores vêm de src/lib/company.ts e ainda são
+            placeholders até a revisão jurídica. */}
+        <div className="mt-8 pt-6 border-t border-white/10 flex flex-col gap-2 text-xs text-blue-300">
+          <address className="not-italic leading-relaxed">
+            <strong className="font-semibold text-blue-200">{COMPANY.legalName}</strong> — CNPJ{' '}
+            {COMPANY.cnpj}
+            <br />
+            {formattedAddress()}
+          </address>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-2">
+            <span>
+              © {year} UtiLar Ferragem. {t('footer.rights')}.
+            </span>
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Link to="/privacidade" className="hover:text-white transition-colors">
+                {t('footer.privacyPolicy')}
+              </Link>
+              <Link to="/termos" className="hover:text-white transition-colors">
+                {t('footer.terms')}
+              </Link>
+            </span>
+          </div>
         </div>
       </div>
     </footer>

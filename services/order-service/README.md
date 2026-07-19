@@ -70,6 +70,44 @@ Base URL em dev: `http://localhost:8092`. Todos os endpoints `api/v1` requerem `
 | `GET` | `/api/v1/orders` | lista pedidos do usuário (suporta `?status=active\|done\|all`, `?page`, `?per_page`) |
 | `GET` | `/api/v1/orders/:id` | detalhe + items + endereço + tracking events |
 | `PATCH` | `/api/v1/orders/:id/cancel` | transição para `cancelled` (apenas se não shipped/delivered) |
+| `POST` | `/api/v1/shipping/quote` | cotação de frete por CEP — ver [docs/shipping-api.md](../../docs/shipping-api.md) |
+
+**Rotas de operação** (`RequireRole("admin", "operator")`):
+
+| Método | Rota | Transição |
+|---|---|---|
+| `PATCH` | `/api/v1/admin/orders/:id/picking` | `paid → picking` |
+| `PATCH` | `/api/v1/admin/orders/:id/shipped` | `picking → shipped` (exige `trackingCode` no body) |
+| `PATCH` | `/api/v1/admin/orders/:id/delivered` | `shipped → delivered` |
+| `PATCH` | `/api/v1/admin/orders/:id/cancel` | `* → cancelled` (pré-despacho) |
+
+### Máquina de estados
+
+```
+pending_payment ──> paid ──> picking ──> shipped ──> delivered
+       │              │         │
+       └──────────────┴─────────┴────────> cancelled
+```
+
+Implementada como função pura em `internal/model/transition.go` (`CanTransition`)
+e aplicada no banco por `internal/fulfillment.Advance`, que trava a linha com
+`SELECT ... FOR UPDATE`, preenche o timestamp correspondente e grava o tracking
+event. Transição inválida vira `409` com a mensagem "de X pra Y não pode" —
+nunca no-op silencioso.
+
+### Consumer de pagamento
+
+`internal/consumer` assina os topics `payment.confirmed`, `payment.failed` e
+`payment.cancelled` do Redpanda (publicados pelo outbox do payment-service). É o
+caminho que leva o pedido a `paid` e preenche `paid_at`.
+
+Idempotência via tabela `processed_payment_events`, com unique em
+`(payment_id, event_type)`. O INSERT dela acontece **na mesma transação** que
+muda o pedido: a reentrega do mesmo evento (o outbox é at-least-once) dá
+rollback inteiro e não duplica status, timestamp nem tracking event.
+
+Sem `KAFKA_BROKERS` o consumer não sobe e **o pedido nunca sai de
+`pending_payment`** — o serviço grita um `WARN` no boot nesse caso.
 
 **Headers comuns:**
 - `X-User-Id: <opaque-id>` — identifica o dono do pedido (RLS implementado em SQL via `WHERE user_id = $1`)
@@ -132,6 +170,9 @@ Response 201:
 |---|---|---|
 | `PORT` | `8092` | porta HTTP |
 | `ORDER_DB_URL` | `postgres://utilar:utilar@localhost:5437/order_service?sslmode=disable` | DSN Postgres |
+| `KAFKA_BROKERS` | *(vazio)* | brokers do Redpanda, separados por vírgula (ex.: `localhost:19092`). **Vazio desliga o consumer de pagamento** |
+| `CATALOG_SERVICE_URL` | `http://localhost:8091` | preço autoritativo + reserva de estoque |
+| `JWT_SECRET` | — | também assina o token `role=service` das chamadas de reserva ao catalog |
 
 ---
 
@@ -210,5 +251,7 @@ Para ver pedidos do seed, o mock auth precisaria gerar um dos `user-001..user-02
 ## Próximos passos
 
 - **Phase B3 — `auth-service`**: `users` + `addresses` + JWT. Remove `RequireUser()` middleware, substitui por `JWTMiddleware`.
-- **Webhook integration com payment-service**: quando `payment.confirmed` chega, o order-service atualiza `payment_id`, `paid_at`, `status = 'paid'` e insere evento de tracking. Isso é parte da Sprint 15 (disputas) ou pode ser antecipado.
-- **Status manual transitions por admin**: endpoints `PATCH /orders/:id/status` com role admin (Sprint 20 — admin console).
+- ~~**Webhook integration com payment-service**~~ — feito: `internal/consumer` consome os eventos do outbox e leva o pedido a `paid`.
+- ~~**Status manual transitions por admin**~~ — feito: rotas `/api/v1/admin/orders/:id/{picking,shipped,delivered,cancel}`.
+- **Peso no cálculo de frete**: hoje a tabela usa faixa de CEP × valor + custo por item, porque `products` não tem coluna de peso. Ver limitação em [docs/shipping-api.md](../../docs/shipping-api.md).
+- **Reconciliação de estoque**: um job que compare reservas `committed` com itens de pedidos pagos e alerte divergência (o commit da reserva acontece fora da transação do pedido, por ser HTTP).

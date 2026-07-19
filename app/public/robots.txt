@@ -1,0 +1,22 @@
+# robots.txt — UtiLar Ferragem
+# Ao publicar, confirme que o Sitemap abaixo aponta para o domínio real
+# (o host é injetado no build a partir de VITE_SITE_URL — ver vite.config.ts).
+
+User-agent: *
+Allow: /
+
+# Áreas sem valor de busca ou com dado de sessão. Não são segredo — apenas não
+# devem consumir orçamento de rastreamento nem aparecer no índice.
+Disallow: /carrinho
+Disallow: /checkout
+Disallow: /conta
+Disallow: /pedido/
+Disallow: /entrar
+Disallow: /cadastro
+Disallow: /esqueci-senha
+Disallow: /_dev/
+
+# Resultados de busca: conteúdo duplicado e praticamente infinito.
+Disallow: /busca
+
+Sitemap: https://www.utilarferragem.com.br/sitemap.xml

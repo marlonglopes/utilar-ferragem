@@ -58,34 +58,57 @@ type TrackingEvent struct {
 }
 
 type Order struct {
-	ID             string          `json:"id"`
-	Number         string          `json:"number"`
-	UserID         string          `json:"userId"`
-	Status         OrderStatus     `json:"status"`
-	PaymentMethod  PaymentMethod   `json:"paymentMethod"`
-	PaymentID      *string         `json:"paymentId,omitempty"`
-	PaymentInfo    *string         `json:"paymentInfo,omitempty"`
-	Items          []OrderItem     `json:"items"`
-	Subtotal       float64         `json:"subtotal"`
-	ShippingCost   float64         `json:"shippingCost"`
-	Total          float64         `json:"total"`
-	Address        OrderAddress    `json:"address"`
-	TrackingCode   *string         `json:"trackingCode,omitempty"`
-	TrackingEvents []TrackingEvent `json:"trackingEvents,omitempty"`
-	CreatedAt      time.Time       `json:"createdAt"`
-	PaidAt         *time.Time      `json:"paidAt,omitempty"`
-	PickedAt       *time.Time      `json:"pickedAt,omitempty"`
-	ShippedAt      *time.Time      `json:"shippedAt,omitempty"`
-	DeliveredAt    *time.Time      `json:"deliveredAt,omitempty"`
-	CancelledAt    *time.Time      `json:"cancelledAt,omitempty"`
-	UpdatedAt      time.Time       `json:"updatedAt"`
+	ID              string          `json:"id"`
+	Number          string          `json:"number"`
+	UserID          string          `json:"userId"`
+	Status          OrderStatus     `json:"status"`
+	PaymentMethod   PaymentMethod   `json:"paymentMethod"`
+	PaymentID       *string         `json:"paymentId,omitempty"`
+	PaymentInfo     *string         `json:"paymentInfo,omitempty"`
+	Items           []OrderItem     `json:"items"`
+	Subtotal        float64         `json:"subtotal"`
+	ShippingCost    float64         `json:"shippingCost"`
+	ShippingService string          `json:"shippingService"`
+	Total           float64         `json:"total"`
+	Address         OrderAddress    `json:"address"`
+	TrackingCode    *string         `json:"trackingCode,omitempty"`
+	TrackingEvents  []TrackingEvent `json:"trackingEvents,omitempty"`
+	CreatedAt       time.Time       `json:"createdAt"`
+	PaidAt          *time.Time      `json:"paidAt,omitempty"`
+	PickedAt        *time.Time      `json:"pickedAt,omitempty"`
+	ShippedAt       *time.Time      `json:"shippedAt,omitempty"`
+	DeliveredAt     *time.Time      `json:"deliveredAt,omitempty"`
+	CancelledAt     *time.Time      `json:"cancelledAt,omitempty"`
+	UpdatedAt       time.Time       `json:"updatedAt"`
 }
 
 // CreateOrderRequest — payload de POST /api/v1/orders.
 // Limites de tamanho previnem DoS por payload absurdo (audit O3-M1).
+//
+// ShippingCost é ACEITO mas NÃO usado no total: o servidor recalcula o frete a
+// partir da tabela `shipping_rates` e do CEP do endereço. O campo continua no
+// contrato só pra detectar divergência (frontend com tabela velha, ou tentativa
+// de tamper) e logar — remover o campo quebraria o app hoje em produção.
+// O cliente escolhe QUAL serviço quer via ShippingService; o preço é do servidor.
 type CreateOrderRequest struct {
-	PaymentMethod PaymentMethod `json:"paymentMethod" binding:"required,oneof=pix boleto card"`
-	Items         []OrderItem   `json:"items" binding:"required,min=1,max=100,dive"`
-	ShippingCost  float64       `json:"shippingCost" binding:"gte=0,lte=99999.99"`
-	Address       OrderAddress  `json:"address" binding:"required"`
+	PaymentMethod   PaymentMethod `json:"paymentMethod" binding:"required,oneof=pix boleto card"`
+	Items           []OrderItem   `json:"items" binding:"required,min=1,max=100,dive"`
+	ShippingCost    float64       `json:"shippingCost" binding:"gte=0,lte=99999.99"`
+	ShippingService string        `json:"shippingService" binding:"omitempty,oneof=standard express"`
+	Address         OrderAddress  `json:"address" binding:"required"`
+}
+
+// ShippingQuoteRequest — payload de POST /api/v1/shipping/quote.
+// O carrinho chama isso com o CEP antes do checkout.
+type ShippingQuoteRequest struct {
+	CEP       string  `json:"cep" binding:"required,max=9"`
+	Subtotal  float64 `json:"subtotal" binding:"gte=0,lte=9999999.99"`
+	ItemCount int     `json:"itemCount" binding:"gte=0,lte=9999"`
+}
+
+// FulfillmentRequest — payload dos endpoints de operação (separar/enviar/entregar).
+type FulfillmentRequest struct {
+	TrackingCode *string `json:"trackingCode" binding:"omitempty,max=64"`
+	Location     *string `json:"location" binding:"omitempty,max=255"`
+	Note         *string `json:"note" binding:"omitempty,max=500"`
 }

@@ -1,17 +1,17 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Sparkles, Send, X } from 'lucide-react'
-import { useLara } from '@/hooks/useLara'
+import { useAlice } from '@/hooks/useAlice'
 import { formatCurrency } from '@/lib/format'
-import type { LaraProduct } from '@/lib/lara'
+import type { LaraProduct } from '@/lib/alice'
 
 /**
- * Lara ✨ — copiloto embarcado da UtiLar (equivalente à "Gi" do Gifthy).
+ * Alice ✨ — copiloto embarcado da UtiLar (equivalente à "Gi" do Gifthy).
  * Bolha flutuante no canto → painel de chat. Sugere produtos reais do catálogo.
  */
-export function LaraBubble() {
+export function AliceBubble() {
   const [open, setOpen] = useState(false)
-  const { messages, loading, send } = useLara()
+  const { messages, loading, send } = useAlice()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -31,7 +31,7 @@ export function LaraBubble() {
       {/* Botão flutuante */}
       <button
         onClick={() => setOpen((v) => !v)}
-        aria-label={open ? 'Fechar assistente Lara' : 'Abrir assistente Lara'}
+        aria-label={open ? 'Fechar assistente Alice' : 'Abrir assistente Alice'}
         className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-brand-orange text-white shadow-lg transition-transform hover:scale-105 hover:bg-brand-orange-dark focus:outline-none focus:ring-2 focus:ring-brand-orange focus:ring-offset-2"
       >
         {open ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
@@ -43,7 +43,7 @@ export function LaraBubble() {
           <header className="flex items-center gap-2 bg-brand-blue px-4 py-3 text-white">
             <Sparkles className="h-5 w-5 text-brand-gold" />
             <div className="leading-tight">
-              <div className="font-display font-bold">Lara</div>
+              <div className="font-display font-bold">Alice</div>
               <div className="text-[11px] text-white/70">sua ajudante na UtiLar</div>
             </div>
           </header>
@@ -71,7 +71,7 @@ export function LaraBubble() {
             ))}
             {loading && (
               <div className="mr-auto max-w-[85%] rounded-2xl rounded-bl-sm bg-gray-100 px-3 py-2 text-sm text-gray-400">
-                Lara está digitando…
+                Alice está digitando…
               </div>
             )}
           </div>
@@ -80,8 +80,8 @@ export function LaraBubble() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Pergunte à Lara…"
-              aria-label="Mensagem para a Lara"
+              placeholder="Pergunte à Alice…"
+              aria-label="Mensagem para a Alice"
               className="flex-1 rounded-full bg-gray-100 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-orange"
             />
             <button

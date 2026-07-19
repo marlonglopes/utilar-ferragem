@@ -1,4 +1,4 @@
-import { forwardRef, type InputHTMLAttributes } from 'react'
+import { forwardRef, useId, type InputHTMLAttributes } from 'react'
 import { cn } from '@/lib/cn'
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
@@ -9,7 +9,16 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
 
 const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
   ({ label, hint, error, className, id, ...props }, ref) => {
-    const checkId = id ?? label?.toLowerCase().replace(/\s+/g, '-')
+    // Ver Input.tsx: id derivado do label colidia entre checkboxes homônimos.
+    const generatedId = useId()
+    const checkId = id ?? generatedId
+    const errorId = `${checkId}-error`
+    const hintId = `${checkId}-hint`
+
+    const describedBy =
+      [error ? errorId : null, hint && !error ? hintId : null].filter(Boolean).join(' ') ||
+      undefined
+
     return (
       <div className="flex flex-col gap-0.5">
         <label htmlFor={checkId} className="inline-flex items-center gap-2 cursor-pointer">
@@ -17,6 +26,9 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
             ref={ref}
             type="checkbox"
             id={checkId}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy}
+            aria-errormessage={error ? errorId : undefined}
             className={cn(
               'h-4 w-4 rounded border-gray-300 text-brand-orange',
               'focus:ring-2 focus:ring-brand-orange focus:ring-offset-0',
@@ -28,8 +40,16 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           />
           {label && <span className="text-sm text-gray-700">{label}</span>}
         </label>
-        {hint && !error && <p className="ml-6 text-xs text-gray-500">{hint}</p>}
-        {error && <p className="ml-6 text-xs text-red-600">{error}</p>}
+        {hint && !error && (
+          <p id={hintId} className="ml-6 text-xs text-gray-500">
+            {hint}
+          </p>
+        )}
+        {error && (
+          <p id={errorId} role="alert" className="ml-6 text-xs text-red-600">
+            {error}
+          </p>
+        )}
       </div>
     )
   }

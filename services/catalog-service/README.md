@@ -46,6 +46,34 @@ Base URL em dev: `http://localhost:8091`. CORS liberado (`Access-Control-Allow-O
 | `GET` | `/api/v1/products/facets` | marcas + faixa de preço para sidebar |
 | `GET` | `/api/v1/products/:slug` | detalhe + imagens |
 
+### Reserva de estoque (rotas internas)
+
+Chamadas pelo order-service, não pelo browser. Exigem JWT com `role=service`
+(assinado pelo order-service com o `JWT_SECRET` compartilhado) ou `role=admin`.
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `POST` | `/api/v1/internal/reservations` | reserva N unidades de cada item (all-or-nothing) |
+| `POST` | `/api/v1/internal/reservations/:orderId/commit` | baixa definitiva (pedido pago) |
+| `POST` | `/api/v1/internal/reservations/:orderId/release` | devolve o saldo (cancelamento) |
+
+**Modelo:** a reserva **decrementa `products.stock` na hora**, dentro da mesma
+transação que insere a linha em `stock_reservations`. `stock` significa
+"disponível para venda". A corrida é resolvida por
+`UPDATE products SET stock = stock - $n WHERE id = $id AND stock >= $n`:
+o Postgres reavalia o predicado contra a versão mais recente da linha, então
+dois clientes disputando a última unidade não podem ambos ver `stock = 1`.
+
+**Idempotência:** unique index em `(order_id, product_id) WHERE status='active'`.
+Retry de rede ou redelivery não decrementa duas vezes.
+
+**Expiração:** reservas têm TTL (30min padrão, 72h para boleto). Um sweeper
+(`internal/reservation`) roda a cada minuto devolvendo o saldo das vencidas —
+sem ele, carrinho abandonado prenderia estoque para sempre.
+
+Erro de falta de saldo devolve `409` com `code: "insufficient_stock"` e
+`details: { productId, requested, available }`.
+
 ### Query params de `/api/v1/products`
 
 | Param | Tipo | Default | Descrição |

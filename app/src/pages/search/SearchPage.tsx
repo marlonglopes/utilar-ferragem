@@ -9,6 +9,7 @@ import { ProductCard, ProductCardSkeleton } from '@/components/catalog/ProductCa
 import { FacetSidebar } from '@/components/catalog/FacetSidebar'
 import { ActiveFilterChips } from '@/components/catalog/ActiveFilterChips'
 import { Drawer, Pagination, Select } from '@/components/ui'
+import { Seo } from '@/components/seo/Seo'
 import { TOP_LEVEL_CATEGORIES } from '@/lib/taxonomy'
 import type { ProductsParams } from '@/types/product'
 
@@ -90,6 +91,16 @@ export default function SearchPage() {
 
   return (
     <div className="container py-4">
+      {/* noIndex proposital: páginas de resultado de busca são conteúdo
+          duplicado/infinito e o Google penaliza a indexação delas. O canonical
+          aponta para /busca sem query. */}
+      <Seo
+        title={filters.q ? `Busca: ${filters.q}` : 'Busca'}
+        description="Busque ferramentas, materiais de construção, elétrica e hidráulica na UtiLar Ferragem e filtre por marca, faixa de preço e disponibilidade."
+        path="/busca"
+        noIndex
+      />
+
       {/* Search bar */}
       <form onSubmit={handleSearchSubmit} className="mb-4 flex gap-2">
         <input

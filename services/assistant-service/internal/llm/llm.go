@@ -1,5 +1,5 @@
-// Package llm abstrai o modelo por trás da Lara: uma rodada da Messages API
-// (system + tools + histórico → blocos de resposta). O orquestrador (pkg lara)
+// Package llm abstrai o modelo por trás da Alice: uma rodada da Messages API
+// (system + tools + histórico → blocos de resposta). O orquestrador (pkg alice)
 // dirige o loop de tool use; assim o mock e o Claude real compartilham o contrato.
 package llm
 

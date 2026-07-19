@@ -10,9 +10,11 @@ import { SellerCard } from '@/components/catalog/SellerCard'
 import { SpecSheet } from '@/components/catalog/SpecSheet'
 import { ProductCard, ProductCardSkeleton } from '@/components/catalog/ProductCard'
 import { Breadcrumb, Skeleton } from '@/components/ui'
+import { Seo } from '@/components/seo/Seo'
 import { useCartStore } from '@/store/cartStore'
 import { formatCurrency } from '@/lib/format'
 import { TOP_LEVEL_CATEGORIES } from '@/lib/taxonomy'
+import { breadcrumbListSchema, productSchema } from '@/lib/seo'
 import { cn } from '@/lib/cn'
 
 type Tab = 'description' | 'specs' | 'reviews'
@@ -123,7 +125,11 @@ export default function ProductDetailPage() {
 
   const breadcrumb = [
     { label: t('common:home.categories'), href: '/' },
-    ...(category ? [{ label: t(category.labelKey), href: `/categoria/${category.slug}` }] : []),
+    // `taxonomy.*` vive no namespace common, mas o default aqui é catalog —
+    // sem o prefixo, o breadcrumb renderizava a chave crua ("taxonomy.ferramentas").
+    ...(category
+      ? [{ label: t(`common:${category.labelKey}`), href: `/categoria/${category.slug}` }]
+      : []),
     { label: product.name },
   ]
 
@@ -133,8 +139,44 @@ export default function ProductDetailPage() {
     { id: 'reviews', label: t('catalog:product.reviews') },
   ]
 
+  // Product + Offer com preço e availability derivada do estoque real: é o que
+  // faz o Google exibir preço e "em estoque" direto no resultado de busca.
+  const seoDescription =
+    product.description?.slice(0, 155).trim() ??
+    `${product.name} por ${formatCurrency(product.price)} na UtiLar Ferragem. Vendido por ${product.seller}, com nota fiscal.`
+
   return (
     <>
+      <Seo
+        title={product.name}
+        description={seoDescription}
+        path={`/produto/${product.slug}`}
+        type="product"
+        image={product.images?.[0]?.url ?? product.imageUrl}
+        jsonLd={[
+          productSchema({
+            name: product.name,
+            slug: product.slug,
+            description: product.description,
+            price: product.price,
+            currency: product.currency,
+            stock: product.stock,
+            brand: product.brand,
+            seller: product.seller,
+            rating: product.rating,
+            reviewCount: product.reviewCount,
+            images: product.images?.map((i) => i.url) ?? (product.imageUrl ? [product.imageUrl] : []),
+          }),
+          breadcrumbListSchema([
+            { name: 'Início', path: '/' },
+            ...(category
+              ? [{ name: t(`common:${category.labelKey}`), path: `/categoria/${category.slug}` }]
+              : []),
+            { name: product.name },
+          ]),
+        ]}
+      />
+
       <div className="container py-4 pb-28 lg:pb-6">
         <Breadcrumb items={breadcrumb} className="mb-4" />
 

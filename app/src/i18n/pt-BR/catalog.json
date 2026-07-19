@@ -51,7 +51,8 @@
     "priceRange": "Faixa de preço",
     "inStockOnly": "Somente em estoque",
     "apply": "Aplicar",
-    "brands": "Marca"
+    "brands": "Marca",
+    "allBrands": "Todas as marcas"
   },
   "category": {
     "allProducts": "Todos os produtos",

@@ -23,8 +23,29 @@ type Claude struct {
 	http      *http.Client
 }
 
+// requestTimeout — teto total de uma chamada à Messages API.
+const requestTimeout = 60 * time.Second
+
+// NewClaude monta o client com um transport DEDICADO.
+//
+// pkg/httpclient é calibrado pra chamadas service-to-service (upstreams em
+// milissegundos) e traz ResponseHeaderTimeout: 5s. A Messages API sem streaming
+// só manda o header de resposta quando a geração termina — com Opus e 1024
+// tokens de saída isso passa de 5s rotineiramente, então o transport
+// compartilhado abortaria requests perfeitamente saudáveis, e o Timeout de 60s
+// do client nunca chegaria a valer.
+//
+// O pkg é compartilhado por 4 serviços e não pode ser afrouxado por causa deste
+// caso; então partimos do transport dele (dial/TLS/pool defensivos, que
+// continuam corretos) e sobrescrevemos só o ResponseHeaderTimeout.
 func NewClaude(apiKey, model string) *Claude {
-	return &Claude{apiKey: apiKey, model: model, maxTokens: 1024, http: httpclient.New(60 * time.Second)}
+	c := httpclient.New(requestTimeout)
+	if tr, ok := c.Transport.(*http.Transport); ok {
+		t := tr.Clone() // Clone: não mutar um transport que o pkg possa vir a reusar
+		t.ResponseHeaderTimeout = requestTimeout
+		c.Transport = t
+	}
+	return &Claude{apiKey: apiKey, model: model, maxTokens: 1024, http: c}
 }
 
 func (c *Claude) Name() string { return c.model }

@@ -2,7 +2,9 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useProducts } from '@/hooks/useProducts'
 import { ProductCard, ProductCardSkeleton } from '@/components/catalog/ProductCard'
+import { Seo } from '@/components/seo/Seo'
 import { TOP_LEVEL_CATEGORIES } from '@/lib/taxonomy'
+import { organizationSchema, webSiteSchema } from '@/lib/seo'
 
 function Hero() {
   const { t } = useTranslation()
@@ -137,6 +139,9 @@ function TrustRow() {
 export default function HomePage() {
   return (
     <>
+      {/* Organization + WebSite(SearchAction) habilitam o painel de marca e a
+          sitelinks searchbox do Google. */}
+      <Seo path="/" jsonLd={[organizationSchema(), webSiteSchema()]} />
       <Hero />
       <CategoryGrid />
       <FeaturedProducts />

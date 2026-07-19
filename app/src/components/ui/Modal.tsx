@@ -1,8 +1,9 @@
-import { type ReactNode, useEffect, useRef } from 'react'
+import { type ReactNode, useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@/lib/cn'
 import { X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useFocusTrap } from './useFocusTrap'
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full'
 
@@ -26,6 +27,12 @@ const sizes: Record<ModalSize, string> = {
 function Modal({ open, onClose, title, size = 'md', className, children }: ModalProps) {
   const { t } = useTranslation()
   const dialogRef = useRef<HTMLDivElement>(null)
+  // O id era a string fixa "modal-title": com dois modais montados, dois
+  // elementos passavam a ter o mesmo id e o aria-labelledby ficava ambíguo.
+  const titleId = useId()
+
+  // Prende o Tab no diálogo e devolve o foco ao gatilho ao fechar.
+  useFocusTrap(dialogRef, open)
 
   useEffect(() => {
     if (!open) return
@@ -46,7 +53,7 @@ function Modal({ open, onClose, title, size = 'md', className, children }: Modal
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby={title ? 'modal-title' : undefined}
+      aria-labelledby={title ? titleId : undefined}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
       <div
@@ -56,15 +63,16 @@ function Modal({ open, onClose, title, size = 'md', className, children }: Modal
       />
       <div
         ref={dialogRef}
+        tabIndex={-1}
         className={cn(
-          'relative z-10 w-full rounded-2xl bg-white shadow-xl',
+          'relative z-10 w-full rounded-2xl bg-white shadow-xl focus:outline-none',
           sizes[size],
           className
         )}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           {title && (
-            <h2 id="modal-title" className="text-base font-semibold text-gray-900">
+            <h2 id={titleId} className="text-base font-semibold text-gray-900">
               {title}
             </h2>
           )}

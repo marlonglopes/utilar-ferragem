@@ -1,10 +1,26 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>UtiLar Ferragem — Solução em Ferragem</title>
+    <meta name="theme-color" content="#1B3E8A" />
+
+    <!-- Meta base. Cada rota sobrescreve title/description via react-helmet-async
+         (ver src/components/seo/Seo.tsx); o que está aqui é o fallback servido
+         antes do JS executar. -->
+    <title>UtiLar Ferragem — Ferramentas e Material de Construção Online</title>
+    <meta
+      name="description"
+      content="Ferramentas, materiais de construção, elétrica e hidráulica com entrega rápida. Pague no Pix, boleto ou cartão em até 12x. Vendedores com CNPJ verificado e nota fiscal."
+    />
+    <!-- Sem <meta name="robots"> estático: "index, follow" já é o padrão dos
+         buscadores, e uma tag fixa aqui competiria com o `noindex` que o
+         <Seo noIndex /> injeta em carrinho, checkout, conta, busca e 404. -->
+
+    <!-- As fontes são carregadas SOMENTE aqui. O @import equivalente foi removido
+         de src/index.css porque @import em CSS é render-blocking e serializa o
+         download da folha de estilo com o da fonte. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

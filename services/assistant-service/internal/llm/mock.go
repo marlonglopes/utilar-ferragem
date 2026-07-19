@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Mock é a Lara sem chave de API: guiada por regras, mas ainda usando tool use
+// Mock é a Alice sem chave de API: guiada por regras, mas ainda usando tool use
 // (busca real no catálogo) pra não inventar. Demonstra o fluxo ponta a ponta.
 // Mesmo espírito do modo mock do resto do Utilar.
 type Mock struct{}
@@ -43,7 +43,7 @@ func (m *Mock) Complete(_ context.Context, _ string, _ []Tool, msgs []Message) (
 	greeting := contains(q, "oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "ajuda", "quem é você", "quem e voce")
 	if greeting && !hasProductIntent(q) {
 		return &Response{Blocks: []Block{Text(
-			"Oi! Eu sou a Lara ✨, sua ajudante aqui da UtiLar Ferragem. " +
+			"Oi! Eu sou a Alice ✨, sua ajudante aqui da UtiLar Ferragem. " +
 				"Posso achar ferramentas e materiais, comparar preços e estoque, e montar a lista pra sua obra. " +
 				"O que você está procurando?",
 		)}, StopReason: "end_turn"}, nil
