@@ -27,7 +27,7 @@ Para testar Pix/Boleto em dev: **alternativa simples** — passar todos os méto
 ### 2.1 Credenciais MP (após 2ª tentativa do user no dashboard)
 
 - **Public Key**: `APP_USR-1283f488-3640-4c81-9d7a-b3b5acc0cfde` (aba Teste)
-- **Access Token**: `APP_USR-3355899843628859-042411-12c2473e53f298355e049ce60f80aeb0-3348419867` (aba Teste)
+- **Access Token**: `APP_USR-<REDIGIDO>` (aba Teste)
 - **App ID**: `3355899843628859` (diferente do anterior `5712930741890196` — nova app em test mode)
 - **Test user seller**: `TESTUSER1590029200225619972` (email `test_user_1590029200225619972@testuser.com`)
 - **Test user buyer criado**: `TESTUSER303903997142113642` (email `test_user_303903997142113642@testuser.com`, senha `6WoiM78AFX`)
@@ -229,7 +229,7 @@ JWT_SECRET="change-me-in-production" ./bin/auth-service
 
 # Terminal 2: payment-service (mesmo secret + credenciais MP)
 cd services/payment-service
-MP_ACCESS_TOKEN="APP_USR-3355899843628859-042411-..." \
+MP_ACCESS_TOKEN="APP_USR-<REDIGIDO>..." \
 MP_PUBLIC_KEY="APP_USR-1283f488-..." \
 JWT_SECRET="change-me-in-production" \
 REDPANDA_BROKERS="localhost:19092" \

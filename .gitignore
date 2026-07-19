@@ -40,3 +40,23 @@ backups/
 # Docs de infra do gifthy — não pertencem a este repo (docs/SEPARATION-utilar-vs-gifthy.md)
 AWS-INFRA.md
 AWS-SUBACCOUNT-PLAN.md
+
+# ── Segredos: nada disso pode ser versionado ────────────────────────────────
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+.creds
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+credentials
+.aws/
+.claude/settings.local.json
+secrets/
+*-secrets.*
+*.secret
