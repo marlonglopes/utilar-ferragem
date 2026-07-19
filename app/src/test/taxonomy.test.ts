@@ -9,7 +9,11 @@ describe('taxonomy', () => {
   it('todo nó tem slug, labelKey e icon', () => {
     for (const node of TOP_LEVEL_CATEGORIES) {
       expect(node.slug).toBeTruthy()
-      expect(node.labelKey).toMatch(/^taxonomy\./)
+      // O namespace TEM que estar embutido na chave. Sem ele, consumidores que
+      // declaram useTranslation(['catalog','common']) procuram taxonomy.* no
+      // namespace errado, não acham, e o i18next devolve a própria chave — o
+      // usuário via `taxonomy.ferramentas` escrito na tela do filtro de busca.
+      expect(node.labelKey).toMatch(/^common:taxonomy\./)
       expect(node.icon).toBeTruthy()
     }
   })
