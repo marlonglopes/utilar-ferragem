@@ -6,7 +6,7 @@ está esperando o servidor. Onde não havia endpoint, o front escolheu um caminh
 honesto e deixou o encaixe pronto — a intenção é que o trabalho de backend seja
 "ligar o fio", não redesenhar a feature.
 
-Ordem sugerida: **1 (favoritos) → 2 (co-compra) → 3 (etapas do pedido) → 4 (logout)**.
+Ordem sugerida: **1 (favoritos) → 2 (co-compra) → 3 (etapas do pedido)**. O item 4 (logout) já foi resolvido neste trabalho — ficou registrado como referência.
 
 ---
 
@@ -191,37 +191,58 @@ enviado parecer que pulou a separação. Mas a informação que o cliente quer
 
 ---
 
-## 4. Logout não revoga o refresh token
+## 4. Logout — ✅ RESOLVIDO (revogação ligada)
 
-**Hoje:** sair da conta é **puramente local** — `useLogout` zera o `authStore`,
-limpa o cache do TanStack Query e navega. Nenhuma chamada ao servidor.
+**Era:** sair limpava só o navegador. O `refreshToken` (30 dias, revogável) ficava
+**válido no servidor** até expirar — se tivesse vazado (extensão maliciosa,
+backup do navegador, terminal compartilhado da loja), "sair" não protegia nada.
 
-**Consequência:** o `refreshToken` (30 dias, revogável) é **descartado no
-cliente sem ser invalidado no servidor**. Quem tiver capturado esse token
-continua renovando sessão depois que o cliente "saiu". Num aparelho
-compartilhado — o caso que motivou colocar o "Sair" no cabeçalho — isso é
-justamente o cenário que se quer cobrir.
+**Agora:** o frontend chama `POST /api/v1/auth/logout`, que já existia pronto no
+auth-service e ninguém usava. O servidor revoga o refresh token pelo hash e
+ainda põe o access token numa deny-list (`SetAccessTokenDenyList`), encurtando a
+janela dos 15 minutos restantes.
 
-O comentário em `app/src/lib/api.ts` já menciona um endpoint `logout` protegido,
-mas **nada no frontend o chama** e não achei implementação no auth-service.
+Verificado contra o auth-service em execução: depois de sair pela interface, um
+`POST /auth/refresh` com o token capturado antes do logout responde
+**`401 refresh token revoked`**. Antes desta mudança, devolvia um access token novo.
 
-### O que falta
+### Como ficou
 
-```
-POST /api/v1/auth/logout      Authorization: Bearer <access>
-     { refreshToken }         → 204
-```
+| Onde | O quê |
+|---|---|
+| `app/src/lib/api.ts` → `authLogout()` | transporte, best-effort, nunca lança |
+| `app/src/hooks/useLogout.ts` | logout do cliente (cabeçalho, menu mobile, /conta) |
+| `app/src/main.tsx` → `clearSession` | sessão derrubada por falha de refresh |
 
-Deve revogar o refresh token (marcar como revogado na tabela de tokens). O front
-liga isso em `useLogout` — uma linha — mas com duas ressalvas de comportamento:
+Regras que a implementação garante (e que os testes travam):
 
-- **Falha do endpoint não pode bloquear a saída.** Se a rede cair, a sessão local
-  tem que ser encerrada do mesmo jeito. Logout que falha e deixa o usuário logado
-  é pior que logout sem revogação.
-- Chamar **antes** de limpar o `authStore`, senão não há mais token para enviar.
+1. **A limpeza local acontece SEMPRE**, mesmo com a API fora do ar. Rede caída
+   não pode prender a pessoa logada num terminal compartilhado. A segurança
+   local é o mínimo garantido; a revogação é reforço, nunca condição.
+2. **Não bloqueia a navegação** — a revogação é disparada sem `await`.
+3. **Erro não é engolido**: `console.warn` com o status. Silêncio esconderia a
+   revogação parando de funcionar.
+4. **Tokens capturados antes de limpar** — invertido, mandaria `(null, null)` e
+   a revogação viraria uma chamada vazia.
 
-Há um teste que documenta o estado atual e vai precisar mudar junto:
-`app/src/test/logout.test.tsx` → *"não chama endpoint de logout no servidor"*.
+⚠️ **Detalhe que quase virou bug:** a rota responde **204 No Content**. Reusar
+`authPost` teria estourado `SyntaxError: Unexpected end of JSON input` no
+`res.json()` de `handleResponse` — a revogação funcionaria no servidor e
+explodiria no cliente, no meio do logout. Por isso `authLogout` não passa por
+`handleResponse`. Coberto em `app/src/test/apiAuthLogout.test.ts`.
+
+### O que ainda vale olhar (backend)
+
+- **`clearSession` tenta revogar também**, mas nesse caminho o refresh já foi
+  rejeitado, então normalmente o servidor responde 401 e a chamada não faz nada.
+  É defesa em profundidade para o caso de o refresh ter falhado por 500 ou queda
+  de rede, quando os tokens continuam vivos. Se isso poluir log/métrica do
+  auth-service, vale um código de resposta distinto para "já estava revogado".
+- **Deny-list de access token:** confirmar que `SetAccessTokenDenyList` está
+  efetivamente ligado em produção (é opcional no wire-up). Sem ela, o access
+  token roubado ainda vale até 15 minutos após o logout.
+- **Logout em todos os dispositivos** ("sair de todas as sessões") não existe.
+  É a evolução natural agora que a revogação individual funciona.
 
 ---
 

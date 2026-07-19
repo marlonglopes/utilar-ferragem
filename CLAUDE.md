@@ -131,7 +131,9 @@ React 18, TS strict, Vite 5, Tailwind 3, Router 6, Zustand 4, TanStack Query 5, 
 
 Go 1.26, Gin, lib/pq, golang-migrate. `go.work` unifica `pkg/` + 5 serviços.
 
-`pkg/`: `audit` (append-only encadeado), `metrics` (Prometheus), `httpclient`, `idempotency`, `ratelimit`, `requestid`.
+`pkg/`: `audit` (append-only encadeado), `metrics` (Prometheus), `httpclient`, `idempotency`, `ratelimit`, `requestid`, `circuitbreaker`, `retry`.
+
+⚠️ **`pkg/retry`: o zero value de `Safety` é `NonIdempotent`** — quem esquecer de declarar ganha 1 tentativa só. Retry em rota de pagamento cobra o cliente duas vezes; ver `appmaxv1.isFinancialRoute` e `docs/resiliencia-entre-servicos.md`.
 
 **Erro:** `{error, code, requestId, details?}` — códigos `not_found`, `bad_request`, `unauthorized`, `conflict`, `validation_error`, `db_error`, `insufficient_stock`.
 
@@ -176,6 +178,8 @@ docs/                # arquitetura, ADRs, APIs, segurança, orçamento
 | Segurança (histórico) | `docs/security/security-roadmap.md` |
 | Appmax | `docs/appmax-v1-appstore.md` |
 | Contábil | `docs/ledger-api.md` |
+| Devolução/troca (CDC) | `docs/devolucao-e-troca.md` |
+| Resiliência (disjuntor/retry) | `docs/resiliencia-entre-servicos.md` |
 | Frete | `docs/shipping-api.md` |
 | Dashboard | `docs/admin-dashboard-api.md` |
 | Custo no balcão (PDV) | `docs/store-cost-api.md` |
