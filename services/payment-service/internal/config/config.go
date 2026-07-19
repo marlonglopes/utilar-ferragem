@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/utilar/pkg/devguard"
 )
 
 type Config struct {
@@ -57,6 +59,14 @@ type Config struct {
 
 	// Redis (rate limit + idempotency). Vazio em dev = features desabilitadas.
 	RedisURL string
+
+	// MetricsToken protege GET /metrics (bearer token).
+	//
+	// FAIL-CLOSED: vazio = endpoint DESABILITADO (404), nunca aberto. /metrics
+	// entrega volume financeiro, taxa de recusa por método e topologia interna;
+	// "só a rede interna acessa" é uma suposição que não sobrevive a um pod
+	// comprometido no mesmo cluster. Ver docs/observability-alerts.md.
+	MetricsToken string
 }
 
 // #nosec G101 — placeholder dev-only, rejeitado em prod via fail-closed em Load().
@@ -78,6 +88,14 @@ func Load() (*Config, error) {
 	}
 	if !devMode && (strings.HasPrefix(jwt, "change-me") || jwt == devSecret || len(jwt) < 32) {
 		return nil, fmt.Errorf("JWT_SECRET must be at least 32 chars and not a development default")
+	}
+
+	// A2 (auditoria 2026-07-18): DEV_MODE liga o fallback de header
+	// X-User-Role, sem verificação criptográfica. Ligado por engano em
+	// produção, `X-User-Role: admin` vira acesso de administrador — sem alarme
+	// e sem sintoma. Recusar subir é preferível a comprometimento silencioso.
+	if err := devguard.Check(devMode, os.Getenv("PAYMENT_DB_URL")); err != nil {
+		return nil, err
 	}
 
 	cfg := &Config{
@@ -108,7 +126,8 @@ func Load() (*Config, error) {
 		AppmaxV1ClientSecret: os.Getenv("APPMAX_V1_CLIENT_SECRET"),
 		AppmaxV1ExternalID:   os.Getenv("APPMAX_V1_EXTERNAL_ID"),
 
-		RedisURL: os.Getenv("REDIS_URL"),
+		RedisURL:     os.Getenv("REDIS_URL"),
+		MetricsToken: os.Getenv("METRICS_TOKEN"),
 	}
 
 	// Valida credenciais do provider escolhido + webhook secret fail-closed em prod (audit C5).

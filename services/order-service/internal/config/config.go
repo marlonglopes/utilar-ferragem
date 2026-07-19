@@ -4,6 +4,8 @@ import (
 	"errors"
 	"os"
 	"strings"
+
+	"github.com/utilar/pkg/devguard"
 )
 
 type Config struct {
@@ -42,6 +44,16 @@ func Load() (*Config, error) {
 	}
 	if !devMode && (strings.HasPrefix(jwt, "change-me") || jwt == devSecret || len(jwt) < 32) {
 		return nil, ErrInsecureJWTSecret
+	}
+
+	// A2 (auditoria 2026-07-18): DEV_MODE liga o fallback de header
+	// X-User-Role, que não tem verificação criptográfica nenhuma. Se essa
+	// variável for ligada por engano em produção, qualquer requisição com
+	// `X-User-Role: admin` vira acesso de administrador — sem alarme e sem
+	// sintoma. Aqui o serviço se RECUSA A SUBIR: indisponibilidade barulhenta
+	// é preferível a comprometimento silencioso.
+	if err := devguard.Check(devMode, os.Getenv("ORDER_DB_URL")); err != nil {
+		return nil, err
 	}
 
 	return &Config{
