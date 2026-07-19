@@ -60,6 +60,7 @@ import {
 const PAYMENT_URL = import.meta.env.VITE_API_URL ?? ''
 const ORDER_URL = import.meta.env.VITE_ORDER_URL ?? ''
 const AUTH_URL = import.meta.env.VITE_AUTH_URL ?? ''
+const CATALOG_URL = import.meta.env.VITE_CATALOG_URL ?? ''
 
 /**
  * Modo mock: sem backend configurado, o painel roda com dados de demonstração.
@@ -293,5 +294,8 @@ export async function fetchChainVerification(period: AdminPeriod): Promise<Chain
 
 export async function fetchObservability(): Promise<ObservabilitySnapshot> {
   if (!isAdminApiEnabled) return mockObservability()
-  return adminGet<ObservabilitySnapshot>(PAYMENT_URL, '/api/v1/admin/observability')
+  // CATALOG_URL, não PAYMENT_URL: o agregador de saúde mora no catalog
+  // porque o payment é o serviço mais sensível do sistema e não deve virar
+  // cliente HTTP dos outros três só para montar um painel.
+  return adminGet<ObservabilitySnapshot>(CATALOG_URL, '/api/v1/admin/observability')
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/utilar/order-service/internal/paymentclient"
 	"github.com/utilar/order-service/internal/shipping"
 	"github.com/utilar/pkg/idempotency"
+	"github.com/utilar/pkg/metrics"
 	"github.com/utilar/pkg/ratelimit"
 )
 
@@ -87,6 +88,11 @@ func main() {
 			"orders will stay in pending_payment after payment confirmation")
 	}
 
+	// Métricas. Sem isto o painel de observabilidade mostra o order-service
+	// "de pé" e nada mais — e o order-service é onde o pedido trava depois de
+	// pago, exatamente o incidente que o painel existe para pegar.
+	mreg := metrics.New("order-service")
+
 	r := gin.New()
 	r.Use(
 		gin.Recovery(),
@@ -94,7 +100,14 @@ func main() {
 		handler.AccessLog(),
 		handler.SecurityHeaders(),
 		handler.CORS(cfg.AllowedOrigins),
+		mreg.Middleware(),
 	)
+
+	// Fail-closed por token (pkg/metrics.Handler): sem METRICS_TOKEN, 404.
+	r.GET("/metrics", mreg.Handler(cfg.MetricsToken))
+	if cfg.MetricsToken == "" {
+		slog.Warn("METRICS_TOKEN não configurado — /metrics DESABILITADO (fail-closed)")
+	}
 
 	// O3-M3: rate limit em POST /orders. 20/min/user — folga acima do uso humano,
 	// mas bloqueia bot que tenta inflar tabelas.
@@ -170,6 +183,21 @@ func main() {
 		ops.PATCH("/orders/:id/shipped", orderH.MarkShipped)
 		ops.PATCH("/orders/:id/delivered", orderH.MarkDelivered)
 		ops.PATCH("/orders/:id/cancel", orderH.AdminCancel)
+	}
+
+	// Painel do dono — grupo SEPARADO do `ops` acima, e de propósito.
+	//
+	// `ops` aceita role=operator porque quem separa pedido precisa marcar
+	// despacho. O painel NÃO: ele agrega faturamento, margem e custo da
+	// operação inteira. Operador de balcão vendo a margem de todas as lojas e o
+	// faturamento consolidado é vazamento de inteligência de negócio, e
+	// `store_operator` no `RequireRole` do painel seria exatamente isso.
+	// Só role=admin. Ver docs/admin-dashboard-api.md § Autorização.
+	dash := handler.NewAdminDashboardHandler(database, catalog, authc)
+	adminDash := r.Group("/api/v1/admin", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, "admin"))
+	{
+		adminDash.GET("/overview", dash.Overview)
+		adminDash.GET("/sellers/performance", dash.SellersPerformance)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

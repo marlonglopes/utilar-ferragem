@@ -6,10 +6,16 @@ Contrato que o SPA (`app/src/pages/admin/`) consome. Os tipos em
 Onde a API ainda não existe, o modelo de view é também a especificação do que
 se espera dela.
 
-Status: **front pronto.** A fatia contábil e a trilha de auditoria já existem
-no payment-service (`/api/v1/ledger/*`) e o front está ligado nelas através de
-`app/src/lib/adminAdapters.ts`. A visão geral, o desempenho de vendedores e a
-observabilidade ainda não têm backend — ver § Pendências.
+Status: **front e backend prontos.** A fatia contábil e a trilha de auditoria
+vivem no payment-service (`/api/v1/ledger/*`); a visão geral e o desempenho de
+vendedores no order-service; a observabilidade no **catalog-service** (ver
+§5 — o doc dizia payment-service e estava errado). O front se liga a tudo
+através de `app/src/lib/adminAdapters.ts`.
+
+> ⚠️ **Três divergências foram encontradas ao implementar** e estão corrigidas
+> abaixo, cada uma marcada com **CORRIGIDO**. A que exige mudança no front é a
+> §5: a URL base da observabilidade passou de `{API_URL}` (payment) para
+> `{CATALOG_URL}`.
 
 ---
 
@@ -98,7 +104,46 @@ Notas:
   cliente para decidir o que está atrasado.
 - "Travado" = pagamento confirmado e pedido ainda em `paid` (sem separação).
   O limiar de exibição sugerido é 4h.
-- `status` ∈ `pending | paid | picking | shipped | delivered | canceled | refunded`.
+- `status` ∈ `pending | paid | picking | shipped | delivered | canceled`.
+
+**CORRIGIDO — o vocabulário de status diverge do banco.** O enum do
+order-service é `pending_payment | paid | picking | shipped | delivered |
+cancelled` (grafia britânica). O contrato do front usa `pending` e `canceled`
+(americana). O backend **traduz na serialização** (`statusToWire` em
+`internal/handler/admin_dashboard.go`) — o front não muda, e uma migration de
+ENUM em produção fica evitada. Há teste travando a tradução nos dois sentidos.
+
+`refunded` **não existe** no order-service e nunca sai desta rota: estorno é
+fato contábil e vive no payment-service (`/api/v1/ledger`). Mantê-lo no tipo do
+front é inofensivo (nenhum bucket virá com ele), mas a tela não deve esperá-lo.
+
+**CORRIGIDO — a semântica do funil é aproximada, e o doc não dizia.** A
+intenção de pagamento vive no payment-service, em outro banco; o order-service
+só enxerga o pedido. Portanto:
+
+| Campo | O que realmente é |
+|---|---|
+| `created` | pedidos criados no período |
+| `confirmed` | os que chegaram a ter `paid_at` |
+| `failed` | cancelados que **nunca** foram pagos |
+| `expired` | ainda em `pending_payment` e criados há mais de 24h |
+
+`confirmed / created` (a conversão que o front deriva) é exata. O recorte
+`failed` / `expired` é conservador — tentativa de cartão recusada e Pix expirado
+não são eventos separados aqui. Fechar isso exige o payment-service publicar um
+agregado de funil; até lá o número é honesto, só menos granular.
+
+**Âncora temporal** (não estava no doc e muda o resultado): `kpis` e `series`
+são ancorados em **`paid_at`** — receita é reconhecida quando o dinheiro entra,
+e pedido criado e não pago não é faturamento. Já `byStatus` e `funnel` são
+ancorados em **`created_at`**, porque a pergunta ali é "dos pedidos que
+entraram, onde eles estão" e pedido nunca pago não tem `paid_at`. As KPIs
+`today/week/month` **ignoram o `?from&to`** de propósito: "vendas de hoje" é
+sempre hoje, independente do filtro aplicado ao gráfico.
+
+**Período**: janela máxima de **366 dias**. Acima disso a rota responde `400`
+com `code: "validation_error"` — período longo demais é recusado, nunca
+truncado em silêncio. Sem `from`/`to`, o padrão são os últimos 30 dias.
 
 ---
 
@@ -193,10 +238,44 @@ GET {ORDER_URL}/api/v1/admin/sellers/performance?from&to&storeId
 }
 ```
 
-**Dependência:** exige o papel de operador e a atribuição de pedido
-(`orders.operator_id`) que está sendo criado em paralelo. Sem isso não há como
-agrupar. Enquanto não existir, a rota pode responder `501` com
-`code: "not_implemented"` — o front mostra o estado de erro com botão de retry.
+**Dependência: RESOLVIDA.** `orders.operator_id` e `orders.store_id` existem
+desde a migration 003 do order-service. A rota está implementada e **não**
+responde 501.
+
+Notas de implementação:
+
+- Só o canal `balcao` entra. Venda web não tem vendedor, e incluí-la criaria
+  uma linha fantasma "sem operador" carregando o faturamento inteiro do site,
+  que esconderia todos os vendedores reais.
+- `avgDiscountPct` é fração do **bruto** (`total + desconto`), não do líquido:
+  R$ 20 de desconto em R$ 100 de bruto é 20%, não 25%.
+- `avgMarginPct` é **ponderada por receita** — `(Σreceita − ΣCMV) / Σreceita`,
+  não a média das margens por item. A média simples daria o mesmo peso a um
+  parafuso e a uma betoneira, e o número serve para decidir desconto em
+  dinheiro. O desconto do pedido é rateado proporcionalmente entre os itens.
+- **Produto sem custo cadastrado fica fora da conta de margem inteira**
+  (receita e CMV). Assumir custo zero daria margem inflada — o erro mais
+  perigoso possível aqui, porque faria o gerente enxergar folga para desconto
+  onde não existe. Há teste de regressão para isso.
+- ⚠️ **`avgMarginPct: 0` é ambíguo** e o tipo do front não permite resolver
+  isso hoje (`number`, não `number | null`). Zero significa tanto "margem
+  realmente zero" quanto "nenhum item vendido tinha custo cadastrado". No
+  banco de dev é o segundo caso — os itens de balcão do seed apontam para um
+  produto que não existe no catálogo. *Pedido: `avgMarginPct: number | null`
+  no front, com a célula exibindo "—" no `null`, pela mesma razão que o
+  `chargebacksCents` do `by-method` já é anulável (§2.1).*
+- O custo vem do catalog-service via `POST /api/v1/store/products/costs` com
+  token `role=service`, em lotes de 200. **O custo unitário nunca é
+  serializado na resposta** — só a margem agregada. Teste
+  `TestSellersPerformance_NuncaVazaCusto` verifica o JSON cru por substring,
+  porque um campo novo (`cost`, `cogs`) passaria despercebido por decodificação
+  tipada.
+- `sellerName` e `storeName` vêm de `GET {AUTH}/api/v1/admin/operators`,
+  propagando o **token do admin que chamou** (não um token de serviço: a rota
+  do auth-service já é `RequireAdmin`, e emitir identidade de serviço só para
+  ler nomes ampliaria o alcance do `SERVICE_JWT_SECRET` sem necessidade). Se o
+  auth-service estiver fora do ar, a tela **degrada para o id** em vez de
+  falhar — o dono ainda precisa ver quanto vendeu.
 
 `managerApprovals` conta pedidos cujo desconto excedeu o teto do cargo e passou
 por aprovação — o mesmo evento que gera `discount_approval` na trilha (§4).
@@ -243,12 +322,25 @@ faria o painel mostrar "erro de rede" no exato instante em que precisa gritar
    dele), mas vai ficar caro conforme a tabela cresce. Considerar uma âncora
    periódica publicada externamente.
 
-## 5. Observabilidade — payment-service (agregador) ⛔ A IMPLEMENTAR
+## 5. Observabilidade — catalog-service (agregador) ✅ IMPLEMENTADO
 
 ```
-GET {API_URL}/api/v1/admin/observability
+GET {CATALOG_URL}/api/v1/admin/observability
 → ObservabilitySnapshot
 ```
+
+> 🔴 **CORRIGIDO — mudança que o front precisa aplicar.** Este documento dizia
+> `{API_URL}` (payment-service) e `app/src/lib/adminApi.ts` foi escrito assim
+> (`adminGet<ObservabilitySnapshot>(PAYMENT_URL, ...)`). A rota foi
+> implementada no **catalog-service**. Trocar `PAYMENT_URL` por `CATALOG_URL`
+> nessa chamada é a única mudança necessária no front — o formato do payload é
+> exatamente o especificado abaixo.
+>
+> **Por que mudou:** a rota não pertence a nenhum serviço em particular (é
+> sobre todos eles), e o payment-service é o mais sensível do sistema. Dar a
+> quem move dinheiro a função de cliente HTTP dos outros três amplia a
+> superfície de ataque sem ganho nenhum. O agregador só **lê** métricas, então
+> mora no serviço de menor privilégio que já tinha um grupo `/admin`.
 
 ```ts
 {
@@ -289,6 +381,73 @@ em 10s é saudável, 3 eventos parados há uma hora é incidente.
 
 Esta rota é chamada a cada 30s enquanto a tela está aberta. Deve ser barata —
 ler de um cache/agregado, não varrer tabela.
+
+### Como funciona (e o que ainda é aproximação)
+
+O agregador sonda `/health` e `/metrics` dos quatro serviços **em paralelo**
+(em série, quatro timeouts somariam 12s e o painel de diagnóstico seria a coisa
+mais lenta da tela) e guarda o snapshot por **15s** — menor que o polling de
+30s, para que um refresh manual durante um incidente traga dado novo, e
+suficiente para que N abas abertas custem o mesmo que uma.
+
+`/metrics` é lido com o `METRICS_TOKEN` no servidor. **O token nunca vai ao
+navegador**: `/metrics` expõe volume financeiro, taxa de recusa de cartão e
+topologia, e é fail-closed (sem token, 404). Esse é o motivo principal de haver
+um agregado JSON em vez de o SPA falar Prometheus direto.
+
+Limitações **conhecidas e deliberadas**, que o doc não pode omitir:
+
+1. **A janela não é de 5 minutos.** Os contadores do Prometheus são cumulativos
+   desde o boot do processo; uma janela real exige duas coletas e uma subtração
+   (`rate()`). `errorRate` e `rpm` são médias da vida do processo. Um serviço
+   de pé há dias com um pico agora mostra `rpm` baixo.
+2. **p50/p95/p99 são estimados por interpolação nos buckets** — a mesma conta
+   do `histogram_quantile`, com a mesma limitação: a precisão é a dos limites
+   dos buckets do `pkg/metrics`. Um p95 real de 700 ms é reportado em algum
+   ponto entre 500 ms e 1 s. É por isso que os limiares de severidade são
+   grossos (1 s / 3 s), não finos.
+3. **`uptimePct` é a fração de sondagens bem-sucedidas** desde que o
+   catalog-service subiu, não um SLA. Reiniciar o catalog zera a conta.
+   Uptime de verdade exige TSDB com retenção.
+4. **`version` sai como `"unknown"`** — nenhum serviço publica hoje uma série
+   `utilar_build_info{version=...}`. O agregador já sabe lê-la assim que
+   existir.
+
+As três primeiras somem quando houver um Prometheus de verdade fazendo
+`rate()` sobre séries retidas (ver `docs/observability-alerts.md`). Até lá, um
+número honesto e limitado é melhor que um campo inventado — e muito melhor que
+`uptimePct: 100` fixo, que mentiria.
+
+### Instrumentação: o que faltava
+
+Só o **payment-service** usava `pkg/metrics`. Sem isso, o painel mostraria três
+dos quatro serviços "de pé" e nada mais — cego justamente no catálogo (o
+caminho mais lido do sistema) e no order-service (onde o pedido trava depois de
+pago). Foram instrumentados agora:
+
+| Serviço | `/metrics` | Observação |
+|---|---|---|
+| payment | ✅ (já tinha) | também publica as séries do outbox |
+| catalog | ✅ **novo** | |
+| order | ✅ **novo** | |
+| auth | ❌ **pendente** | fora do escopo deste trabalho; aparece com latência 0 e `status` derivado só do `/health` até ser instrumentado |
+
+Todos fail-closed por `METRICS_TOKEN`.
+
+### Limiares (decididos no servidor)
+
+| | `warn` | `critical` |
+|---|---|---|
+| Outbox — idade do mais antigo | ≥ 120 s | ≥ 900 s |
+| Outbox — pendentes | ≥ 100 | ≥ 500 |
+| Taxa de 5xx | ≥ 1% | ≥ 5% |
+| p95 | ≥ 1 s | ≥ 3 s |
+| Serviço sem resposta no `/health` | — | sempre `critical` |
+
+A severidade é calculada no backend, não no front: são regras de negócio, e
+regra duplicada no navegador diverge na primeira mudança — aqui divergir
+significa o painel dizer "ok" durante um incidente. O front pode continuar com
+`outboxSeverity` como fallback do modo mock; os números batem.
 
 ---
 

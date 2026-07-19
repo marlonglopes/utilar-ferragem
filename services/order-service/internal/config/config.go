@@ -36,6 +36,12 @@ type Config struct {
 	// eventos do outbox. Vazio desliga o consumer (e o pedido nunca vira 'paid'
 	// automaticamente), então logamos alto no boot.
 	KafkaBrokers []string
+
+	// MetricsToken protege /metrics (fail-closed: vazio = 404, ver
+	// pkg/metrics.Handler). É lido pelo agregador de observabilidade do painel,
+	// que precisa da latência e da taxa de erro deste serviço para dizer ao
+	// dono qual das quatro pernas do sistema está mancando.
+	MetricsToken string
 }
 
 // #nosec G101 — placeholder dev-only, rejeitado em prod via fail-closed em Load().
@@ -89,6 +95,7 @@ func Load() (*Config, error) {
 		PaymentServiceURL: env("PAYMENT_SERVICE_URL", "http://localhost:8090"),
 		RedisURL:          os.Getenv("REDIS_URL"),
 		KafkaBrokers:      parseOrigins(os.Getenv("KAFKA_BROKERS")),
+		MetricsToken:      os.Getenv("METRICS_TOKEN"),
 	}, nil
 }
 
