@@ -208,7 +208,7 @@ func (h *ProductHandler) GetByID(c *gin.Context) {
 		  p.description, p.specs, p.created_at, p.updated_at
 		FROM products p
 		JOIN sellers s ON s.id = p.seller_id
-		WHERE p.id = $1
+		WHERE p.id = $1 AND p.status = 'published'
 	`, id)
 	p, err := scanProduct(row)
 	if err == sql.ErrNoRows {

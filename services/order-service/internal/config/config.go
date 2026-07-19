@@ -33,7 +33,7 @@ func Load() (*Config, error) {
 		}
 		jwt = devSecret
 	}
-	if !devMode && (jwt == "change-me" || jwt == "change-me-in-prod-please" || len(jwt) < 32) {
+	if !devMode && (strings.HasPrefix(jwt, "change-me") || jwt == devSecret || len(jwt) < 32) {
 		return nil, ErrInsecureJWTSecret
 	}
 

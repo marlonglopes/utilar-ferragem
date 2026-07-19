@@ -42,7 +42,7 @@ func Load() (*Config, error) {
 		jwt = devSecret
 	}
 	// Recusa qualquer fallback antigo conhecido mesmo se vier por engano via env
-	if !devMode && (jwt == "change-me" || jwt == "change-me-in-prod-please" || len(jwt) < 32) {
+	if !devMode && (strings.HasPrefix(jwt, "change-me") || jwt == devSecret || len(jwt) < 32) {
 		return nil, ErrInsecureJWTSecret
 	}
 

@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/authStore'
 
 export type PaymentMethod = 'pix' | 'boleto' | 'card'
 export type PaymentStatus = 'idle' | 'creating' | 'pending' | 'confirmed' | 'failed' | 'expired'
-export type PaymentProvider = 'stripe' | 'mercadopago' | 'mock'
+export type PaymentProvider = 'stripe' | 'mercadopago' | 'appmax' | 'appmax-v1' | 'mock'
 
 export interface PaymentResult {
   paymentId: string
@@ -25,6 +25,8 @@ export interface PaymentResult {
   boletoExpiresAt?: Date
   // Card (MP-only redirect)
   initPoint?: string
+  // Appmax: parcelas confirmadas pelo PSP (cartão)
+  installments?: number
 }
 
 const MOCK_PIX_QR = 'iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAAACXBIWXMAAAsTAAALEwEAmpwYAAAF'
@@ -146,9 +148,62 @@ function parseMercadoPagoResult(raw: ApiPaymentResponse, method: PaymentMethod):
   return result
 }
 
+/**
+ * Appmax (v3 admin e v1 AppStore) — os dois gateways normalizam o mesmo
+ * ClientData plano, então um parser serve para ambos:
+ *
+ *   { provider, pix_qrcode, pix_emv, pix_expires_at, boleto_url, boleto_line, installments }
+ *
+ * `pix_qrcode` vem como PNG em base64 SEM o prefixo `data:` — o PixPayment já
+ * detecta e monta o data URI. O cartão é confirmado por webhook (não há
+ * clientSecret nem redirect), então aqui não há campo extra a extrair.
+ */
+function parseAppmaxResult(
+  raw: ApiPaymentResponse,
+  method: PaymentMethod,
+  provider: PaymentProvider,
+): PaymentResult {
+  const cd = (raw.psp_payload ?? {}) as Record<string, unknown>
+
+  const result: PaymentResult = {
+    paymentId: raw.id,
+    pspId: raw.psp_id,
+    provider,
+    method,
+    status: 'pending',
+  }
+
+  const installments = cd.installments as number | undefined
+  if (typeof installments === 'number' && installments > 0) {
+    result.installments = installments
+  }
+
+  if (method === 'pix') {
+    result.qrCodeBase64 = (cd.pix_qrcode as string | undefined) || undefined
+    result.copyPaste = (cd.pix_emv as string | undefined) || undefined
+    const expires = cd.pix_expires_at as string | undefined
+    const parsed = expires ? new Date(expires) : null
+    result.expiresAt =
+      parsed && !Number.isNaN(parsed.getTime())
+        ? parsed
+        : new Date(Date.now() + 30 * 60 * 1000) // Appmax: Pix expira em 30min
+  }
+
+  if (method === 'boleto') {
+    result.barCode = (cd.boleto_line as string | undefined) || undefined
+    result.pdfUrl = (cd.boleto_url as string | undefined) || undefined
+    result.boletoExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  }
+
+  return result
+}
+
 function parseApiResult(raw: ApiPaymentResponse, method: PaymentMethod): PaymentResult {
   const provider = raw.provider ?? 'stripe' // backend default é stripe
   if (provider === 'mercadopago') return parseMercadoPagoResult(raw, method)
+  if (provider === 'appmax' || provider === 'appmax-v1') {
+    return parseAppmaxResult(raw, method, provider)
+  }
   return parseStripeResult(raw, method)
 }
 
@@ -219,7 +274,9 @@ export function usePayment() {
     orderId: string,
     method: PaymentMethod,
     amount: number,
-    extras?: { payer_cpf?: string; payer_name?: string },
+    // payer_phone é OBRIGATÓRIO na Appmax (403 "O campo Celular é obrigatório",
+    // confirmado no sandbox). Stripe/MP ignoram.
+    extras?: { payer_cpf?: string; payer_name?: string; payer_phone?: string },
   ) => {
     setError('')
     setResult((prev) => prev

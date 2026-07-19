@@ -21,7 +21,11 @@ import (
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("config", "error", err)
+		os.Exit(1)
+	}
 
 	database, err := db.Open(cfg.DatabaseURL)
 	if err != nil {
@@ -41,8 +45,8 @@ func main() {
 	sellerH := handler.NewSellerHandler(database)
 	adminProductH := handler.NewAdminProductHandler(database)
 
-	if cfg.JWTSecret == "" && !cfg.DevMode {
-		slog.Warn("JWT_SECRET not set — /admin routes reject all requests (set JWT_SECRET, or DEV_MODE=true for local)")
+	if cfg.DevMode {
+		slog.Warn("DEV_MODE=true — /admin aceita fallback X-User-Role; nunca use em produção")
 	}
 
 	// CT1-H1: rate limit em /products (search). 100/min/IP. Outros endpoints

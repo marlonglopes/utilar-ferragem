@@ -44,6 +44,17 @@ type Config struct {
 	AppmaxAccessToken   string
 	AppmaxWebhookSecret string
 
+	// Appmax AppStore API v1 (usado quando PSPProvider=appmax-v1) — API OAuth2
+	// distinta da v3 admin acima. Valores em centavos, Bearer token com TTL de 1h.
+	// Sandbox: auth=https://auth.sandboxappmax.com.br api=https://api.sandboxappmax.com.br
+	// O webhook continua sem assinatura → APPMAX_WEBHOOK_SECRET é opcional (compartilhado
+	// com o provider v3, já que o header X-Appmax-Token é o mesmo mecanismo).
+	AppmaxV1AuthURL      string
+	AppmaxV1APIURL       string
+	AppmaxV1ClientID     string
+	AppmaxV1ClientSecret string
+	AppmaxV1ExternalID   string
+
 	// Redis (rate limit + idempotency). Vazio em dev = features desabilitadas.
 	RedisURL string
 }
@@ -65,7 +76,7 @@ func Load() (*Config, error) {
 		}
 		jwt = devSecret
 	}
-	if !devMode && (jwt == "change-me" || jwt == "change-me-in-prod-please" || len(jwt) < 32) {
+	if !devMode && (strings.HasPrefix(jwt, "change-me") || jwt == devSecret || len(jwt) < 32) {
 		return nil, fmt.Errorf("JWT_SECRET must be at least 32 chars and not a development default")
 	}
 
@@ -90,6 +101,12 @@ func Load() (*Config, error) {
 
 		AppmaxAccessToken:   os.Getenv("APPMAX_ACCESS_TOKEN"),
 		AppmaxWebhookSecret: os.Getenv("APPMAX_WEBHOOK_SECRET"),
+
+		AppmaxV1AuthURL:      os.Getenv("APPMAX_V1_AUTH_URL"),
+		AppmaxV1APIURL:       os.Getenv("APPMAX_V1_API_URL"),
+		AppmaxV1ClientID:     os.Getenv("APPMAX_V1_CLIENT_ID"),
+		AppmaxV1ClientSecret: os.Getenv("APPMAX_V1_CLIENT_SECRET"),
+		AppmaxV1ExternalID:   os.Getenv("APPMAX_V1_EXTERNAL_ID"),
 
 		RedisURL: os.Getenv("REDIS_URL"),
 	}
@@ -118,8 +135,24 @@ func Load() (*Config, error) {
 		// secret obrigatório. A integridade do webhook é garantida pela
 		// re-consulta via GetPayment no handler (audit C3). APPMAX_WEBHOOK_SECRET
 		// é opcional (defesa em profundidade via header X-Appmax-Token).
+	case "appmax-v1":
+		// Fail-closed nas credenciais OAuth2 — sem elas nenhum request /v1/* sai.
+		if cfg.AppmaxV1ClientID == "" {
+			return nil, fmt.Errorf("APPMAX_V1_CLIENT_ID is required when PSP_PROVIDER=appmax-v1")
+		}
+		if cfg.AppmaxV1ClientSecret == "" {
+			return nil, fmt.Errorf("APPMAX_V1_CLIENT_SECRET is required when PSP_PROVIDER=appmax-v1")
+		}
+		// Em prod exigimos as URLs explícitas: um deploy que esqueceu de apontar
+		// pro sandbox cobraria de verdade (e vice-versa).
+		if !devMode && (cfg.AppmaxV1AuthURL == "" || cfg.AppmaxV1APIURL == "") {
+			return nil, fmt.Errorf("APPMAX_V1_AUTH_URL and APPMAX_V1_API_URL are required in non-dev mode (evita apontar pro ambiente errado)")
+		}
+		// Nota: a Appmax não assina webhooks (nem v3 nem v1). A integridade vem da
+		// re-consulta GET /v1/orders/{id} (audit C3); APPMAX_WEBHOOK_SECRET é
+		// opcional (header X-Appmax-Token, defesa em profundidade).
 	default:
-		return nil, fmt.Errorf("invalid PSP_PROVIDER=%q (expected: stripe | mercadopago | appmax)", cfg.PSPProvider)
+		return nil, fmt.Errorf("invalid PSP_PROVIDER=%q (expected: stripe | mercadopago | appmax | appmax-v1)", cfg.PSPProvider)
 	}
 
 	return cfg, nil

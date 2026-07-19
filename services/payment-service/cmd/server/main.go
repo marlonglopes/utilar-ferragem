@@ -20,6 +20,7 @@ import (
 	"github.com/utilar/payment-service/internal/outbox"
 	"github.com/utilar/payment-service/internal/psp"
 	appmaxgateway "github.com/utilar/payment-service/internal/psp/appmax"
+	appmaxv1gateway "github.com/utilar/payment-service/internal/psp/appmaxv1"
 	mpgateway "github.com/utilar/payment-service/internal/psp/mercadopago"
 	stripegateway "github.com/utilar/payment-service/internal/psp/stripe"
 	"github.com/utilar/pkg/idempotency"
@@ -57,6 +58,16 @@ func main() {
 		gateway = mpgateway.New(cfg.MPAccessToken, cfg.MPWebhookSecret)
 	case "appmax":
 		gateway = appmaxgateway.New(cfg.AppmaxAccessToken, cfg.AppmaxWebhookSecret)
+	case "appmax-v1":
+		// Appmax AppStore API v1 (OAuth2, centavos) — convive com o provider v3.
+		gateway = appmaxv1gateway.New(appmaxv1gateway.Config{
+			AuthURL:       cfg.AppmaxV1AuthURL,
+			APIURL:        cfg.AppmaxV1APIURL,
+			ClientID:      cfg.AppmaxV1ClientID,
+			ClientSecret:  cfg.AppmaxV1ClientSecret,
+			ExternalID:    cfg.AppmaxV1ExternalID,
+			WebhookSecret: cfg.AppmaxWebhookSecret,
+		})
 	default:
 		slog.Error("unknown PSP_PROVIDER", "provider", cfg.PSPProvider)
 		os.Exit(1)
