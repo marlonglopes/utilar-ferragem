@@ -30,6 +30,21 @@ type Config struct {
 	// assinar `role=service` ou `role=admin` e reescrever o catálogo. Ver
 	// pkg/servicetoken.
 	ServiceJWTSecret string
+
+	// MetricsToken protege /metrics (fail-closed: vazio = 404, ver
+	// pkg/metrics.Handler) E é o token com que o agregador de observabilidade
+	// deste serviço LÊ o /metrics dos outros. É o mesmo segredo dos dois lados
+	// de propósito: são os quatro serviços da mesma malha interna, e um token
+	// por par multiplicaria a superfície de rotação sem reduzir risco nenhum.
+	MetricsToken string
+
+	// URLs dos outros serviços — alvos do agregador de
+	// /api/v1/admin/observability. Alvo com URL vazia é simplesmente omitido do
+	// painel: melhor um serviço ausente da lista que um "fora do ar" falso
+	// disparando alerta crítico porque ninguém configurou o endereço.
+	AuthServiceURL    string
+	OrderServiceURL   string
+	PaymentServiceURL string
 }
 
 // #nosec G101 — placeholder dev-only, rejeitado em prod via fail-closed em Load().
@@ -83,6 +98,11 @@ func Load() (*Config, error) {
 		JWTSecret:        jwt,
 		DevMode:          devMode,
 		ServiceJWTSecret: serviceSecret,
+
+		MetricsToken:      os.Getenv("METRICS_TOKEN"),
+		AuthServiceURL:    env("AUTH_SERVICE_URL", "http://localhost:8093"),
+		OrderServiceURL:   env("ORDER_SERVICE_URL", "http://localhost:8092"),
+		PaymentServiceURL: env("PAYMENT_SERVICE_URL", "http://localhost:8090"),
 	}, nil
 }
 

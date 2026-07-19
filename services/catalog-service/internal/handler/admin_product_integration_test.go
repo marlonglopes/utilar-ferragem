@@ -38,7 +38,10 @@ func adminRouterDB(db *sql.DB) *gin.Engine {
 	adminH := handler.NewAdminProductHandler(db)
 	productH := handler.NewProductHandler(db)
 
+	catalogAdminH := handler.NewCatalogAdminHandler(db)
+
 	admin := r.Group("/api/v1/admin", handler.RequireAdmin("", true)) // devMode
+	admin.GET("/products", catalogAdminH.ListProducts)
 	admin.POST("/products", adminH.Create)
 	admin.PATCH("/products/by-id/:id", adminH.Patch)
 	admin.DELETE("/products/by-id/:id", adminH.Delete)

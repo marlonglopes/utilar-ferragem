@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/utilar/catalog-service/internal/handler"
 	"github.com/utilar/catalog-service/internal/reservation"
 	"github.com/utilar/catalog-service/internal/storage"
+	"github.com/utilar/pkg/metrics"
 	"github.com/utilar/pkg/ratelimit"
 )
 
@@ -83,6 +85,12 @@ func main() {
 		slog.Warn("REDIS_URL not set — catalog rate limit DISABLED (CT1-H1 unprotected)")
 	}
 
+	// Métricas. Até aqui só o payment-service instrumentava, o que deixava o
+	// painel de observabilidade sem latência nem taxa de erro para 3 dos 4
+	// serviços — ou seja, cego justamente onde a loja é lida (o catálogo é o
+	// caminho mais quente do sistema).
+	mreg := metrics.New("catalog-service")
+
 	r := gin.New()
 	r.Use(
 		gin.Recovery(),
@@ -90,7 +98,16 @@ func main() {
 		handler.AccessLog(),
 		handler.SecurityHeaders(),
 		handler.CORS(cfg.AllowedOrigins),
+		mreg.Middleware(),
 	)
+
+	// /metrics é fail-closed por token (pkg/metrics.Handler): sem METRICS_TOKEN
+	// responde 404 e nunca fica público por omissão.
+	r.GET("/metrics", mreg.Handler(cfg.MetricsToken))
+	if cfg.MetricsToken == "" {
+		slog.Warn("METRICS_TOKEN não configurado — /metrics DESABILITADO (fail-closed) " +
+			"e o painel /admin/observabilidade não terá latência deste serviço")
+	}
 
 	// L-CATALOG-1: cache headers — listings 1min, detail 5min.
 	listCache := handler.CacheControl(60)
@@ -115,6 +132,23 @@ func main() {
 		// frontend precisa pra montar os filtros técnicos.
 		api.GET("/categories/:id/attributes", listCache, catalogAdminH.CategoryAttributes)
 	}
+
+	// Alvos do agregador de observabilidade. O próprio catalog entra na lista
+	// (via localhost): um serviço que não se mede não sabe se é ele o lento.
+	obsTargets := []handler.ServiceTarget{{Name: "catalog", BaseURL: "http://localhost:" + cfg.Port}}
+	for _, t := range []handler.ServiceTarget{
+		{Name: "auth", BaseURL: cfg.AuthServiceURL},
+		{Name: "order", BaseURL: cfg.OrderServiceURL},
+		{Name: "payment", BaseURL: cfg.PaymentServiceURL},
+	} {
+		// URL vazia = alvo omitido. Um "fora do ar" falso por falta de
+		// configuração dispararia alerta crítico e treinaria o dono a ignorar
+		// o painel — que é o pior estrago que um alerta pode causar.
+		if strings.TrimSpace(t.BaseURL) != "" {
+			obsTargets = append(obsTargets, t)
+		}
+	}
+	obsH := handler.NewObservabilityHandler(obsTargets, cfg.MetricsToken)
 
 	// Rotas de escrita (ingestão) — protegidas por role=admin.
 	admin := r.Group("/api/v1/admin", handler.RequireAdmin(cfg.JWTSecret, cfg.DevMode))
@@ -142,6 +176,10 @@ func main() {
 
 		// ⚠️ ESTA é a única rota que devolve `cost`/margem. Está sob
 		// RequireAdmin; nenhuma equivalente existe fora deste grupo.
+		// Listagem de admin: devolve custo, margem e TODOS os status —
+		// a pública esconde os dois de propósito. Sem ela a tela de gestão
+		// de produtos abria com "Produto não encontrado".
+		admin.GET("/products", catalogAdminH.ListProducts)
 		admin.GET("/products/by-id/:id", catalogAdminH.GetProduct)
 		admin.GET("/products/by-id/:id/price-history", catalogAdminH.GetPriceHistory)
 		admin.PUT("/products/by-id/:id/price-tiers", catalogAdminH.SetPriceTiers)
@@ -167,6 +205,12 @@ func main() {
 		// (Caixa/IBGE), carregado em `cost` — NUNCA em `price`. Os itens entram
 		// como rascunho sem preço de venda. Ver docs/base-de-produtos.md.
 		admin.POST("/import/sinapi", importH.ImportSINAPI)
+
+		// Observabilidade agregada dos 4 serviços. Está sob o mesmo
+		// RequireAdmin do grupo — anônimo toma 401, customer/seller/
+		// store_operator tomam 403. Ver internal/handler/observability.go
+		// para o PORQUÊ de a rota morar aqui e não no payment-service.
+		admin.GET("/observability", obsH.Snapshot)
 	}
 
 	// Rotas internas de reserva de estoque — chamadas pelo order-service, não
