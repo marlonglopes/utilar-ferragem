@@ -1,0 +1,18 @@
+CODIGO;DESCRICAO DO PRODUTO;GRUPO;MARCA;UN;VLR VENDA;VLR CUSTO;ESTOQUE;PESO KG;EAN;NCM
+FORN-0001;Cimento CP-II-E-32 saco 50kg;construcao;Votoran;saco;R$ 34,90;R$ 27,10;240;50;7891234500017;25232910
+FORN-0002;Argamassa AC-III interna/externa 20kg;construcao;Quartzolit;saco;28,40;21,90;180;20;7891234500024;38245000
+FORN-0003;Vergalhão CA-50 3/8" barra 12m;construcao;Gerdau;barra;R$ 47,50;R$ 38,20;96;6,6;7891234500031;72142000
+FORN-0004;Furadeira de Impacto 1/2" 750W 220V;ferramentas;Bosch;un;R$ 429,90;R$ 296,00;12;2,1;7891234500048;84672100
+FORN-0005;Cabo Flexível 2,5mm² 750V rolo 100m;eletrica;Sil;rolo;R$ 189,00;R$ 148,00;34;9,5;7891234500055;85444200
+FORN-0006;Tubo PVC Esgoto 100mm barra 6m;hidraulica;Tigre;barra;R$ 78,90;R$ 59,00;45;4,2;7891234500062;39172390
+FORN-0007;Tinta Acrílica Fosca Branco Neve 18L;pintura;Suvinil;lata;R$ 264,00;R$ 198,50;22;24;7891234500079;32091010
+FORN-0008;Disjuntor Bipolar 40A Curva C;eletrica;Schneider;un;R$ 62,40;R$ 44,90;60;0,25;7891234500086;85362000
+FORN-0009;Luva de Vaqueta Cano Curto Par;seguranca;Danny;par;R$ 18,90;R$ 12,40;150;0,18;7891234500093;42032990
+FORN-0010;Parafuso Chipboard 4,0x40mm Cento;fixacao;Ciser;cento;R$ 22,50;R$ 14,80;300;0,45;7891234500109;73181500
+FORN-0011;Mangueira de Jardim 1/2" 20m;jardim;Tramontina;un;R$ 89,90;R$ 62,00;18;2,8;7891234500116;39173100
+FORN-0012;Piso Cerâmico 45x45 Bege PEI-4 caixa 2m²;construcao;Portobello;caixa;R$ 39,90;R$ 28,70;120;22;7891234500123;69072200
+FORN-0013;Produto sem preço nenhum;ferramentas;Marca X;un;;;10;1;7891234500130;84672100
+FORN-0014;Categoria que não existe;departamento-inventado;Marca Y;un;R$ 10,00;R$ 5,00;5;1;7891234500147;84672100
+;Linha sem código;ferramentas;Marca Z;un;R$ 99,00;R$ 70,00;3;1;7891234500154;84672100
+FORN-0016;=cmd|' /C calc'!A1;ferramentas;Suspeita;un;R$ 1,00;R$ 0,50;1;1;7891234500161;84672100
+FORN-0017;Cimento CP-V ARI saco 50kg;construcao;Votoran;saco;R$ 1,23;R$ 31,40;80;50;7891234500178;25232910

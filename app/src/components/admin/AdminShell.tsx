@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Menu,
   ScrollText,
+  Upload,
   Users,
   X,
 } from 'lucide-react'
@@ -29,6 +30,7 @@ const NAV = [
   { to: '/admin', label: 'Visão geral', short: 'Geral', icon: LayoutDashboard, end: true },
   { to: '/admin/contabil', label: 'Auditoria contábil', short: 'Contábil', icon: BookOpenCheck },
   { to: '/admin/vendedores', label: 'Vendedores', short: 'Vendedores', icon: Users },
+  { to: '/admin/importar', label: 'Importar produtos', short: 'Importar', icon: Upload },
   { to: '/admin/trilha', label: 'Trilha de auditoria', short: 'Trilha', icon: ScrollText },
   { to: '/admin/observabilidade', label: 'Observabilidade', short: 'Saúde', icon: Activity },
 ]

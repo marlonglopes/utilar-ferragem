@@ -5,6 +5,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { RouteErrorBoundary } from '@/components/common/ErrorBoundary'
 import { PageFallback } from '@/components/common/PageFallback'
 import { balcaoRoutes } from '@/router/balcaoRoutes'
+import { adminRoutes } from '@/router/adminRoutes'
 
 // Todas as rotas são carregadas sob demanda (React.lazy). Sem isso o bundle
 // vira um chunk único de ~520 kB, penalizando o LCP de quem cai na home vindo
@@ -85,6 +86,8 @@ const router = createBrowserRouter([
   // O catch-all '*' acima é filho de '/', então não intercepta estas rotas; se um
   // dia ele subir para a raiz, `...balcaoRoutes` precisa vir antes dele.
   ...balcaoRoutes,
+  // Painel do dono: contábil, vendedores, trilha de auditoria, importação.
+  ...adminRoutes,
   // Showcase do design system: só existe em desenvolvimento. `import.meta.env.DEV`
   // vira `false` no build de produção, então o Rollup elimina o ramo inteiro e o
   // chunk da UiPage nunca é gerado.
