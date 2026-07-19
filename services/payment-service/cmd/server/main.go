@@ -214,9 +214,24 @@ func main() {
 			"liquidação externa de balcão não será lançada no livro contábil")
 	}
 
+	// Vigia da credencial do PSP. Sem isto, uma chave expirada só aparecia na
+	// primeira venda, como 502 na cara do cliente, com o /health dizendo "ok".
+	pspCheck := handler.NewPSPCheck(gateway, 5*time.Minute)
+	pspCtx, stopPSPCheck := context.WithCancel(context.Background())
+	defer stopPSPCheck()
+	go pspCheck.Run(pspCtx)
+
 	r.GET("/health", func(c *gin.Context) {
 		if err := database.Ping(); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"db": "down"})
+			return
+		}
+		// Credencial inválida NÃO derruba o health para 503: o serviço continua
+		// atendendo consulta de pagamento e webhook, e derrubar tiraria o pod do
+		// balanceador sem resolver nada — o problema é configuração, não
+		// capacidade. Sai como "degraded" para o painel mostrar em vermelho.
+		if est := pspCheck.Estado(); !est.OK {
+			c.JSON(http.StatusOK, gin.H{"status": "degraded", "db": "ok", "psp": est})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
