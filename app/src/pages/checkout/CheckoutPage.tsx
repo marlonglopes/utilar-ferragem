@@ -6,6 +6,7 @@ import { useCartStore } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
 import { useAddressStore, type Address as StoredAddress } from '@/store/addressStore'
 import { usePayment, type PaymentMethod } from '@/hooks/usePayment'
+import { useShippingQuote, type ShippingOption } from '@/hooks/useShippingQuote'
 import { formatCurrency, formatCEP } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { isApiEnabled, isOrderEnabled, orderPostWithJWT } from '@/lib/api'
@@ -39,18 +40,9 @@ function toShippingAddress(a: StoredAddress): Address {
   }
 }
 
-interface ShippingOption {
-  id: string
-  label: string
-  price: number
-  days: number
-}
-
-const SHIPPING_OPTIONS: ShippingOption[] = [
-  { id: 'free', label: 'Grátis', price: 0, days: 10 },
-  { id: 'pac', label: 'PAC — Correios', price: 15.9, days: 7 },
-  { id: 'sedex', label: 'SEDEX — Correios', price: 38.9, days: 2 },
-]
+// O tipo de frete é o MESMO da cotação real (useShippingQuote): serviceCode,
+// cost, deliveryDays, free. Antes havia um SHIPPING_OPTIONS hardcoded aqui
+// (Grátis/PAC/SEDEX) que não batia com o que o servidor cobra — ver ShippingStep.
 
 // ─── Step indicator ──────────────────────────────────────────────────────────
 
@@ -342,60 +334,115 @@ function AddressStep({
 // ─── Shipping step ────────────────────────────────────────────────────────────
 
 function ShippingStep({
+  cep,
+  subtotal,
+  itemCount,
   onNext,
 }: {
+  cep: string
+  subtotal: number
+  itemCount: number
   onNext: (option: ShippingOption) => void
 }) {
   const { t } = useTranslation('checkout')
-  const [selected, setSelected] = useState<string>('free')
+  const { options, loading, error, quote } = useShippingQuote()
+  const [selected, setSelected] = useState<string | null>(null)
 
-  const option = SHIPPING_OPTIONS.find((o) => o.id === selected)!
+  // Cota assim que o passo abre, usando o CEP do endereço que o cliente escolheu.
+  //
+  // Regressão que isto conserta: este passo mostrava um frete FIXO hardcoded
+  // (Grátis/PAC/SEDEX) que ignorava o endereço e NÃO batia com o que o
+  // order-service cobra — o servidor recalcula da tabela e descarta o
+  // `shippingCost` do cliente. Resultado: o cliente via um frete no checkout e
+  // era cobrado outro. Agora a cotação vem da MESMA rota que o carrinho usa
+  // (POST /api/v1/shipping/quote), pelo CEP real, e o valor exibido é o cobrado.
+  const cotar = useCallback(() => {
+    void (async () => {
+      const res = await quote(cep, subtotal, itemCount)
+      // Pré-seleciona a mais barata (a API devolve ordenado) — é o padrão que o
+      // cliente escolheria, e já deixa o total completo sem exigir outro clique.
+      if (res && res.length > 0) setSelected(res[0].serviceCode)
+    })()
+  }, [quote, cep, subtotal, itemCount])
+
+  useEffect(() => {
+    cotar()
+  }, [cotar])
+
+  const option = options?.find((o) => o.serviceCode === selected) ?? null
 
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-lg font-bold text-gray-900">{t('shipping.title')}</h2>
 
-      <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-        {t('shipping.stub')}
-      </p>
+      {loading && (
+        <p className="flex items-center gap-2 text-sm text-gray-500">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          {t('shipping.calculating')}
+        </p>
+      )}
 
-      <div className="flex flex-col gap-2">
-        {SHIPPING_OPTIONS.map((opt) => (
-          <label
-            key={opt.id}
-            className={cn(
-              'flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-colors',
-              selected === opt.id
-                ? 'border-brand-orange bg-orange-50'
-                : 'border-gray-200 hover:border-gray-300'
-            )}
+      {error && (
+        <div className="flex flex-col gap-2">
+          <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={cotar}
+            className="self-start text-sm font-semibold text-brand-orange hover:text-brand-orange-dark"
           >
-            <div className="flex items-center gap-3">
-              <input
-                type="radio"
-                name="shipping"
-                value={opt.id}
-                checked={selected === opt.id}
-                onChange={() => setSelected(opt.id)}
-                className="accent-brand-orange"
-              />
-              <div>
-                <p className="text-sm font-medium text-gray-900">{opt.label}</p>
-                <p className="text-xs text-gray-400">
-                  {t(opt.days === 1 ? 'shipping.days' : 'shipping.days_plural', { count: opt.days })}
-                </p>
+            {t('shipping.retry')}
+          </button>
+        </div>
+      )}
+
+      {options && options.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {options.map((opt) => (
+            <label
+              key={opt.serviceCode}
+              className={cn(
+                'flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-colors',
+                selected === opt.serviceCode
+                  ? 'border-brand-orange bg-orange-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="shipping"
+                  value={opt.serviceCode}
+                  checked={selected === opt.serviceCode}
+                  onChange={() => setSelected(opt.serviceCode)}
+                  className="accent-brand-orange"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{opt.serviceName}</p>
+                  <p className="text-xs text-gray-400">
+                    {t('shipping.days', { count: opt.deliveryDays })}
+                  </p>
+                </div>
               </div>
-            </div>
-            <span className="text-sm font-semibold text-gray-900">
-              {opt.price === 0 ? t('shipping.free') : formatCurrency(opt.price)}
-            </span>
-          </label>
-        ))}
-      </div>
+              {/* "Grátis" e não "R$ 0,00": o cliente lê como benefício. */}
+              <span
+                className={cn(
+                  'text-sm font-semibold tabular-nums',
+                  opt.free ? 'text-green-600' : 'text-gray-900'
+                )}
+              >
+                {opt.free ? t('shipping.free') : formatCurrency(opt.cost)}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
 
       <button
-        onClick={() => onNext(option)}
-        className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors mt-2"
+        onClick={() => option && onNext(option)}
+        disabled={!option}
+        className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {t('shipping.continue')}
         <ChevronRight className="h-4 w-4" />
@@ -643,7 +690,7 @@ function OrderSummary({ shipping }: { shipping: ShippingOption | null }) {
   const items = useCartStore((s) => s.items)
 
   const subtotal = items.reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0)
-  const shippingCost = shipping?.price ?? 0
+  const shippingCost = shipping?.cost ?? 0
   const total = subtotal + shippingCost
 
   return (
@@ -671,7 +718,11 @@ function OrderSummary({ shipping }: { shipping: ShippingOption | null }) {
         <div className="flex items-center justify-between">
           <span className="text-gray-500">{t('checkout:cart.shipping')}</span>
           <span className="font-medium text-gray-900">
-            {shippingCost === 0 ? (
+            {/* Sem frete escolhido ainda (passo endereço) mostra "A calcular",
+                não "Grátis" — dizer grátis antes de cotar é promessa falsa. */}
+            {shipping == null ? (
+              <span className="text-gray-400">{t('shipping.pending')}</span>
+            ) : shipping.free ? (
               <span className="text-green-600">{t('shipping.free')}</span>
             ) : (
               formatCurrency(shippingCost)
@@ -701,7 +752,10 @@ export default function CheckoutPage() {
   const [shipping, setShipping] = useState<ShippingOption | null>(null)
 
   const subtotal = items.reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0)
-  const shippingCost = shipping?.price ?? 0
+  // itemCount = soma das quantidades (não número de linhas): é o que a cotação
+  // usa na fórmula `base + por_item × itemCount`.
+  const itemCount = items.reduce((sum, i) => sum + i.quantity, 0)
+  const shippingCost = shipping?.cost ?? 0
   const total = subtotal + shippingCost
 
   const handleAddressDone = useCallback((addr: Address) => {
@@ -728,6 +782,10 @@ export default function CheckoutPage() {
       }
       const payload = {
         paymentMethod: method,
+        // shippingService é a opção que o cliente escolheu na cotação; o servidor
+        // recalcula o custo dela pela tabela (o shippingCost aqui é só referência,
+        // não fonte de verdade — ver docs/shipping-api.md).
+        shippingService: shipping?.serviceCode,
         shippingCost,
         items: items.map((i) => ({
           productId: i.productId,
@@ -756,7 +814,7 @@ export default function CheckoutPage() {
       setCommittedOrderNumber(order.number)
       return order.id
     },
-    [accessToken, address, items, shippingCost],
+    [accessToken, address, items, shipping, shippingCost],
   )
 
   const handlePaymentCreated = useCallback(
@@ -784,8 +842,13 @@ export default function CheckoutPage() {
           {step === 'address' && (
             <AddressStep onNext={handleAddressDone} />
           )}
-          {step === 'shipping' && (
-            <ShippingStep onNext={handleShippingDone} />
+          {step === 'shipping' && address && (
+            <ShippingStep
+              cep={address.cep}
+              subtotal={subtotal}
+              itemCount={itemCount}
+              onNext={handleShippingDone}
+            />
           )}
           {step === 'payment' && (
             <PaymentStep

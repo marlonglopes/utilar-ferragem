@@ -35,12 +35,12 @@
   "shipping": {
     "title": "Opções de entrega",
     "free": "Grátis",
-    "standard": "PAC — Correios",
-    "express": "SEDEX — Correios",
     "days": "{{count}} dia útil",
     "days_one": "{{count}} dia útil",
     "days_other": "{{count}} dias úteis",
-    "stub": "Integração com Correios disponível em breve. Frete fixo aplicado.",
+    "calculating": "Calculando o frete para o seu endereço…",
+    "pending": "A calcular",
+    "retry": "Tentar de novo",
     "continue": "Continuar para pagamento"
   },
   "payment": {

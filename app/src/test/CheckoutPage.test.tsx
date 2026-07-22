@@ -139,14 +139,38 @@ describe('CheckoutPage — passo entrega', () => {
     await waitFor(() => screen.getByText(/opções de entrega/i))
   }
 
-  it('exibe as opções PAC e SEDEX', async () => {
+  // Regressão: o passo de entrega mostrava um frete FIXO hardcoded (Grátis/PAC/
+  // SEDEX) que ignorava o endereço e não batia com o que o order-service cobra.
+  // Agora as opções vêm da cotação real (useShippingQuote), pelo CEP escolhido.
+  it('cota o frete pelo endereço, não usa mais o stub fixo PAC/SEDEX', async () => {
     await goToShipping()
-    expect(screen.getByText(/PAC — Correios/i)).toBeInTheDocument()
-    expect(screen.getByText(/SEDEX — Correios/i)).toBeInTheDocument()
+    // As opções da cotação real aparecem (assíncronas), não os rótulos antigos.
+    await waitFor(() => {
+      expect(screen.getByText(/entrega padrão/i)).toBeInTheDocument()
+    })
+    expect(screen.getByText(/entrega expressa/i)).toBeInTheDocument()
+    expect(screen.queryByText(/PAC — Correios/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/SEDEX — Correios/i)).not.toBeInTheDocument()
+  })
+
+  // Regressão: o frete exibido no checkout tem que ser o MESMO que o pedido leva.
+  // Escolher a opção mais cara reflete no total do resumo (não fica no valor da
+  // opção pré-selecionada nem num frete fixo).
+  it('o total do resumo reflete a opção de frete escolhida', async () => {
+    await goToShipping()
+    await waitFor(() => screen.getByText(/entrega expressa/i))
+    // Mock: capital, subtotal 89,90 → padrão 24,90 · expressa 47,90.
+    fireEvent.click(screen.getByLabelText(/entrega expressa/i))
+    fireEvent.click(screen.getByRole('button', { name: /continuar para pagamento/i }))
+    // 89,90 + 47,90 = 137,80
+    await waitFor(() => {
+      expect(screen.getByText(/137,80/)).toBeInTheDocument()
+    })
   })
 
   it('avança para pagamento ao selecionar frete', async () => {
     await goToShipping()
+    await waitFor(() => screen.getByText(/entrega padrão/i))
     fireEvent.click(screen.getByRole('button', { name: /continuar para pagamento/i }))
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /confirmar e pagar/i })).toBeInTheDocument()
@@ -166,6 +190,8 @@ describe('CheckoutPage — passo pagamento', () => {
     fireEvent.change(screen.getByLabelText(/Estado/i), { target: { value: 'SP' } })
     fireEvent.click(screen.getByRole('button', { name: /continuar/i }))
     await waitFor(() => screen.getByText(/opções de entrega/i))
+    // Espera a cotação real carregar (o botão fica desabilitado até haver opção).
+    await waitFor(() => screen.getByText(/entrega padrão/i))
     fireEvent.click(screen.getByRole('button', { name: /continuar para pagamento/i }))
     await waitFor(() => screen.getByRole('button', { name: /confirmar e pagar/i }))
   }

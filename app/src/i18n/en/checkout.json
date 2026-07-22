@@ -35,12 +35,12 @@
   "shipping": {
     "title": "Delivery options",
     "free": "Free",
-    "standard": "PAC — Correios",
-    "express": "SEDEX — Correios",
     "days": "{{count}} business day",
     "days_one": "{{count}} business day",
     "days_other": "{{count}} business days",
-    "stub": "Correios integration coming soon. Fixed shipping applied.",
+    "calculating": "Calculating shipping for your address…",
+    "pending": "To be calculated",
+    "retry": "Try again",
     "continue": "Continue to payment"
   },
   "payment": {
