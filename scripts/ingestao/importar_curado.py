@@ -160,6 +160,22 @@ ON CONFLICT (sku) WHERE sku IS NOT NULL DO UPDATE SET
 
     psql("\n".join(stmts), tuples=False)
 
+    # Capa placeholder — MESMA convenção do seed.sql (picsum por slug). Os itens
+    # curados chegam SEM imagem; sem capa a vitrine mostra só o ícone, e o teste
+    # de integração TestList_DevolveCapaDoProduto quebra: a listagem ordena por
+    # `created_at DESC`, então os curados (recém-inseridos) dominam a 1ª página e,
+    # sem nenhuma capa ali, a asserção "a vitrine voltou a mostrar só ícone" falha.
+    # É DADO DE TESTE (placeholder neutro), não foto real — a foto de verdade vem
+    # do fornecedor/loja depois. Idempotente: só insere onde ainda não há imagem
+    # (não reetiqueta um produto que já ganhou foto real).
+    psql("""
+INSERT INTO product_images (product_id, url, alt, sort_order)
+SELECT p.id, 'https://picsum.photos/seed/' || p.slug || '-1/800/800', p.name, 0
+  FROM products p
+ WHERE p.sku LIKE 'CUR-%'
+   AND NOT EXISTS (SELECT 1 FROM product_images i WHERE i.product_id = p.id);
+""", tuples=False)
+
     total = psql("SELECT count(*) FROM products WHERE sku LIKE 'CUR-%';")[0][0]
     print(f"\n✓ importado. {total} produtos curados no banco, status='{status}'.")
     if not args.publicar:
