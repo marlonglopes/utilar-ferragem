@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowDown, ArrowUp, ImageOff, Plus, Search } from 'lucide-react'
+import { resolveImageUrl } from '@/lib/api'
 import { AdminShell } from '@/components/admin/AdminShell'
 import {
   EmptyState,
@@ -398,7 +399,7 @@ export default function AdminProductsPage() {
                       <Td>
                         {r.imageUrl ? (
                           <img
-                            src={r.imageUrl}
+                            src={resolveImageUrl(r.imageUrl)}
                             alt=""
                             loading="lazy"
                             className="h-9 w-9 rounded border border-gray-200 object-contain"

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/cn'
+import { resolveImageUrl } from '@/lib/api'
 import { formatCurrency } from '@/lib/format'
 import { Skeleton } from '@/components/ui'
 import { FavoriteButton } from './FavoriteButton'
@@ -62,7 +63,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
         */}
         {capa ? (
           <img
-            src={capa.url}
+            src={resolveImageUrl(capa.url)}
             alt={capa.alt || name}
             loading="lazy"
             decoding="async"

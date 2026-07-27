@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronLeft, ChevronRight, X, ZoomIn } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { resolveImageUrl } from '@/lib/api'
 import type { ProductImage } from '@/types/product'
 
 interface ImageGalleryProps {
@@ -31,7 +32,10 @@ function ImageSlide({ src, alt, size = 'lg' }: { src: string; alt: string; size?
   )
 }
 
-export function ImageGallery({ images, icon, productName }: ImageGalleryProps) {
+export function ImageGallery({ images: rawImages, icon, productName }: ImageGalleryProps) {
+  // Resolve as URLs relativas (/media/...) contra a base do catalog uma vez só;
+  // todo o resto do componente usa `images` já resolvido. Ver resolveImageUrl.
+  const images = rawImages?.map((img) => ({ ...img, url: resolveImageUrl(img.url) ?? img.url }))
   const hasImages = images && images.length > 0
   const count = hasImages ? images.length : 1
   const [active, setActive] = useState(0)

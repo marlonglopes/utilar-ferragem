@@ -8,6 +8,27 @@ export const isCatalogEnabled = CATALOG_URL !== ''
 export const isOrderEnabled = ORDER_URL !== ''
 export const isAuthEnabled = AUTH_URL !== ''
 
+/**
+ * Resolve a URL de imagem do catálogo contra a base do catalog-service.
+ *
+ * PORQUÊ existe (bug de regressão): as imagens re-ingeridas (variantes locais)
+ * são servidas pelo catalog em `GET /media/*`, e a API devolve a URL como
+ * caminho ROOT-RELATIVE — `"/media/produtos/.../medium.jpg"`. O navegador
+ * resolve caminho root-relative contra a origem da SPA (`:5175`), NÃO contra o
+ * catalog (`:8091`) que realmente serve o arquivo. Resultado: 404 e o card caía
+ * no emoji ("sumiram as fotos"). Aqui prefixamos a base do catalog nas URLs
+ * relativas. URLs absolutas (Wikimedia, picsum, data:/blob:) passam intactas.
+ *
+ * `base` é parâmetro (default = CATALOG_URL) só para o teste conseguir simular
+ * uma base sem depender de import.meta.env.
+ */
+export function resolveImageUrl(url?: string, base: string = CATALOG_URL): string | undefined {
+  if (!url) return url
+  if (/^(https?:)?\/\//i.test(url) || /^(data|blob):/i.test(url)) return url
+  if (!base) return url // mock mode: sem base configurada, não há /media pra servir
+  return `${base.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`
+}
+
 /** Envelope de erro do backend: `{error, code, requestId, details?}`. */
 interface ApiErrorEnvelope {
   error: string

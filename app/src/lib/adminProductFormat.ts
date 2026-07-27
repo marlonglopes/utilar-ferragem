@@ -1,3 +1,4 @@
+import { resolveImageUrl } from '@/lib/api'
 import type { Severity } from '@/lib/adminTypes'
 import type {
   AdminProductRow,
@@ -241,8 +242,10 @@ export function hasVariants(img: ProductImageRecord): boolean {
  * direto a `img.variants.thumb` em nenhum componente.
  */
 export function imageSrc(img: ProductImageRecord, size: 'thumb' | 'medium' | 'large'): string {
-  if (img.variants && img.variants[size]) return img.variants[size]
-  return img.url
+  // resolveImageUrl prefixa a base do catalog nas URLs /media/... (relativas);
+  // sem isso o admin também mostrava foto quebrada nas imagens re-ingeridas.
+  const raw = img.variants && img.variants[size] ? img.variants[size] : img.url
+  return resolveImageUrl(raw) ?? raw
 }
 
 /** Ordena pelo `sortOrder` do servidor; a primeira é a capa, por definição. */

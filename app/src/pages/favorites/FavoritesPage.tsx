@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Heart, Trash2, Info } from 'lucide-react'
 import { useFavoritesStore } from '@/store/favoritesStore'
+import { resolveImageUrl } from '@/lib/api'
 import { formatCurrency } from '@/lib/format'
 import { Seo } from '@/components/seo/Seo'
 
@@ -39,7 +40,7 @@ function FavoriteRow({
       <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-50 text-2xl sm:h-20 sm:w-20">
         {imageUrl ? (
           <img
-            src={imageUrl}
+            src={resolveImageUrl(imageUrl)}
             alt=""
             loading="lazy"
             decoding="async"
