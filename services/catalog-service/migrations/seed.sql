@@ -444,6 +444,63 @@ ON CONFLICT (product_id, key) DO NOTHING;
 INSERT INTO product_price_history (product_id, price, cost, source)
 SELECT id, price, cost, 'seed' FROM products;
 
+-- ----------------------------------------------------------------------------
+-- Regras de complemento (co-compra técnica). Ficam AQUI, não na migration 016,
+-- porque cada regra referencia categories(id) por FK — e as categorias são dado
+-- de seed. No migrate limpo a categoria ainda não existe, então o INSERT tinha
+-- que sair da migration para não quebrar o `catalog-db-reset`. A tabela é criada
+-- pela migration 016 (roda antes do seed). Todas são fatos de aplicação de
+-- ferragem/construção — o tipo de coisa que o cliente descobre que faltava
+-- quando já está na obra.
+INSERT INTO product_complement_rules (source_category_id, source_query, target_category_id, target_query, note, priority)
+VALUES
+    -- Piso / porcelanato: o trio clássico do assentamento.
+    ('construcao', 'piso OR porcelanato OR ceramica', 'construcao', 'argamassa',
+     'Porcelanato e piso cerâmico exigem argamassa colante — AC-III para porcelanato.', 10),
+    ('construcao', 'piso OR porcelanato OR ceramica', 'construcao', 'rejunte',
+     'O rejunte fecha as juntas depois do assentamento.', 20),
+    ('construcao', 'piso OR porcelanato OR ceramica', 'ferramentas', 'espacador OR espaçador',
+     'Espaçadores mantêm a junta uniforme durante o assentamento.', 30),
+    ('construcao', 'argamassa', 'ferramentas', 'desempenadeira OR colher',
+     'A argamassa colante é aplicada com desempenadeira dentada.', 40),
+
+    -- Hidráulica: PVC soldável não cola sem adesivo, e não adere sem lixar.
+    ('hidraulica', 'tubo OR pvc', 'hidraulica', 'adesivo OR cola',
+     'Tubo de PVC soldável só veda com adesivo plástico específico.', 10),
+    ('hidraulica', 'tubo OR pvc', 'hidraulica', 'conexao OR joelho OR luva',
+     'Conexões (joelhos e luvas) fecham o trecho da tubulação.', 20),
+    ('hidraulica', 'tubo OR rosca', 'hidraulica', 'veda OR fita',
+     'Rosca de tubulação precisa de fita veda-rosca para não vazar.', 30),
+
+    -- Elétrica: cabo passa dentro de eletroduto; circuito termina em disjuntor.
+    ('eletrica', 'cabo OR fio', 'eletrica', 'eletroduto',
+     'O cabo deve correr dentro de eletroduto na infraestrutura embutida.', 10),
+    ('eletrica', 'cabo OR fio', 'eletrica', 'disjuntor',
+     'Cada circuito precisa do disjuntor dimensionado para a bitola do cabo.', 20),
+    ('eletrica', 'tomada OR interruptor', 'eletrica', 'caixa',
+     'Tomadas e interruptores são instalados sobre caixa de embutir.', 30),
+
+    -- Fixação: parafuso em alvenaria sem bucha não segura.
+    ('fixacao', 'parafuso', 'fixacao', 'bucha',
+     'Parafuso em alvenaria precisa de bucha compatível com o diâmetro.', 10),
+    ('fixacao', 'parafuso OR bucha', 'ferramentas', 'broca',
+     'A bucha exige furo do diâmetro correto — broca compatível.', 20),
+
+    -- Ferramentas: furadeira sem broca não fura; corte/desbaste pede EPI.
+    ('ferramentas', 'furadeira OR parafusadeira', 'ferramentas', 'broca',
+     'A furadeira não acompanha brocas — escolha o jogo pelo material.', 10),
+    ('ferramentas', 'esmerilhadeira OR lixadeira OR serra', 'seguranca', 'oculos OR protecao',
+     'Corte e desbaste projetam partículas: óculos de proteção é obrigatório (NR-6).', 10),
+
+    -- Pintura: tinta sozinha não pinta parede.
+    ('pintura', 'tinta', 'pintura', 'rolo OR pincel',
+     'A aplicação pede rolo para área ampla e pincel para recorte.', 10),
+    ('pintura', 'tinta', 'pintura', 'fita OR crepe',
+     'Fita crepe delimita rodapé e batente antes de pintar.', 20),
+    ('pintura', 'tinta OR massa', 'pintura', 'lixa OR massa',
+     'Massa corrida e lixa preparam a superfície antes da tinta.', 30)
+ON CONFLICT DO NOTHING;
+
 COMMIT;
 
 -- Relatório
