@@ -1,6 +1,8 @@
 // Cliente da assistente Alice ✨. Base URL independente (VITE_ASSISTANT_URL);
 // vazio = mock leve no cliente (o assistant-service tem o modo mock próprio, mas
 // aqui garantimos que a bolha funcione mesmo sem backend).
+import { tunnelFetch } from '@/lib/api'
+
 const ASSISTANT_URL = import.meta.env.VITE_ASSISTANT_URL ?? ''
 export const isLaraEnabled = ASSISTANT_URL !== ''
 
@@ -131,7 +133,7 @@ export async function sendToLara(message: string, history: LaraTurn[]): Promise<
   const token = authToken()
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${ASSISTANT_URL}/api/v1/assistant/chat`, {
+  const res = await tunnelFetch(`${ASSISTANT_URL}/api/v1/assistant/chat`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ message, history }),

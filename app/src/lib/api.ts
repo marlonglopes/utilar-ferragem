@@ -29,6 +29,35 @@ export function resolveImageUrl(url?: string, base: string = CATALOG_URL): strin
   return `${base.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`
 }
 
+/**
+ * fetch que faz túneis de preview (ngrok etc.) NÃO devolverem a página de aviso
+ * do serviço no lugar da resposta real.
+ *
+ * PORQUÊ: o ngrok free injeta um HTML de aviso quando o User-Agent é de
+ * navegador — e aí a SPA recebe HTML no lugar do JSON e quebra a demo. O header
+ * `ngrok-skip-browser-warning` faz o ngrok pular o aviso.
+ *
+ * Só entra em requisição MESMA-ORIGEM: no túnel, SPA e API dividem o domínio
+ * (proxy do Vite), então é same-origin; em produção a API é OUTRA origem e um
+ * header custom dispararia preflight de CORS à toa. Fora do túnel o header é
+ * inofensivo (o servidor ignora), mas restringir a same-origin evita o preflight.
+ */
+export function tunnelFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  let sameOrigin = input.startsWith('/')
+  if (!sameOrigin && typeof window !== 'undefined') {
+    try {
+      sameOrigin = new URL(input, window.location.href).origin === window.location.origin
+    } catch {
+      // URL inválida cai como cross-origin — não adiciona o header, sem risco.
+    }
+  }
+  if (!sameOrigin) return globalThis.fetch(input, init)
+  return globalThis.fetch(input, {
+    ...init,
+    headers: { ...(init.headers as Record<string, string> | undefined), 'ngrok-skip-browser-warning': 'true' },
+  })
+}
+
 /** Envelope de erro do backend: `{error, code, requestId, details?}`. */
 interface ApiErrorEnvelope {
   error: string
@@ -127,7 +156,7 @@ async function tryRefreshToken(): Promise<string | null> {
 
   inflightRefresh = (async () => {
     try {
-      const res = await fetch(`${AUTH_URL}/api/v1/auth/refresh`, {
+      const res = await tunnelFetch(`${AUTH_URL}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
@@ -286,7 +315,7 @@ export async function apiPost<T>(
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (tok) headers['Authorization'] = `Bearer ${tok}`
     applyIdempotency(headers, path, body, idempotencyKey)
-    return fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
+    return tunnelFetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
   }, token)
   return handleResponse<T>(res)
 }
@@ -295,7 +324,7 @@ export async function apiGet<T>(path: string, token?: string): Promise<T> {
   const res = await fetchWithAutoRefresh((tok) => {
     const headers: Record<string, string> = {}
     if (tok) headers['Authorization'] = `Bearer ${tok}`
-    return fetch(`${BASE_URL}${path}`, { headers })
+    return tunnelFetch(`${BASE_URL}${path}`, { headers })
   }, token)
   return handleResponse<T>(res)
 }
@@ -304,14 +333,14 @@ export async function apiPatch<T>(path: string, body: unknown, token?: string): 
   const res = await fetchWithAutoRefresh((tok) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (tok) headers['Authorization'] = `Bearer ${tok}`
-    return fetch(`${BASE_URL}${path}`, { method: 'PATCH', headers, body: JSON.stringify(body) })
+    return tunnelFetch(`${BASE_URL}${path}`, { method: 'PATCH', headers, body: JSON.stringify(body) })
   }, token)
   return handleResponse<T>(res)
 }
 
 // Catalog API — leitura pública, sem auth. Base URL independente (VITE_CATALOG_URL).
 export async function catalogGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${CATALOG_URL}${path}`)
+  const res = await tunnelFetch(`${CATALOG_URL}${path}`)
   if (res.status === 404) throw new Error('not_found')
   return handleResponse<T>(res)
 }
@@ -324,7 +353,7 @@ function orderHeaders(userId: string, contentType = false): Record<string, strin
 }
 
 export async function orderGet<T>(path: string, userId: string): Promise<T> {
-  const res = await fetch(`${ORDER_URL}${path}`, { headers: orderHeaders(userId) })
+  const res = await tunnelFetch(`${ORDER_URL}${path}`, { headers: orderHeaders(userId) })
   if (res.status === 404) throw new Error('not_found')
   return handleResponse<T>(res)
 }
@@ -337,7 +366,7 @@ export async function orderPost<T>(
 ): Promise<T> {
   const headers = orderHeaders(userId, true)
   applyIdempotency(headers, path, body, idempotencyKey)
-  const res = await fetch(`${ORDER_URL}${path}`, {
+  const res = await tunnelFetch(`${ORDER_URL}${path}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -346,7 +375,7 @@ export async function orderPost<T>(
 }
 
 export async function orderPatch<T>(path: string, userId: string, body: unknown = {}): Promise<T> {
-  const res = await fetch(`${ORDER_URL}${path}`, {
+  const res = await tunnelFetch(`${ORDER_URL}${path}`, {
     method: 'PATCH',
     headers: orderHeaders(userId, true),
     body: JSON.stringify(body),
@@ -364,7 +393,7 @@ function authHeaders(token?: string, contentType = false): Record<string, string
 }
 
 export async function authPost<T>(path: string, body: unknown, token?: string): Promise<T> {
-  const res = await fetch(`${AUTH_URL}${path}`, {
+  const res = await tunnelFetch(`${AUTH_URL}${path}`, {
     method: 'POST',
     headers: authHeaders(token, true),
     body: JSON.stringify(body),
@@ -403,7 +432,7 @@ export async function authLogout(
   // Sem auth-service (modo mock) ou sem token não há o que revogar.
   if (!isAuthEnabled || !accessToken) return false
   try {
-    const res = await fetch(`${AUTH_URL}/api/v1/auth/logout`, {
+    const res = await tunnelFetch(`${AUTH_URL}/api/v1/auth/logout`, {
       method: 'POST',
       headers: authHeaders(accessToken, true),
       body: JSON.stringify({ refreshToken: refreshToken ?? '' }),
@@ -423,7 +452,7 @@ export async function authLogout(
 }
 
 export async function authGet<T>(path: string, token: string): Promise<T> {
-  const res = await fetch(`${AUTH_URL}${path}`, { headers: authHeaders(token) })
+  const res = await tunnelFetch(`${AUTH_URL}${path}`, { headers: authHeaders(token) })
   if (res.status === 404) throw new Error('not_found')
   return handleResponse<T>(res)
 }
@@ -433,7 +462,7 @@ export async function authGet<T>(path: string, token: string): Promise<T> {
 // Usa fetchWithAutoRefresh: 401 dispara refresh+retry automático.
 export async function orderGetWithJWT<T>(path: string, token: string): Promise<T> {
   const res = await fetchWithAutoRefresh((tok) => {
-    return fetch(`${ORDER_URL}${path}`, {
+    return tunnelFetch(`${ORDER_URL}${path}`, {
       headers: tok ? { Authorization: `Bearer ${tok}` } : {},
     })
   }, token)
@@ -451,7 +480,7 @@ export async function orderPostWithJWT<T>(
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (tok) headers['Authorization'] = `Bearer ${tok}`
     applyIdempotency(headers, path, body, idempotencyKey)
-    return fetch(`${ORDER_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
+    return tunnelFetch(`${ORDER_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
   }, token)
   return handleResponse<T>(res)
 }
@@ -460,7 +489,7 @@ export async function orderPatchWithJWT<T>(path: string, token: string, body: un
   const res = await fetchWithAutoRefresh((tok) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (tok) headers['Authorization'] = `Bearer ${tok}`
-    return fetch(`${ORDER_URL}${path}`, { method: 'PATCH', headers, body: JSON.stringify(body) })
+    return tunnelFetch(`${ORDER_URL}${path}`, { method: 'PATCH', headers, body: JSON.stringify(body) })
   }, token)
   return handleResponse<T>(res)
 }
