@@ -1,6 +1,6 @@
 ---
 name: test-utilar
-description: "Roda a suíte completa do Utilar Ferragem — backend (5 serviços Go: catalog, order, auth, payment, assistant), frontend (tsc+lint+vitest), E2E (Playwright), ingestão de produtos, integrações cross-service e PSP Appmax. Isola o banco do order automaticamente para não flakar. Use quando o usuário pedir para rodar testes, testar as features/fluxos, validar o Utilar, checar se está tudo verde, testar backend/frontend/integrações/ingestão/Appmax, ou verificar regressões antes de commit/deploy."
+description: "Roda a suíte completa do Utilar Ferragem — backend (5 serviços Go: catalog, order, auth, payment, assistant), frontend (tsc+lint+vitest), E2E (Playwright), acessibilidade (axe WCAG A/AA), segurança (SAST gosec + CVE govulncheck + npm audit + invariantes do caminho do dinheiro/autorização), pentest (cenários adversariais como teste), boas práticas (go vet), ingestão de produtos, integrações cross-service e PSP Appmax. Isola o banco do order automaticamente para não flakar. Use quando o usuário pedir para rodar testes, testar as features/fluxos, validar o Utilar, checar se está tudo verde, testar backend/frontend/segurança/pentest/acessibilidade/integrações/ingestão/Appmax, auditar boas práticas, ou verificar regressões antes de commit/deploy."
 ---
 
 # Testar o Utilar Ferragem
@@ -11,13 +11,17 @@ Executa toda a pirâmide de testes do Utilar e reporta um resumo consolidado
 ## Como usar
 
 ```bash
-# tudo: backend + ingestão + frontend + e2e
+# tudo: backend + ingestão + security + quality + frontend + a11y + e2e
 .claude/skills/test-utilar/run-tests.sh
 
 # por camada
 .claude/skills/test-utilar/run-tests.sh backend        # 5 serviços Go, -race
 .claude/skills/test-utilar/run-tests.sh frontend       # tsc -b + lint + vitest
 .claude/skills/test-utilar/run-tests.sh e2e            # Playwright (SPA mock)
+.claude/skills/test-utilar/run-tests.sh a11y           # axe-core WCAG 2.1 A/AA
+.claude/skills/test-utilar/run-tests.sh security       # SAST + CVE + audit + invariantes
+.claude/skills/test-utilar/run-tests.sh pentest        # cenários adversariais como teste
+.claude/skills/test-utilar/run-tests.sh quality        # go vet + gofmt/prettier (débito)
 .claude/skills/test-utilar/run-tests.sh ingest         # ingestão de produtos
 .claude/skills/test-utilar/run-tests.sh appmax         # PSP Appmax (v1/v3)
 .claude/skills/test-utilar/run-tests.sh integrations   # cross-service
@@ -36,6 +40,10 @@ Executa toda a pirâmide de testes do Utilar e reporta um resumo consolidado
   - `assistant` — Alice (tool use como única fonte de fato), cálculos de obra, safety (não dimensiona estrutura), gaps
 - **frontend** — `tsc -b` (o `--noEmit` NÃO checa nada aqui) + `lint` + `vitest`
 - **e2e** — Playwright: storefront ponta a ponta (catálogo, busca, carrinho, auth, checkout, conta), chromium + mobile, modo mock
+- **a11y** — axe-core (WCAG 2.1 A/AA) nas páginas públicas (home, carrinho, login, cadastro, detalhe de produto). Duas camadas: **estrutural** (rótulo, `alt`, nome acessível, landmarks, ARIA) é **gate de verdade e hoje está ZERADO**; **contraste de cor** é medido e reportado, mas **não bloqueia** — a marca é laranja #F47920 com texto branco (~2,6:1, abaixo do 4,5:1 do AA) e mudar isso é **decisão de design do dono**. Precisa de `@axe-core/playwright` + chromium do Playwright.
+- **security** — cinco frentes: **gosec** (SAST, `-severity high -confidence high`) é gate por módulo; **govulncheck** (CVE conhecidas) é **informativo** — CVE de stdlib/dep se resolve subindo toolchain/versão, não é bug do código; **npm audit** (`--omit=dev --audit-level=high`) trava só em high/critical de produção; **higiene** (nenhum segredo versionado, `DEV_MODE` desligado em arquivo de produção); e as **invariantes** (abaixo).
+- **pentest** — os cenários de ataque conhecidos, encodados como teste de regressão (roda **sem** o stack no ar): cliente nunca vê custo, `seller`≠balcão, token sem teto de desconto, webhook forjado não confirma pagamento, custo não vaza na API pública/balcão, token de serviço só vale assinado. **Não há DAST ativo** (varredura contra os serviços rodando) — isso fica fora do runner.
+- **quality** — boas práticas: **`go vet`** é o gate de estática (limpo). **gofmt** e **prettier** são débito pré-existente (dezenas de arquivos) — a contagem é **informada, não trava**. `eslint --max-warnings 0` já é gate na camada frontend. **staticcheck não é usado** — o binário deste ambiente está linkado a um loader linuxbrew ausente e falha com "no such file".
 - **ingest** — regras da importação (draft por padrão, nunca apaga por ausência → archived, segura queda de preço): pacotes Go `ingest` do catalog e do assistant + smoke de sintaxe dos scripts Python de curadoria (não há suíte funcional Python)
 - **appmax** — contratos das duas APIs (v3 admin e v1 AppStore com Payment Split) + redação de PII; teste **live** contra o sandbox só roda com creds no ambiente
 - **integrations** — Alice→catálogo, payment↔order (clients), identidade de serviço (`role=service` só vale assinada com `SERVICE_JWT_SECRET`)
@@ -59,11 +67,16 @@ usa. Duas armadilhas conhecidas:
 
 ## Pré-requisitos
 
-- **Go** no PATH (`/usr/local/go/bin` — o script adiciona).
-- **Node 20** + deps (`cd app && npm install`); para E2E, `npx playwright install chromium`.
-- **Postgres** (`make infra-up`). Sem banco, os testes de integração **SKIPam**
-  (não falham) e o runner avisa. Para a isolação do order: **Docker** com o
-  container `utilar_order_db` no ar.
+- **Go** no PATH (`/usr/local/go/bin` — o script adiciona) + **GOPATH/bin** para
+  `gosec`/`govulncheck` (o script adiciona via `go env GOPATH`). Sem essas
+  ferramentas, a camada `security` avisa e pula a parte de SAST/CVE.
+- **Node 20** + deps (`cd app && npm install`); para E2E **e a11y**,
+  `npx playwright install chromium`; a a11y usa `@axe-core/playwright` (devDep).
+- **Postgres** (`make infra-up` + `make <prefixo>-reset` para migrar/semear).
+  Sem banco, os testes de integração **SKIPam** (não falham) e o runner avisa.
+  Para a isolação do order: **Docker** com o container `utilar_order_db` no ar.
+  ⚠️ O `catalog-db-reset` precisa do fix de seed do `product_complement_rules`
+  (o INSERT saiu da migration 016 pro seed.sql — ver `TestRegression_Migrations…`).
 - **Appmax live** (opcional): `APPMAX_ACCESS_TOKEN`/`APPMAX_CLIENT_ID` no ambiente.
 
 ## Nota fiscal — o que a suíte NÃO cobre (ainda)
