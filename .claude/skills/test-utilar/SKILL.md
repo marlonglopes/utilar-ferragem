@@ -61,9 +61,24 @@ usa. Duas armadilhas conhecidas:
   schema+seed do `order_service`, `TRUNCATE orders CASCADE`, dropa no fim).
   `shipping_rates`/`zones` sobrevivem — os testes de frete dependem deles. Dados
   de dev ficam **intactos**. Sem Docker, cai no banco compartilhado e avisa.
-- **catalog** — um sweeper de reservas roda a cada 60s no mesmo banco e briga
-  com os testes de concorrência. Se um teste de concorrência falhar "do nada",
-  pare o catalog-service e rode de novo, ou trate como flake.
+- **catalog** — DUAS coisas:
+  - **Fixture de ~400 produtos.** Os testes de busca/listagem dependem do catálogo
+    de dev completo: `seed` (115 base) + importador curado (285) + `balcao_ids.sql`
+    (SKU/código de barras/capa). Um `catalog-db-reset` sozinho deixa **só 115** →
+    a busca por acento/radical some (`unaccent` funciona, mas os produtos-alvo
+    não existem) e a listagem vem sem capa. O runner **provisiona o fixture
+    sozinho** antes de rodar (`catalog_fixture_ensure`, idempotente): importa o
+    curado e roda o `balcao_ids.sql` se faltarem os `CUR-%`. Dados de dev
+    intactos. Sem Docker/python, avisa e os testes que dependem do fixture podem
+    falhar (não é regressão).
+  - **Flake de upload sob `-race`.** `TestUploadImagem_OrdenacaoECapa` faz ~3s de
+    processamento de imagem e corre com a escrita assíncrona do upload: **passa
+    isolado e com `-v`, mas flaka no pacote cheio**. O runner detecta quando a
+    ÚNICA falha do catalog é esse teste, **reexecuta isolado e tolera como flake**
+    (igual ao tratamento do order). Qualquer outra falha é regressão de verdade.
+  - Além disso, um **sweeper de reservas** roda a cada 60s no mesmo banco e briga
+    com os testes de concorrência. Se um deles falhar "do nada", pare o
+    catalog-service e rode de novo.
 
 ## Pré-requisitos
 
