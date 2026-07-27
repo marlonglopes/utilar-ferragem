@@ -1,9 +1,11 @@
 # Emissão de nota fiscal — spec de implementação
 
-> **Para:** Thomazinho · **Objetivo:** documentar tudo que precisa para emitir
-> NF-e (compra web) e NFC-e (balcão/tablet), como integrar, e a ordem de
-> implementação. Este é o **plano de código**; o *porquê* e as decisões de
-> negócio/contábil estão em [`fiscal-nota-e-integracao.md`](fiscal-nota-e-integracao.md).
+> **Para:** quem for implementar (dev) · **Objetivo:** documentar tudo que
+> precisa para emitir NF-e (compra web) e NFC-e (balcão/tablet), como integrar, e
+> a ordem de implementação. Este é o **plano de código**. As **decisões do dono**
+> (regime, emissor, certificado) estão em
+> [`fiscal-para-o-dono.md`](fiscal-para-o-dono.md); o *porquê*/análise em
+> [`fiscal-nota-e-integracao.md`](fiscal-nota-e-integracao.md).
 
 ---
 
