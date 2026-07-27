@@ -104,7 +104,13 @@ func (c *Client) get(ctx context.Context, path string) (json.RawMessage, error) 
 }
 
 func (c *Client) do(req *http.Request, method, path string) (json.RawMessage, error) {
-	resp, err := c.http.Do(req)
+	// gosec G704 (SSRF) é falso-positivo aqui: o HOST do destino é sempre o
+	// c.baseURL (const defaultBaseURL ou APPMAX_BASE_URL — config do operador,
+	// não entrada do cliente). O `path` é sempre literal interno ("/customer",
+	// "/order", "/payment/…") ou "/order/"+url.PathEscape(orderID); nada disso
+	// troca o host. Anotado, não silenciado no gate: um Do() com URL vinda de
+	// corpo de requisição continuaria disparando o alerta.
+	resp, err := c.http.Do(req) // #nosec G704 -- host fixo por config; path interno/escapado
 	if err != nil {
 		return nil, err
 	}
