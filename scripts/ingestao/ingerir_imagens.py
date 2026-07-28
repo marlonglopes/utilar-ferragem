@@ -33,7 +33,10 @@ UA = "UtilarFerragem-DevSeed/1.0 (catálogo de teste; dev@utilarferragem.com.br)
 PAUSA_DOWNLOAD = 0.8   # segundos entre downloads
 ESPERA_429 = 20        # recuo inicial quando a API pede calma
 
-LICENCAS_OK = {"cc0", "public domain", "pd", "cc pd mark", "no restrictions"}
+# CC0/PD são ideais (sem obrigação). "cc by" cobre CC BY e CC BY-SA — livres para
+# exibir com ATRIBUIÇÃO. Para demo é ok; em produção, a atribuição por imagem
+# precisa ser rastreada (o extmetadata traz o autor/licença).
+LICENCAS_OK = {"cc0", "public domain", "pd", "cc pd mark", "no restrictions", "cc by"}
 
 PSQL = ["docker", "exec", "utilar_catalog_db", "psql", "-U", "utilar", "-d", "catalog_service"]
 
@@ -215,11 +218,17 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--por-produto", type=int, default=3, help="até 5")
+    ap.add_argument("--only-missing", action="store_true",
+                    help="só produtos SEM imagem real (ignora quem já tem foto não-picsum)")
     args = ap.parse_args()
     por = max(1, min(args.por_produto, 5))
 
-    produtos = sql("SELECT id, name, category_id FROM products "
-                   "WHERE status='published' ORDER BY category_id, name;")
+    where = "status='published'"
+    if args.only_missing:
+        where += (" AND id NOT IN (SELECT product_id FROM product_images "
+                  "WHERE url NOT LIKE '%picsum%')")
+    produtos = sql(f"SELECT id, name, category_id FROM products "
+                   f"WHERE {where} ORDER BY category_id, name;")
     if args.limit:
         produtos = produtos[: args.limit]
 
