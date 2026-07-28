@@ -69,18 +69,10 @@ coleta:
 			rep.Erros = append(rep.Erros, RunError{URLOrigem: u, Erro: err.Error()})
 			continue
 		}
-		// Campos garantidos pelo orquestrador (não pelo adapter).
-		p.Fonte = a.Name()
+		// URL é do orquestrador (o adapter não a conhece); o resto (fonte, moeda,
+		// categoria normalizada, validação, sinalização) é a lógica compartilhada.
 		p.URLOrigem = u
-		p.Moeda = "BRL"
-		p.ColetadoEm = now()
-		p.CategoriaNormalizada = NormalizeCategoria(p.CategoriaBruta, p.Nome)
-
-		incluir, flag := Validate(p)
-		if flag != nil {
-			rep.Sinalizados = append(rep.Sinalizados, *flag)
-		}
-		if incluir {
+		if processarItem(p, a.Name(), now(), &rep) {
 			coletados = append(coletados, *p)
 		}
 	}

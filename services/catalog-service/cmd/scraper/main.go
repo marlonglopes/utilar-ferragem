@@ -31,10 +31,15 @@ func main() {
 	flag.Parse()
 
 	reg := scrape.NewRegistry()
-	// Registre aqui os adapters de fontes AUTORIZADAS, quando existirem. Ex.:
-	//   reg.Register(mercadolivre.New(appID, secret)) // API oficial (OAuth2 + backoff)
-	//   reg.Register(fornecedorx.New())               // site com robots.txt liberado / permissão
-	//   reg.Register(gs1cnp.New(token))               // provedor por EAN (GS1 CNP / Cosmos)
+	// Fontes de HTML (implementam scrape.Adapter) entram no Registry, ex.:
+	//   reg.Register(fornecedorx.New())  // site com robots.txt liberado / permissão
+	//
+	// Fontes de API NÃO usam o Registry (não têm HTML) — rodam direto pelo .Run().
+	// Ex.: Mercado Livre (crie o app em developers.mercadolivre.com.br):
+	//   ml := mercadolivre.New(os.Getenv("ML_CLIENT_ID"), os.Getenv("ML_CLIENT_SECRET"),
+	//       []string{"dobradiça", "fechadura", "parafuso", "cadeado", "puxador"}, 30)
+	//   batch, err := ml.Run(context.Background())   // batch → revisar → importar
+	// (mesmo padrão p/ GS1 CNP / Cosmos por EAN quando tiver credencial).
 
 	if *list {
 		names := reg.Names()
