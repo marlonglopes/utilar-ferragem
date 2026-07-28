@@ -88,12 +88,27 @@ pagamento, Timeline por correlation_id).
 trigger) **mas só no payment**; ledger + reconciliação prontos; `AuditTrailPage` liga só no
 payment e o vocabulário de ações não-financeiras é mock.
 
+**Correção do mapa (importante):** o order **já audita** as ações sensíveis de dinheiro,
+só que em tabelas próprias, não no `pkg/audit`: `balcao_audit_events` (aprovação de
+desconto, liquidação externa) e `return_audit_events` (devolução/estorno), ambas
+**fail-closed e no MESMO tx** do fato (`auditTx` do balcão, `auditReturnTx`). O auth
+também tem `auth_events` (login/registro/reset). O buraco real é: (a) essas trilhas estão
+espalhadas em tabelas por-domínio, e (b) **nenhuma tem API admin de leitura** — o
+`AuditTrailPage` só lê a trilha `pkg/audit` do payment. Então a 1ª entrega é mais barata do
+que parecia.
+
 **Fazer:**
-- **Ligar `pkg/audit` nos serviços que faltam**, nas ações que a UI já anuncia:
+- **API admin de leitura unificada** que agrega as trilhas que JÁ existem
+  (`pkg/audit` do payment + `balcao_audit_events` + `return_audit_events` + `auth_events`)
+  num formato comum ("quem fez o quê, quando, antes→depois"), filtrável por ação/entidade/
+  ator. É o que enche o `AuditTrailPage` de dado real (hoje o vocabulário não-financeiro é
+  mock). Cada serviço expõe a leitura da sua própria trilha; o admin do front consolida.
+- **Ligar `pkg/audit` (hash-chain) onde ainda não há trilha nenhuma**, nas ações que a UI
+  anuncia e que hoje não são gravadas:
   - catalog: `price_change`, `product_publish/archive`, `import_commit`, `cost_change`.
-  - order: `order_status_change`, `discount_approval` (e recusa), `refund_issued`, `balcao_sale`.
-  - auth: `user_role_change`, `operator_create`, `admin_access` (login de admin), e expor
-    `auth_events` (login/registro/reset) por uma **API admin de leitura**.
+  - auth: `user_role_change`, `operator_create`, `admin_access` (login de admin).
+  - order: manter as tabelas de balcão/devolução (já são fail-closed) e, se valer a
+    consistência, migrar depois para o `pkg/audit` — não reescrever o que já funciona agora.
   - Cada `Record` no MESMO tx da escrita de negócio (o `RecordTx` já suporta).
 - **Timeline por pagamento / por request-id:** endpoint admin que junta, para um pagamento,
   `payments` + transições + webhooks (payload cru arquivado) + lançamentos do ledger +
