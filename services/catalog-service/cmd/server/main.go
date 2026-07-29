@@ -65,7 +65,7 @@ func main() {
 	storeCostH := handler.NewStoreCostHandler(database)
 	productImageH := handler.NewProductImageHandler(database, mediaStore)
 	reviewH := handler.NewReviewHandler(database, cfg.ServiceJWTSecret)
-	recoH := handler.NewRecommendationHandler(database)
+	recoH := handler.NewRecommendationHandler(database).WithMedia(mediaStore)
 	copurchase := reco.New(database)
 
 	if cfg.DevMode {

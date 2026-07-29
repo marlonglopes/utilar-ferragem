@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -9,8 +10,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 
 	"github.com/utilar/catalog-service/internal/model"
+	"github.com/utilar/catalog-service/internal/storage"
 )
 
 // ============================================================================
@@ -60,10 +63,94 @@ const maxRelatedLimit = 24
 // RecommendationHandler serve GET /products/:slug/related.
 type RecommendationHandler struct {
 	db *sql.DB
+	// media traduz a chave lógica das variantes na URL pública — o MESMO
+	// resolver do ProductHandler. Sem ele, a seção "Outros produtos" não tinha
+	// como montar a capa e caía no ícone da categoria mesmo com foto (regressão).
+	media storage.URLResolver
 }
 
 func NewRecommendationHandler(db *sql.DB) *RecommendationHandler {
-	return &RecommendationHandler{db: db}
+	return &RecommendationHandler{db: db, media: storage.PrefixResolver("/media")}
+}
+
+// WithMedia injeta o resolver de mídia ativo (o main passa o do storage real).
+func (h *RecommendationHandler) WithMedia(r storage.URLResolver) *RecommendationHandler {
+	if r != nil {
+		h.media = r
+	}
+	return h
+}
+
+// loadCovers preenche a imagem de CAPA dos relacionados em uma única query.
+//
+// PORQUÊ existe: a /related montava o produto sem `images`, então a seção
+// "Outros produtos de X" caía no ícone da categoria MESMO com o produto tendo
+// foto — a listagem (vitrine) traz a capa via loadThumbnails, mas a recomendação
+// não trazia. Regressão de vitrine na seção de relacionados.
+//
+// Só a CAPA (menor sort_order), como na vitrine: a galeria completa é do detalhe.
+func (h *RecommendationHandler) loadCovers(c *gin.Context, out []model.RelatedProduct) {
+	if len(out) == 0 {
+		return
+	}
+	ids := make([]string, len(out))
+	for i := range out {
+		ids[i] = out[i].ID
+	}
+	rows, err := h.db.Query(`
+		SELECT DISTINCT ON (product_id) product_id, url, alt, variants
+		FROM product_images
+		WHERE product_id = ANY($1)
+		ORDER BY product_id, sort_order ASC`, pq.Array(ids))
+	if err != nil {
+		slog.Error("related.covers_failed", "request_id", c.GetString("request_id"), "error", err.Error())
+		return
+	}
+	defer rows.Close()
+
+	capas := make(map[string]model.ProductImage, len(out))
+	for rows.Next() {
+		var pid string
+		var im model.ProductImage
+		var rawVariants []byte
+		if err := rows.Scan(&pid, &im.URL, &im.Alt, &rawVariants); err != nil {
+			slog.Error("related.covers_failed", "request_id", c.GetString("request_id"), "error", err.Error())
+			return
+		}
+		im.Variants = buildImageVariants(h.media, rawVariants)
+		if im.Variants != nil {
+			im.URL = im.Variants.Thumb // a vitrine serve a miniatura
+		}
+		capas[pid] = im
+	}
+	if err := rows.Err(); err != nil {
+		slog.Error("related.covers_failed", "request_id", c.GetString("request_id"), "error", err.Error())
+		return
+	}
+	for i := range out {
+		if im, ok := capas[out[i].ID]; ok {
+			out[i].Images = []model.ProductImage{im}
+		}
+	}
+}
+
+// buildImageVariants converte o JSONB de variantes (chaves lógicas) nas URLs
+// públicas via resolver de mídia. Compartilhado por ProductHandler.imageVariants
+// e RecommendationHandler.loadCovers — a capa da vitrine e a dos relacionados
+// usam a MESMA tradução, então não podem divergir.
+func buildImageVariants(media storage.URLResolver, raw []byte) *model.ImageVariants {
+	if len(raw) == 0 {
+		return nil
+	}
+	var keys map[string]string
+	if err := json.Unmarshal(raw, &keys); err != nil || len(keys) == 0 {
+		return nil
+	}
+	return &model.ImageVariants{
+		Thumb:  media.URL(keys["thumb"]),
+		Medium: media.URL(keys["medium"]),
+		Large:  media.URL(keys["large"]),
+	}
 }
 
 // Related GET /api/v1/products/:slug/related?limit=8
@@ -134,6 +221,9 @@ func (h *RecommendationHandler) Related(c *gin.Context) {
 
 	meta.Fallback = meta.Counts.Fallback > 0
 	meta.Strategy = strategyOf(meta)
+
+	// Capa dos relacionados (senão a seção "Outros produtos" cai no ícone).
+	h.loadCovers(c, out)
 
 	c.JSON(http.StatusOK, model.RelatedResponse{Data: out, Meta: meta})
 }

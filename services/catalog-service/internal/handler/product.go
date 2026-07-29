@@ -2,7 +2,6 @@ package handler
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -61,18 +60,8 @@ func (h *ProductHandler) WithMedia(r storage.URLResolver) *ProductHandler {
 // variantes) — e é essa ausência que o frontend usa pra distinguir os dois
 // tipos: com `variants`, escolhe o tamanho pelo contexto; sem, usa `url`.
 func (h *ProductHandler) imageVariants(raw []byte) *model.ImageVariants {
-	if len(raw) == 0 {
-		return nil
-	}
-	var keys map[string]string
-	if err := json.Unmarshal(raw, &keys); err != nil || len(keys) == 0 {
-		return nil
-	}
-	return &model.ImageVariants{
-		Thumb:  h.media.URL(keys["thumb"]),
-		Medium: h.media.URL(keys["medium"]),
-		Large:  h.media.URL(keys["large"]),
-	}
+	// Delega ao helper compartilhado (a mesma tradução usada pelos relacionados).
+	return buildImageVariants(h.media, raw)
 }
 
 // productColumns é a projeção PÚBLICA de produto — a única usada pelas rotas
