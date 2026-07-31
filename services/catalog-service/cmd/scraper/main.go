@@ -16,6 +16,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -106,6 +107,14 @@ func gravar(batch *scrape.Batch, out string) {
 		fmt.Fprintf(os.Stderr, "serializar lote: %v\n", err)
 		os.Exit(1)
 	}
+	// filepath.Clean normaliza o caminho (colapsa `..`/`.`) — endurecimento
+	// barato, mesmo o valor não sendo hostil.
+	out = filepath.Clean(out)
+	// #nosec G703 — `out` é a flag `-out` que o OPERADOR passa na linha de
+	// comando (default "scrape-batch.json"), não entrada de rede nem de dado
+	// coletado. Quem roda este binário de dev já tem autoridade de escrita no
+	// processo; "path traversal" aqui é escrever onde o próprio operador mandou.
+	// O lote é sempre um arquivo de REVISÃO — nunca publica nada sozinho.
 	if err := os.WriteFile(out, data, 0o600); err != nil {
 		fmt.Fprintf(os.Stderr, "escrever %s: %v\n", out, err)
 		os.Exit(1)
