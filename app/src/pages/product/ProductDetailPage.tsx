@@ -24,7 +24,8 @@ function Stars({ rating, count }: { rating: number; count: number }) {
   return (
     <div className="flex items-center gap-1.5 text-sm text-gray-500">
       <span className="text-yellow-400 text-base">
-        {'★'.repeat(Math.round(rating))}{'☆'.repeat(5 - Math.round(rating))}
+        {'★'.repeat(Math.round(rating))}
+        {'☆'.repeat(5 - Math.round(rating))}
       </span>
       <span className="font-medium text-gray-700">{rating.toFixed(1)}</span>
       <span>({count.toLocaleString('pt-BR')})</span>
@@ -95,7 +96,9 @@ export default function ProductDetailPage() {
 
   const { data: product, isLoading, isError } = useProduct(slug)
 
-  const category = product ? TOP_LEVEL_CATEGORIES.find((c) => c.slug === product.category) : undefined
+  const category = product
+    ? TOP_LEVEL_CATEGORIES.find((c) => c.slug === product.category)
+    : undefined
 
   const { data: relatedData, isLoading: relatedLoading } = useRelatedProducts(
     slug,
@@ -131,9 +134,7 @@ export default function ProductDetailPage() {
     { label: t('common:home.categories'), href: '/' },
     // `taxonomy.*` vive no namespace common, mas o default aqui é catalog —
     // sem o prefixo, o breadcrumb renderizava a chave crua ("taxonomy.ferramentas").
-    ...(category
-      ? [{ label: t(category.labelKey), href: `/categoria/${category.slug}` }]
-      : []),
+    ...(category ? [{ label: t(category.labelKey), href: `/categoria/${category.slug}` }] : []),
     { label: product.name },
   ]
 
@@ -169,7 +170,8 @@ export default function ProductDetailPage() {
             seller: product.seller,
             rating: product.rating,
             reviewCount: product.reviewCount,
-            images: product.images?.map((i) => i.url) ?? (product.imageUrl ? [product.imageUrl] : []),
+            images:
+              product.images?.map((i) => i.url) ?? (product.imageUrl ? [product.imageUrl] : []),
           }),
           breadcrumbListSchema([
             { name: 'Início', path: '/' },
@@ -192,7 +194,9 @@ export default function ProductDetailPage() {
           <div className="flex flex-col gap-4">
             <div>
               <p className="text-xs text-gray-400 mb-1">{product.seller}</p>
-              <h1 className="font-display font-black text-2xl text-gray-900 leading-tight">{product.name}</h1>
+              <h1 className="font-display font-black text-2xl text-gray-900 leading-tight">
+                {product.name}
+              </h1>
               <div className="mt-2">
                 <Stars rating={product.rating} count={product.reviewCount} />
               </div>
@@ -218,7 +222,9 @@ export default function ProductDetailPage() {
               )}
               {product.cashbackAmount && (
                 <p className="text-sm font-semibold text-brand-orange mt-1">
-                  {t('catalog:product.cashback', { amount: formatCurrency(product.cashbackAmount) })}
+                  {t('catalog:product.cashback', {
+                    amount: formatCurrency(product.cashbackAmount),
+                  })}
                 </p>
               )}
             </div>
@@ -241,8 +247,8 @@ export default function ProductDetailPage() {
                   product.stock === 0
                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     : added
-                    ? 'bg-green-600 text-white'
-                    : 'bg-brand-orange hover:bg-brand-orange-dark text-white'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-brand-orange hover:bg-brand-orange-dark text-white'
                 )}
               >
                 <ShoppingCart className="h-5 w-5" />
@@ -314,9 +320,13 @@ export default function ProductDetailPage() {
       <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-3 safe-area-bottom">
         <div className="flex-1 min-w-0">
           {product.originalPrice && (
-            <p className="text-xs text-gray-400 line-through leading-none">{formatCurrency(product.originalPrice)}</p>
+            <p className="text-xs text-gray-400 line-through leading-none">
+              {formatCurrency(product.originalPrice)}
+            </p>
           )}
-          <p className="text-lg font-bold text-gray-900 leading-tight">{formatCurrency(product.price)}</p>
+          <p className="text-lg font-bold text-gray-900 leading-tight">
+            {formatCurrency(product.price)}
+          </p>
         </div>
         <button
           onClick={handleAddToCart}
@@ -326,8 +336,8 @@ export default function ProductDetailPage() {
             product.stock === 0
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
               : added
-              ? 'bg-green-600 text-white'
-              : 'bg-brand-orange hover:bg-brand-orange-dark text-white'
+                ? 'bg-green-600 text-white'
+                : 'bg-brand-orange hover:bg-brand-orange-dark text-white'
           )}
         >
           <ShoppingCart className="h-4 w-4" />

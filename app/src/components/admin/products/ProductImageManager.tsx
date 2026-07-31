@@ -93,7 +93,7 @@ function ImageCard({
         'relative flex flex-col rounded-lg border bg-white transition-shadow',
         isCover ? 'border-brand-blue ring-1 ring-brand-blue/30' : 'border-gray-200',
         dragging && 'opacity-50',
-        !busy && 'cursor-grab active:cursor-grabbing',
+        !busy && 'cursor-grab active:cursor-grabbing'
       )}
       data-testid={`image-card-${image.id}`}
     >
@@ -222,7 +222,7 @@ export function ProductImageManager({ productId }: { productId: string }) {
       // corrigi-lo) não dispara `change` e o dono acha que a tela travou.
       if (inputRef.current) inputRef.current.value = ''
     },
-    [g],
+    [g]
   )
 
   const onDrop = useCallback(() => {
@@ -279,7 +279,7 @@ export function ProductImageManager({ productId }: { productId: string }) {
           }}
           className={cn(
             'rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors',
-            over ? 'border-brand-blue bg-brand-blue-light/40' : 'border-gray-300 bg-gray-50',
+            over ? 'border-brand-blue bg-brand-blue-light/40' : 'border-gray-300 bg-gray-50'
           )}
           data-testid="image-dropzone"
         >

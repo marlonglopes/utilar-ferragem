@@ -225,7 +225,9 @@ describe('resolveBuyAgain — mudança de preço', () => {
 
 describe('isNotFoundError', () => {
   it('reconhece o envelope do backend pelo code, não pelo texto', () => {
-    expect(isNotFoundError(new ApiError({ error: 'qualquer texto', code: 'not_found' }, 404))).toBe(true)
+    expect(isNotFoundError(new ApiError({ error: 'qualquer texto', code: 'not_found' }, 404))).toBe(
+      true
+    )
     // Mesmo com mensagem reescrita, o code manda.
     expect(isNotFoundError(new ApiError({ error: 'sumiu o produto' }, 404))).toBe(true)
   })

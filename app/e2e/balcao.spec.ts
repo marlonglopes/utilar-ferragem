@@ -39,7 +39,7 @@ test.describe('Balcão (PDV)', () => {
     // operador semeado não homologa, então cai na segunda — as duas provam que
     // a página montou. O guard de poder já é testado no unit; aqui é smoke.
     await expect(
-      page.getByRole('heading', { name: /Aprovações pendentes|Fila de aprovação restrita/ }),
+      page.getByRole('heading', { name: /Aprovações pendentes|Fila de aprovação restrita/ })
     ).toBeVisible()
     expect(errors, 'erros de runtime em /balcao/aprovacoes').toEqual([])
   })

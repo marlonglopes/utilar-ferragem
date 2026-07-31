@@ -92,7 +92,13 @@ describe('errorElement do router', () => {
     // Reproduz a regressão original: antes do errorElement, um throw numa rota
     // derrubava o app inteiro para uma tela branca.
     const router = createMemoryRouter(
-      [{ path: '/', element: <Boom />, errorElement: <ErrorScreen title="Algo deu errado" message="falhou" /> }],
+      [
+        {
+          path: '/',
+          element: <Boom />,
+          errorElement: <ErrorScreen title="Algo deu errado" message="falhou" />,
+        },
+      ],
       { initialEntries: ['/'] }
     )
 

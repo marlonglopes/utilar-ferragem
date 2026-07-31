@@ -88,10 +88,14 @@ export default function CartPage() {
         {/* Items list */}
         <div className="lg:col-span-2 flex flex-col gap-6">
           {Object.entries(bySeller).map(([sellerId, sellerItems]) => (
-            <div key={sellerId} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div
+              key={sellerId}
+              className="bg-white border border-gray-200 rounded-xl overflow-hidden"
+            >
               <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
                 <p className="text-sm font-semibold text-gray-600">
-                  {t('cartPage.soldBy')} <span className="text-gray-900">{sellerItems[0].sellerName}</span>
+                  {t('cartPage.soldBy')}{' '}
+                  <span className="text-gray-900">{sellerItems[0].sellerName}</span>
                 </p>
               </div>
               <div className="divide-y divide-gray-100">
@@ -102,7 +106,9 @@ export default function CartPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 leading-snug">{item.name}</p>
-                      <p className="text-base font-bold text-gray-900 mt-1">{formatCurrency(item.priceSnapshot)}</p>
+                      <p className="text-base font-bold text-gray-900 mt-1">
+                        {formatCurrency(item.priceSnapshot)}
+                      </p>
                       <div className="flex items-center gap-4 mt-2">
                         <QtyControl item={item} />
                         <button
@@ -138,16 +144,14 @@ export default function CartPage() {
             </div>
           </div>
 
-          <ShippingEstimate
-            subtotal={total}
-            itemCount={totalCount}
-            onSelect={setFrete}
-          />
+          <ShippingEstimate subtotal={total} itemCount={totalCount} onSelect={setFrete} />
 
           {frete && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">{t('cartPage.shippingEstimate')}</span>
-              <span className={frete.free ? 'text-green-700 font-medium' : 'font-medium text-gray-900'}>
+              <span
+                className={frete.free ? 'text-green-700 font-medium' : 'font-medium text-gray-900'}
+              >
                 {frete.free ? 'Grátis' : formatCurrency(frete.cost)}
               </span>
             </div>
@@ -166,10 +170,7 @@ export default function CartPage() {
           >
             {t('cartPage.goToCheckout')}
           </Link>
-          <Link
-            to="/"
-            className="text-center text-sm text-brand-orange hover:underline"
-          >
+          <Link to="/" className="text-center text-sm text-brand-orange hover:underline">
             {t('cartPage.exploreCatalog')}
           </Link>
         </div>

@@ -23,20 +23,33 @@ function Avatar({ name }: { name: string }) {
   )
 }
 
-export function SellerCard({ sellerId, sellerName, sellerRating, sellerReviewCount, className }: SellerCardProps) {
+export function SellerCard({
+  sellerId,
+  sellerName,
+  sellerRating,
+  sellerReviewCount,
+  className,
+}: SellerCardProps) {
   const { t } = useTranslation('catalog')
 
   return (
-    <div className={cn('flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3', className)}>
+    <div
+      className={cn(
+        'flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3',
+        className
+      )}
+    >
       <Avatar name={sellerName} />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-gray-500">{t('product.soldBy')}</p>
         <p className="text-sm font-semibold text-gray-900 truncate">{sellerName}</p>
         {sellerRating != null && (
           <p className="text-xs text-gray-500 mt-0.5">
-            <span className="text-yellow-400">{'★'.repeat(Math.round(sellerRating))}</span>
-            {' '}{sellerRating.toFixed(1)}
-            {sellerReviewCount != null && <span className="ml-1">({sellerReviewCount.toLocaleString('pt-BR')})</span>}
+            <span className="text-yellow-400">{'★'.repeat(Math.round(sellerRating))}</span>{' '}
+            {sellerRating.toFixed(1)}
+            {sellerReviewCount != null && (
+              <span className="ml-1">({sellerReviewCount.toLocaleString('pt-BR')})</span>
+            )}
           </p>
         )}
       </div>

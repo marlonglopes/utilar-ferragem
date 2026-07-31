@@ -88,7 +88,10 @@ export default function BalcaoSuccessPage() {
               role="alert"
               className="mt-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-left"
             >
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+              <AlertTriangle
+                className="mt-0.5 h-5 w-5 shrink-0 text-amber-600"
+                aria-hidden="true"
+              />
               <div className="text-sm text-amber-900">
                 <p>
                   Desconto acima do seu teto — o pedido ficou{' '}

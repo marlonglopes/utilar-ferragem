@@ -61,9 +61,7 @@ describe('CategoryPage', () => {
     // "Somente em estoque" vem do FacetSidebar real; a antiga FilterSidebar
     // morta não tinha esse controle.
     await waitFor(() => {
-      expect(
-        screen.getByRole('checkbox', { name: /somente em estoque/i })
-      ).toBeInTheDocument()
+      expect(screen.getByRole('checkbox', { name: /somente em estoque/i })).toBeInTheDocument()
     })
 
     // O grupo de categorias fica escondido: na CategoryPage a categoria é a rota.

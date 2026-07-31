@@ -102,11 +102,11 @@ export function useShippingQuote() {
           return mock.options
         }
 
-        const data = await orderPostWithJWT<QuoteResponse>(
-          '/api/v1/shipping/quote',
-          token ?? '',
-          { cep, subtotal, itemCount },
-        )
+        const data = await orderPostWithJWT<QuoteResponse>('/api/v1/shipping/quote', token ?? '', {
+          cep,
+          subtotal,
+          itemCount,
+        })
         if (id !== reqId.current) return null
         setOptions(data.options ?? [])
         return data.options ?? []
@@ -120,7 +120,7 @@ export function useShippingQuote() {
             ? 'Ainda não entregamos neste CEP'
             : /bad_request|inválido|invalid/i.test(msg)
               ? 'CEP inválido'
-              : 'Não foi possível calcular o frete agora',
+              : 'Não foi possível calcular o frete agora'
         )
         setOptions(null)
         return null
@@ -128,7 +128,7 @@ export function useShippingQuote() {
         if (id === reqId.current) setLoading(false)
       }
     },
-    [token],
+    [token]
   )
 
   const reset = useCallback(() => {

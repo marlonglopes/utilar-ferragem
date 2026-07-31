@@ -11,25 +11,27 @@ describe('resolveImageUrl', () => {
 
   it('prefixa a base do catalog em URL /media relativa (o bug)', () => {
     expect(resolveImageUrl('/media/produtos/abc/x-medium.jpg', base)).toBe(
-      'http://192.168.0.143:8091/media/produtos/abc/x-medium.jpg',
+      'http://192.168.0.143:8091/media/produtos/abc/x-medium.jpg'
     )
   })
 
   it('prefixa também quando vem sem a barra inicial', () => {
     expect(resolveImageUrl('media/produtos/abc/x.jpg', base)).toBe(
-      'http://192.168.0.143:8091/media/produtos/abc/x.jpg',
+      'http://192.168.0.143:8091/media/produtos/abc/x.jpg'
     )
   })
 
   it('não gera barra dupla quando a base termina em /', () => {
-    expect(resolveImageUrl('/media/x.jpg', 'http://host:8091/')).toBe('http://host:8091/media/x.jpg')
+    expect(resolveImageUrl('/media/x.jpg', 'http://host:8091/')).toBe(
+      'http://host:8091/media/x.jpg'
+    )
   })
 
   it('deixa URL absoluta (Wikimedia/picsum) intacta', () => {
     const wm = 'https://upload.wikimedia.org/wikipedia/commons/thumb/x/960px-y.jpg'
     expect(resolveImageUrl(wm, base)).toBe(wm)
     expect(resolveImageUrl('http://picsum.photos/seed/x/800/800', base)).toBe(
-      'http://picsum.photos/seed/x/800/800',
+      'http://picsum.photos/seed/x/800/800'
     )
   })
 

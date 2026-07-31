@@ -29,7 +29,7 @@ describe('usePayment — parser Appmax', () => {
             pix_expires_at: '2026-07-18T18:30:00Z',
           },
         },
-        'pix',
+        'pix'
       )
 
       expect(result.provider).toBe(provider)
@@ -51,7 +51,7 @@ describe('usePayment — parser Appmax', () => {
           status: 'pending',
           psp_payload: { provider, pix_qrcode: 'QR', pix_emv: 'EMV' },
         },
-        'pix',
+        'pix'
       )
 
       const ms = result.expiresAt!.getTime() - before
@@ -68,7 +68,7 @@ describe('usePayment — parser Appmax', () => {
           status: 'pending',
           psp_payload: { provider, pix_qrcode: 'QR', pix_emv: 'EMV', pix_expires_at: 'nao-e-data' },
         },
-        'pix',
+        'pix'
       )
       expect(Number.isNaN(result.expiresAt!.getTime())).toBe(false)
     })
@@ -86,7 +86,7 @@ describe('usePayment — parser Appmax', () => {
             boleto_line: '34191.79001 01043.510047 91020.150008 9 98770000128450',
           },
         },
-        'boleto',
+        'boleto'
       )
 
       expect(result.pdfUrl).toBe('https://appmax.com.br/boleto/123.pdf')
@@ -103,7 +103,7 @@ describe('usePayment — parser Appmax', () => {
           status: 'pending',
           psp_payload: { provider, installments: 6 },
         },
-        'card',
+        'card'
       )
       expect(result.installments).toBe(6)
     })
@@ -111,7 +111,7 @@ describe('usePayment — parser Appmax', () => {
     it('não quebra quando o psp_payload vem nulo', () => {
       const result = paymentResultFromApi(
         { id: 'pay-6', provider, method: 'pix', status: 'pending', psp_payload: null },
-        'pix',
+        'pix'
       )
       expect(result.paymentId).toBe('pay-6')
       expect(result.qrCodeBase64).toBeUndefined()
@@ -128,10 +128,12 @@ describe('usePayment — parser Appmax', () => {
         method: 'pix',
         status: 'pending',
         psp_payload: {
-          next_action: { pix_display_qr_code: { data: 'stripe-emv', image_url_png: 'https://s/qr.png' } },
+          next_action: {
+            pix_display_qr_code: { data: 'stripe-emv', image_url_png: 'https://s/qr.png' },
+          },
         },
       },
-      'pix',
+      'pix'
     )
     expect(stripe.provider).toBe('stripe')
     expect(stripe.copyPaste).toBe('stripe-emv')
@@ -143,10 +145,12 @@ describe('usePayment — parser Appmax', () => {
         method: 'pix',
         status: 'pending',
         psp_payload: {
-          point_of_interaction: { transaction_data: { qr_code: 'mp-emv', qr_code_base64: 'mp-b64' } },
+          point_of_interaction: {
+            transaction_data: { qr_code: 'mp-emv', qr_code_base64: 'mp-b64' },
+          },
         },
       },
-      'pix',
+      'pix'
     )
     expect(mp.provider).toBe('mercadopago')
     expect(mp.copyPaste).toBe('mp-emv')

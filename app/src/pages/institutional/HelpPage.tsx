@@ -189,7 +189,10 @@ export default function HelpPage() {
 
         <div className="max-w-3xl flex flex-col gap-6">
           {SECTIONS.map((section) => (
-            <section key={section.title} className="rounded-xl border border-gray-200 bg-white px-5">
+            <section
+              key={section.title}
+              className="rounded-xl border border-gray-200 bg-white px-5"
+            >
               <h2 className="font-display font-bold text-lg text-gray-900 pt-5 pb-1">
                 {section.title}
               </h2>

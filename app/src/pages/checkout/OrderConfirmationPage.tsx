@@ -54,7 +54,10 @@ function usePollingConfirmation(
         return
       }
       try {
-        const data = await apiGet<{ status: string }>(`/api/v1/payments/${paymentId}`, token ?? undefined)
+        const data = await apiGet<{ status: string }>(
+          `/api/v1/payments/${paymentId}`,
+          token ?? undefined
+        )
         if (data.status === 'confirmed') {
           stop()
           onUpdate('confirmed')
@@ -113,7 +116,7 @@ export default function OrderConfirmationPage() {
       try {
         const data = await apiGet<ApiPaymentDetail>(
           `/api/v1/payments/${paymentId}`,
-          token ?? undefined,
+          token ?? undefined
         )
         if (cancelled) return
         const result = paymentResultFromApi(
@@ -126,7 +129,7 @@ export default function OrderConfirmationPage() {
             clientSecret: data.clientSecret,
             psp_payload: data.psp_payload,
           },
-          method as PaymentMethod,
+          method as PaymentMethod
         )
         setDetails(result)
       } catch {
@@ -140,7 +143,9 @@ export default function OrderConfirmationPage() {
   }, [paymentId, method, token])
 
   const boletoDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
   })
 
   function StatusBadge() {
@@ -210,7 +215,9 @@ export default function OrderConfirmationPage() {
 
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold text-gray-900">{t('confirmation.title')}</h1>
-        <p className="text-sm text-gray-400">{t('confirmation.orderNumber', { id: orderNumber })}</p>
+        <p className="text-sm text-gray-400">
+          {t('confirmation.orderNumber', { id: orderNumber })}
+        </p>
       </div>
 
       <StatusBadge />
@@ -232,9 +239,7 @@ export default function OrderConfirmationPage() {
       )}
 
       {userEmail && (
-        <p className="text-sm text-gray-400">
-          {t('confirmation.emailSent', { email: userEmail })}
-        </p>
+        <p className="text-sm text-gray-400">{t('confirmation.emailSent', { email: userEmail })}</p>
       )}
 
       <div className="flex flex-col sm:flex-row gap-3 w-full mt-2">

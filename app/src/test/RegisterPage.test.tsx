@@ -93,5 +93,6 @@ function fillForm(overrides: Record<string, string> = {}) {
   if (vals.cpf) fireEvent.change(byLabel(/^cpf$/i), { target: { value: vals.cpf } })
   const passwordFields = screen.getAllByLabelText(/senha/i)
   if (vals.password) fireEvent.change(passwordFields[0], { target: { value: vals.password } })
-  if (vals.passwordConfirm) fireEvent.change(passwordFields[1], { target: { value: vals.passwordConfirm } })
+  if (vals.passwordConfirm)
+    fireEvent.change(passwordFields[1], { target: { value: vals.passwordConfirm } })
 }

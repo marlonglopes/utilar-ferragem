@@ -38,7 +38,10 @@ const PAGINAS: Array<{ nome: string; url: string }> = [
 
 function resumo(violations: Awaited<ReturnType<AxeBuilder['analyze']>>['violations']): string {
   return violations
-    .map((v) => `  [${v.impact}] ${v.id}: ${v.help} (${v.nodes.length}x) → ${v.nodes[0]?.target.join(' ')}`)
+    .map(
+      (v) =>
+        `  [${v.impact}] ${v.id}: ${v.help} (${v.nodes.length}x) → ${v.nodes[0]?.target.join(' ')}`
+    )
     .join('\n')
 }
 
@@ -68,8 +71,14 @@ test.describe('Acessibilidade estrutural (WCAG 2.1 A/AA — gate)', () => {
     await primeiro.click()
     await expect(page).toHaveURL(/\/produto\//)
 
-    const r = await new AxeBuilder({ page }).withTags(WCAG_AA).disableRules(['color-contrast']).analyze()
-    expect(r.violations, `Violações estruturais no detalhe do produto:\n${resumo(r.violations)}`).toEqual([])
+    const r = await new AxeBuilder({ page })
+      .withTags(WCAG_AA)
+      .disableRules(['color-contrast'])
+      .analyze()
+    expect(
+      r.violations,
+      `Violações estruturais no detalhe do produto:\n${resumo(r.violations)}`
+    ).toEqual([])
   })
 })
 
@@ -92,7 +101,9 @@ test.describe('Contraste de cor (débito de marca — reporta, não bloqueia)', 
       description: `${total} elemento(s) abaixo de 4,5:1 (marca laranja+branco). Dívida de design — decisão do dono.`,
     })
     // eslint-disable-next-line no-console
-    console.log(`ℹ️  a11y contraste: ${total} elemento(s) abaixo de AA na vitrine (dívida de marca, não bloqueia).`)
+    console.log(
+      `ℹ️  a11y contraste: ${total} elemento(s) abaixo de AA na vitrine (dívida de marca, não bloqueia).`
+    )
     // Sanidade: o medidor rodou (a página tem conteúdo). Não asseveramos o total
     // pra não criar baseline frágil — o gate de verdade é o bloco estrutural.
     expect(total).toBeGreaterThanOrEqual(0)

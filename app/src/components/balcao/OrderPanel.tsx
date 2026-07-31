@@ -17,9 +17,7 @@ function OrderLine({ item, onIncrement, onDecrement, onRemove }: LineProps) {
   return (
     <li className="flex gap-3 border-b border-gray-100 p-3 last:border-b-0">
       <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 text-sm font-semibold leading-snug text-gray-900">
-          {item.name}
-        </p>
+        <p className="line-clamp-2 text-sm font-semibold leading-snug text-gray-900">{item.name}</p>
         <p className="font-mono text-[11px] text-gray-500">
           {item.sku} · {formatCurrency(item.unitPrice)}/{item.unit}
         </p>

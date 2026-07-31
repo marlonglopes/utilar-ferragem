@@ -101,7 +101,7 @@ export function useAdminProduct(id: string | undefined): UseQueryResult<AdminPro
  * devolveu. É a única fonte que sabe o que ficou gravado.
  */
 export function useSaveProduct(
-  id: string,
+  id: string
 ): UseMutationResult<AdminProductDetail, Error, ProductInput> {
   const qc = useQueryClient()
   return useMutation({
@@ -193,7 +193,7 @@ export function useProductImages(productId: string | undefined): ImageManagerSta
     (next: ProductImageRecord[]) => {
       qc.setQueryData(key, next)
     },
-    [qc, key],
+    [qc, key]
   )
 
   const upload = useCallback(
@@ -216,7 +216,7 @@ export function useProductImages(productId: string | undefined): ImageManagerSta
         setUploading(false)
       }
     },
-    [productId, setImages],
+    [productId, setImages]
   )
 
   const move = useCallback(
@@ -237,7 +237,7 @@ export function useProductImages(productId: string | undefined): ImageManagerSta
         setBusy(false)
       }
     },
-    [productId, images, setImages],
+    [productId, images, setImages]
   )
 
   const makeCover = useCallback(
@@ -258,7 +258,7 @@ export function useProductImages(productId: string | undefined): ImageManagerSta
         setBusy(false)
       }
     },
-    [productId, images, setImages],
+    [productId, images, setImages]
   )
 
   const remove = useCallback(
@@ -279,7 +279,7 @@ export function useProductImages(productId: string | undefined): ImageManagerSta
         setBusy(false)
       }
     },
-    [productId, images, setImages],
+    [productId, images, setImages]
   )
 
   return {

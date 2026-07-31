@@ -435,9 +435,7 @@ export const useBalcaoStore = create<BalcaoState>()(
             return {
               ...c,
               items: c.items.map((i) =>
-                i.productId === productId
-                  ? { ...i, quantity: Math.min(i.stock, quantity) }
-                  : i
+                i.productId === productId ? { ...i, quantity: Math.min(i.stock, quantity) } : i
               ),
             }
           }),
@@ -501,9 +499,7 @@ function activeComandaOf(state: Pick<BalcaoState, 'comandas' | 'activeId'>): Com
 }
 
 /** Comanda ativa (nunca undefined). */
-export function selectActiveComanda(
-  state: Pick<BalcaoState, 'comandas' | 'activeId'>
-): Comanda {
+export function selectActiveComanda(state: Pick<BalcaoState, 'comandas' | 'activeId'>): Comanda {
   return activeComandaOf(state)
 }
 

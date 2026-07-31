@@ -51,7 +51,7 @@ export function ImportMapping({
   onSupplierIdChange: (id: string) => void
 }) {
   const needsReview = suggestion.columns.filter(
-    (c) => !c.recognized || (c.confidence && c.confidence !== 'exact'),
+    (c) => !c.recognized || (c.confidence && c.confidence !== 'exact')
   )
 
   return (
@@ -97,7 +97,7 @@ export function ImportMapping({
               className={cn(
                 'rounded-md border border-gray-200 bg-white p-3',
                 severity && SEVERITY_BAR[severity],
-                !current && 'opacity-70',
+                !current && 'opacity-70'
               )}
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -120,7 +120,7 @@ export function ImportMapping({
                             'rounded-full px-2 py-0.5 text-[11px] font-medium',
                             severity
                               ? SEVERITY_PILL[severity]
-                              : 'bg-gray-100 text-gray-600 ring-1 ring-inset ring-gray-300',
+                              : 'bg-gray-100 text-gray-600 ring-1 ring-inset ring-gray-300'
                           )}
                         >
                           {CONFIDENCE_LABEL[col.confidence]}
@@ -135,7 +135,10 @@ export function ImportMapping({
                   </div>
                 </div>
 
-                <ArrowRight className="hidden h-4 w-4 shrink-0 text-gray-400 sm:block" aria-hidden="true" />
+                <ArrowRight
+                  className="hidden h-4 w-4 shrink-0 text-gray-400 sm:block"
+                  aria-hidden="true"
+                />
 
                 {/* Lado do domínio */}
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -150,7 +153,7 @@ export function ImportMapping({
                       'rounded-md border px-2 py-1.5 text-xs focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue',
                       isCritical
                         ? 'border-brand-blue bg-brand-blue-light font-semibold text-brand-blue'
-                        : 'border-gray-300 bg-white text-gray-700',
+                        : 'border-gray-300 bg-white text-gray-700'
                     )}
                   >
                     <option value="">Ignorar esta coluna</option>

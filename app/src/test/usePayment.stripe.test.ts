@@ -90,48 +90,46 @@ afterEach(() => {
 
 describe('usePayment — Stripe API mode', () => {
   it('parses Stripe card response: extrai clientSecret e provider', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      status: 201,
-      json: async () => STRIPE_PI_RESPONSE,
-    } as Response))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => STRIPE_PI_RESPONSE,
+      } as Response)
+    )
 
     const { usePayment } = await import('@/hooks/usePayment')
     const { result } = renderHook(() => usePayment())
 
     await act(async () => {
-      await result.current.createPayment(
-        '4848be8b-320d-48ee-9629-09ca096f38d6',
-        'card',
-        99.9,
-      )
+      await result.current.createPayment('4848be8b-320d-48ee-9629-09ca096f38d6', 'card', 99.9)
     })
 
     expect(result.current.result?.provider).toBe('stripe')
     expect(result.current.result?.method).toBe('card')
     expect(result.current.result?.clientSecret).toBe(
-      'pi_3TQa8WLQCtijFcSY12pJyBht_secret_TvretvvbOmJsklIWVyHIeujmp',
+      'pi_3TQa8WLQCtijFcSY12pJyBht_secret_TvretvvbOmJsklIWVyHIeujmp'
     )
     expect(result.current.result?.pspId).toBe('pi_3TQa8WLQCtijFcSY12pJyBht')
     expect(result.current.result?.status).toBe('pending')
   })
 
   it('parses Stripe pix response: extrai QR + copy-paste do next_action', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      status: 201,
-      json: async () => STRIPE_PIX_RESPONSE,
-    } as Response))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => STRIPE_PIX_RESPONSE,
+      } as Response)
+    )
 
     const { usePayment } = await import('@/hooks/usePayment')
     const { result } = renderHook(() => usePayment())
 
     await act(async () => {
-      await result.current.createPayment(
-        '4848be8b-320d-48ee-9629-09ca096f38d6',
-        'pix',
-        99.9,
-      )
+      await result.current.createPayment('4848be8b-320d-48ee-9629-09ca096f38d6', 'pix', 99.9)
     })
 
     expect(result.current.result?.provider).toBe('stripe')
@@ -141,32 +139,31 @@ describe('usePayment — Stripe API mode', () => {
   })
 
   it('parses Stripe boleto response: extrai hostedVoucherUrl + barCode + pdf', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      status: 201,
-      json: async () => STRIPE_BOLETO_RESPONSE,
-    } as Response))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => STRIPE_BOLETO_RESPONSE,
+      } as Response)
+    )
 
     const { usePayment } = await import('@/hooks/usePayment')
     const { result } = renderHook(() => usePayment())
 
     await act(async () => {
-      await result.current.createPayment(
-        '4848be8b-320d-48ee-9629-09ca096f38d6',
-        'boleto',
-        99.9,
-        { payer_cpf: '12345678901', payer_name: 'Ana Silva' },
-      )
+      await result.current.createPayment('4848be8b-320d-48ee-9629-09ca096f38d6', 'boleto', 99.9, {
+        payer_cpf: '12345678901',
+        payer_name: 'Ana Silva',
+      })
     })
 
     expect(result.current.result?.provider).toBe('stripe')
     expect(result.current.result?.barCode).toBe(
-      '34191.09008 09133.610947 91020.150008 1 00010000012345',
+      '34191.09008 09133.610947 91020.150008 1 00010000012345'
     )
     expect(result.current.result?.pdfUrl).toBe('https://stripe.com/voucher.pdf')
-    expect(result.current.result?.hostedVoucherUrl).toBe(
-      'https://payments.stripe.com/voucher/abc',
-    )
+    expect(result.current.result?.hostedVoucherUrl).toBe('https://payments.stripe.com/voucher/abc')
     expect(result.current.result?.boletoExpiresAt).toBeInstanceOf(Date)
   })
 
@@ -182,12 +179,10 @@ describe('usePayment — Stripe API mode', () => {
     const { result } = renderHook(() => usePayment())
 
     await act(async () => {
-      await result.current.createPayment(
-        '4848be8b-320d-48ee-9629-09ca096f38d6',
-        'boleto',
-        99.9,
-        { payer_cpf: '12345678901', payer_name: 'Ana Silva' },
-      )
+      await result.current.createPayment('4848be8b-320d-48ee-9629-09ca096f38d6', 'boleto', 99.9, {
+        payer_cpf: '12345678901',
+        payer_name: 'Ana Silva',
+      })
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -201,21 +196,20 @@ describe('usePayment — Stripe API mode', () => {
   })
 
   it('parses Mercado Pago pix response (provider=mercadopago)', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      status: 201,
-      json: async () => MP_PIX_RESPONSE,
-    } as Response))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => MP_PIX_RESPONSE,
+      } as Response)
+    )
 
     const { usePayment } = await import('@/hooks/usePayment')
     const { result } = renderHook(() => usePayment())
 
     await act(async () => {
-      await result.current.createPayment(
-        '4848be8b-320d-48ee-9629-09ca096f38d6',
-        'pix',
-        99.9,
-      )
+      await result.current.createPayment('4848be8b-320d-48ee-9629-09ca096f38d6', 'pix', 99.9)
     })
 
     expect(result.current.result?.provider).toBe('mercadopago')
@@ -224,21 +218,20 @@ describe('usePayment — Stripe API mode', () => {
   })
 
   it('markConfirmed promove status para confirmed e para o polling', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      status: 201,
-      json: async () => STRIPE_PI_RESPONSE,
-    } as Response))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => STRIPE_PI_RESPONSE,
+      } as Response)
+    )
 
     const { usePayment } = await import('@/hooks/usePayment')
     const { result } = renderHook(() => usePayment())
 
     await act(async () => {
-      await result.current.createPayment(
-        '4848be8b-320d-48ee-9629-09ca096f38d6',
-        'card',
-        99.9,
-      )
+      await result.current.createPayment('4848be8b-320d-48ee-9629-09ca096f38d6', 'card', 99.9)
     })
 
     expect(result.current.result?.status).toBe('pending')
@@ -251,21 +244,20 @@ describe('usePayment — Stripe API mode', () => {
   })
 
   it('markFailed seta status=failed e error', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      status: 201,
-      json: async () => STRIPE_PI_RESPONSE,
-    } as Response))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => STRIPE_PI_RESPONSE,
+      } as Response)
+    )
 
     const { usePayment } = await import('@/hooks/usePayment')
     const { result } = renderHook(() => usePayment())
 
     await act(async () => {
-      await result.current.createPayment(
-        '4848be8b-320d-48ee-9629-09ca096f38d6',
-        'card',
-        99.9,
-      )
+      await result.current.createPayment('4848be8b-320d-48ee-9629-09ca096f38d6', 'card', 99.9)
     })
 
     act(() => {
@@ -277,21 +269,20 @@ describe('usePayment — Stripe API mode', () => {
   })
 
   it('erro 4xx do backend seta error e zera o result', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 400,
-      json: async () => ({ error: 'invalid request', messages: ['amount must be > 0'] }),
-    } as Response))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: 'invalid request', messages: ['amount must be > 0'] }),
+      } as Response)
+    )
 
     const { usePayment } = await import('@/hooks/usePayment')
     const { result } = renderHook(() => usePayment())
 
     await act(async () => {
-      await result.current.createPayment(
-        '4848be8b-320d-48ee-9629-09ca096f38d6',
-        'card',
-        0,
-      )
+      await result.current.createPayment('4848be8b-320d-48ee-9629-09ca096f38d6', 'card', 0)
     })
 
     expect(result.current.result).toBeNull()

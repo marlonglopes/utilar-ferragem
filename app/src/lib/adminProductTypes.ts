@@ -190,14 +190,7 @@ export interface ProductInput {
 // Consulta da lista
 // ---------------------------------------------------------------------------
 
-export const PRODUCT_SORTS = [
-  'name',
-  'price',
-  'cost',
-  'margin',
-  'stock',
-  'updated',
-] as const
+export const PRODUCT_SORTS = ['name', 'price', 'cost', 'margin', 'stock', 'updated'] as const
 
 export type ProductSortKey = (typeof PRODUCT_SORTS)[number]
 

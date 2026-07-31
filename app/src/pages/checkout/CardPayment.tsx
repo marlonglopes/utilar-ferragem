@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ExternalLink, CheckCircle2, Lock, Loader2 } from 'lucide-react'
-import {
-  Elements,
-  PaymentElement,
-  useElements,
-  useStripe,
-} from '@stripe/react-stripe-js'
+import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import type { Appearance, StripeElementsOptions } from '@stripe/stripe-js'
 import { isApiEnabled } from '@/lib/api'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
@@ -228,10 +223,7 @@ function CardFormInner({
       )}
 
       <div className="min-h-[280px]">
-        <PaymentElement
-          options={{ layout: 'tabs' }}
-          onReady={() => setElementReady(true)}
-        />
+        <PaymentElement options={{ layout: 'tabs' }} onReady={() => setElementReady(true)} />
       </div>
 
       <button

@@ -212,7 +212,8 @@ const MOCK_COMPLEMENTOS: LaraComplemento[] = [
       stock: 18,
       category: 'ferramentas',
     },
-    motivo: 'Contrapiso exige desempenadeira para o acabamento — sem ela a superfície fica irregular.',
+    motivo:
+      'Contrapiso exige desempenadeira para o acabamento — sem ela a superfície fica irregular.',
     origem: 'tecnica',
   },
 ]

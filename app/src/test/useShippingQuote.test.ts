@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
-import {
-  useShippingQuote,
-  normalizeCep,
-  formatCep,
-  isValidCep,
-} from '@/hooks/useShippingQuote'
+import { useShippingQuote, normalizeCep, formatCep, isValidCep } from '@/hooks/useShippingQuote'
 
 /**
  * Regressão: o carrinho mostrava o texto fixo "Calculado no checkout". O

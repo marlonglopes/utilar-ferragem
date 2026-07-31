@@ -10,28 +10,34 @@ import enCatalog from './en/catalog.json'
 import enCheckout from './en/checkout.json'
 import enAccount from './en/account.json'
 
-const storedLocale = typeof window !== 'undefined'
-  ? (() => {
-      try {
-        const raw = localStorage.getItem('utilar-locale-v2')
-        return raw ? (JSON.parse(raw) as { state?: { locale?: string } }).state?.locale : null
-      } catch { return null }
-    })()
-  : null
+const storedLocale =
+  typeof window !== 'undefined'
+    ? (() => {
+        try {
+          const raw = localStorage.getItem('utilar-locale-v2')
+          return raw ? (JSON.parse(raw) as { state?: { locale?: string } }).state?.locale : null
+        } catch {
+          return null
+        }
+      })()
+    : null
 const initialLng = storedLocale === 'en' ? 'en' : 'pt-BR'
 
-i18n
-  .use(initReactI18next)
-  .init({
-    lng: initialLng,
-    fallbackLng: 'pt-BR',
-    defaultNS: 'common',
-    ns: ['common', 'catalog', 'checkout', 'account'],
-    resources: {
-      'pt-BR': { common: ptBRCommon, catalog: ptBRCatalog, checkout: ptBRCheckout, account: ptBRAccount },
-      en: { common: enCommon, catalog: enCatalog, checkout: enCheckout, account: enAccount },
+i18n.use(initReactI18next).init({
+  lng: initialLng,
+  fallbackLng: 'pt-BR',
+  defaultNS: 'common',
+  ns: ['common', 'catalog', 'checkout', 'account'],
+  resources: {
+    'pt-BR': {
+      common: ptBRCommon,
+      catalog: ptBRCatalog,
+      checkout: ptBRCheckout,
+      account: ptBRAccount,
     },
-    interpolation: { escapeValue: false },
-  })
+    en: { common: enCommon, catalog: enCatalog, checkout: enCheckout, account: enAccount },
+  },
+  interpolation: { escapeValue: false },
+})
 
 export default i18n

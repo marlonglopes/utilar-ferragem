@@ -17,7 +17,9 @@ test.describe('Carrinho', () => {
 
     await page.goto(routes.cart)
     // Há um link pra prosseguir ao checkout
-    await expect(page.getByRole('link', { name: /checkout|finalizar|continuar/i }).first()).toBeVisible()
+    await expect(
+      page.getByRole('link', { name: /checkout|finalizar|continuar/i }).first()
+    ).toBeVisible()
   })
 
   test('remover item esvazia o carrinho', async ({ page }) => {

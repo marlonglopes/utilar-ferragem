@@ -13,7 +13,10 @@ test.describe('Busca e filtros', () => {
     // é acessada por outro fluxo (a busca por URL acima cobre ambos).
     test.skip(testInfo.project.name === 'mobile', 'busca por digitação é desktop-only')
     await page.goto(routes.home)
-    const box = page.getByRole('searchbox').or(page.getByPlaceholder(/buscar/i)).first()
+    const box = page
+      .getByRole('searchbox')
+      .or(page.getByPlaceholder(/buscar/i))
+      .first()
     await box.click()
     await box.fill('cimento')
     await box.press('Enter')

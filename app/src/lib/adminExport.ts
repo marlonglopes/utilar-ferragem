@@ -73,7 +73,7 @@ export function ledgerToCsv(entries: LedgerEntry[]): string {
         csvField(e.paymentId),
         csvField(e.pspTransactionId),
         csvField(e.memo),
-      ].join(SEP),
+      ].join(SEP)
     )
   }
   // CRLF: é o que o Excel espera e o que a RFC manda.

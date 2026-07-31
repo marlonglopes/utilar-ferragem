@@ -15,12 +15,17 @@ const DONE_STATUSES: OrderStatus[] = ['delivered', 'cancelled']
 
 function statusColor(status: OrderStatus) {
   switch (status) {
-    case 'delivered': return 'bg-green-100 text-green-700'
-    case 'shipped': return 'bg-blue-100 text-blue-700'
+    case 'delivered':
+      return 'bg-green-100 text-green-700'
+    case 'shipped':
+      return 'bg-blue-100 text-blue-700'
     case 'picking':
-    case 'paid': return 'bg-amber-100 text-amber-700'
-    case 'pending_payment': return 'bg-orange-100 text-orange-700'
-    case 'cancelled': return 'bg-gray-100 text-gray-500'
+    case 'paid':
+      return 'bg-amber-100 text-amber-700'
+    case 'pending_payment':
+      return 'bg-orange-100 text-orange-700'
+    case 'cancelled':
+      return 'bg-gray-100 text-gray-500'
   }
 }
 
@@ -28,7 +33,9 @@ function OrderCard({ order }: { order: Order }) {
   const { t } = useTranslation()
   const itemCount = order.items.reduce((s, i) => s + i.quantity, 0)
   const date = new Date(order.createdAt).toLocaleDateString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
   })
 
   return (
@@ -52,8 +59,7 @@ function OrderCard({ order }: { order: Order }) {
             {t('orders.number', { number: order.number })}
           </Link>
           <p className="text-xs text-gray-400 mt-0.5">
-            {t('orders.placedOn', { date })} ·{' '}
-            {t('orders.items', { count: itemCount })}
+            {t('orders.placedOn', { date })} · {t('orders.items', { count: itemCount })}
           </p>
           <p className="text-xs text-gray-500 mt-0.5 truncate">
             {order.items.map((i) => i.name).join(', ')}
@@ -62,7 +68,12 @@ function OrderCard({ order }: { order: Order }) {
       </div>
       <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0">
         <div className="flex flex-col items-start sm:items-end gap-1">
-          <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', statusColor(order.status))}>
+          <span
+            className={cn(
+              'text-xs font-semibold px-2 py-0.5 rounded-full',
+              statusColor(order.status)
+            )}
+          >
             {t(`orderStatus.${order.status}`)}
           </span>
           <span className="text-sm font-bold text-gray-900">{formatCurrency(order.total)}</span>
@@ -100,7 +111,9 @@ export default function OrdersTab() {
 
   if (error) {
     return (
-      <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{error}</p>
+      <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+        {error}
+      </p>
     )
   }
 
@@ -114,7 +127,9 @@ export default function OrdersTab() {
             onClick={() => setFilter(f)}
             className={cn(
               'px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
-              filter === f ? 'bg-brand-orange text-white' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+              filter === f
+                ? 'bg-brand-orange text-white'
+                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
             )}
           >
             {t(`orders.filter.${f}`)}
@@ -129,10 +144,7 @@ export default function OrdersTab() {
             <p className="text-sm font-medium text-gray-500">{t('orders.empty')}</p>
             <p className="text-xs text-gray-400 mt-1">{t('orders.emptyHint')}</p>
           </div>
-          <Link
-            to="/"
-            className="text-sm text-brand-orange hover:underline font-medium"
-          >
+          <Link to="/" className="text-sm text-brand-orange hover:underline font-medium">
             {t('cartPage.exploreCatalog')}
           </Link>
         </div>

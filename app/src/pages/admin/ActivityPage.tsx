@@ -52,7 +52,8 @@ function ChangesCell({ changes }: { changes: Record<string, FieldChange> }) {
     <div className="flex flex-col gap-0.5">
       {entries.map(([field, ch]) => (
         <span key={field} className="text-xs">
-          <span className="font-medium text-gray-700">{field}</span>{': '}
+          <span className="font-medium text-gray-700">{field}</span>
+          {': '}
           <span className="text-gray-400 line-through">{fmtValue(ch.old)}</span>
           {' → '}
           <span className="text-gray-800">{fmtValue(ch.new)}</span>
@@ -85,10 +86,10 @@ export default function ActivityPage() {
           sp.delete('pagina')
           return sp
         },
-        { replace: true },
+        { replace: true }
       )
     },
-    [setParams],
+    [setParams]
   )
 
   const goPage = useCallback(
@@ -99,15 +100,15 @@ export default function ActivityPage() {
           sp.set('pagina', String(p))
           return sp
         },
-        { replace: true },
+        { replace: true }
       )
     },
-    [setParams],
+    [setParams]
   )
 
   const query: AuditQuery = useMemo(
     () => ({ action, actor, page, perPage: PAGE_SIZE }),
-    [action, actor, page],
+    [action, actor, page]
   )
 
   const { data, isLoading, isError, error, refetch } = useAuditActivity(query)
@@ -202,7 +203,9 @@ export default function ActivityPage() {
                 <tbody>
                   {rows.map((e) => (
                     <tr key={e.id} className="hover:bg-gray-50">
-                      <Td className="whitespace-nowrap text-xs text-gray-600">{formatWhen(e.createdAt)}</Td>
+                      <Td className="whitespace-nowrap text-xs text-gray-600">
+                        {formatWhen(e.createdAt)}
+                      </Td>
                       <Td className="whitespace-nowrap text-gray-800">{actionLabel(e.action)}</Td>
                       <Td className="max-w-[14rem] truncate text-xs text-gray-700">
                         {e.actorId ?? <span className="text-gray-400">sistema</span>}

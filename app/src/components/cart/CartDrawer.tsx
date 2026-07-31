@@ -63,9 +63,12 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
     navigate('/checkout')
   }
 
-  const titleLabel = totalCount > 0
-    ? t('cartPage.title') + ` · ` + t('cartPage.items', { count: totalCount, postProcess: 'interval' })
-    : t('cartPage.title')
+  const titleLabel =
+    totalCount > 0
+      ? t('cartPage.title') +
+        ` · ` +
+        t('cartPage.items', { count: totalCount, postProcess: 'interval' })
+      : t('cartPage.title')
 
   return (
     <Drawer open={open} onClose={onClose} title={titleLabel} side="right">
@@ -77,7 +80,10 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
             <p className="text-sm text-gray-400 mt-1">{t('cartPage.emptyHint')}</p>
           </div>
           <button
-            onClick={() => { onClose(); navigate('/') }}
+            onClick={() => {
+              onClose()
+              navigate('/')
+            }}
             className="mt-2 px-4 py-2 rounded-lg bg-brand-orange text-white text-sm font-semibold hover:bg-brand-orange-dark transition-colors"
           >
             {t('cartPage.exploreCatalog')}
@@ -97,8 +103,12 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
                       {item.icon}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900 font-medium line-clamp-2 leading-snug">{item.name}</p>
-                      <p className="text-sm font-bold text-gray-900 mt-0.5">{formatCurrency(item.priceSnapshot)}</p>
+                      <p className="text-sm text-gray-900 font-medium line-clamp-2 leading-snug">
+                        {item.name}
+                      </p>
+                      <p className="text-sm font-bold text-gray-900 mt-0.5">
+                        {formatCurrency(item.priceSnapshot)}
+                      </p>
                       <div className="flex items-center gap-3 mt-1.5">
                         <QtyControl item={item} />
                         <button
@@ -119,10 +129,12 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
             </div>
           ))}
 
-          <div className={cn(
-            'border-t border-gray-100 pt-4 flex flex-col gap-3',
-            'sticky bottom-0 bg-white -mx-4 px-4 pb-4'
-          )}>
+          <div
+            className={cn(
+              'border-t border-gray-100 pt-4 flex flex-col gap-3',
+              'sticky bottom-0 bg-white -mx-4 px-4 pb-4'
+            )}
+          >
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">{t('cartPage.subtotal')}</span>
               <span className="font-bold text-gray-900 text-base">{formatCurrency(total)}</span>

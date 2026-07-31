@@ -17,13 +17,7 @@ export interface ComandaTabsProps {
  * cartão no carro e o cliente B já quer ser atendido. Sem isso o vendedor perde
  * o pedido ou anota no papel.
  */
-export function ComandaTabs({
-  comandas,
-  activeId,
-  onSelect,
-  onOpen,
-  onClose,
-}: ComandaTabsProps) {
+export function ComandaTabs({ comandas, activeId, onSelect, onOpen, onClose }: ComandaTabsProps) {
   return (
     <div className="flex items-center gap-1 overflow-x-auto border-b border-gray-200 bg-gray-50 px-2 py-1">
       {comandas.map((c) => {

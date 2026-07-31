@@ -38,11 +38,12 @@ export const creds = {
 export async function authAs(
   page: Page,
   role: 'admin' | 'store_operator' | 'customer',
-  email?: string,
+  email?: string
 ) {
   const user = {
     id: '00000000-0000-4000-8000-000000000099',
-    name: role === 'admin' ? 'Admin E2E' : role === 'store_operator' ? 'Operador E2E' : 'Cliente E2E',
+    name:
+      role === 'admin' ? 'Admin E2E' : role === 'store_operator' ? 'Operador E2E' : 'Cliente E2E',
     email: email ?? `${role}@utilar.com.br`,
     role,
     token: 'e2e-mock-token',
@@ -53,7 +54,11 @@ export async function authAs(
 }
 
 /** Faz login pela página /entrar e espera o redirect pra fora do /entrar. */
-export async function login(page: Page, email = creds.customer.email, password = creds.customer.password) {
+export async function login(
+  page: Page,
+  email = creds.customer.email,
+  password = creds.customer.password
+) {
   await page.goto(routes.login)
   await page.getByLabel('E-mail').fill(email)
   await page.getByLabel('Senha').fill(password)
@@ -89,7 +94,10 @@ export function cartButton(page: Page) {
 
 /** Contador do badge do carrinho na navbar (0 se ausente). */
 export async function cartCount(page: Page): Promise<number> {
-  const txt = (await cartButton(page).innerText().catch(() => '')) || ''
+  const txt =
+    (await cartButton(page)
+      .innerText()
+      .catch(() => '')) || ''
   const m = txt.match(/\d+/)
   return m ? Number(m[0]) : 0
 }

@@ -7,7 +7,17 @@
 @tailwind utilities;
 
 @layer base {
-  *, *::before, *::after { box-sizing: border-box; }
-  html { -webkit-font-smoothing: antialiased; }
-  body { margin: 0; background: #F8F7F5; color: #1A1A1A; }
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    margin: 0;
+    background: #f8f7f5;
+    color: #1a1a1a;
+  }
 }

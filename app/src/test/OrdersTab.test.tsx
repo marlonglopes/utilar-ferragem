@@ -35,10 +35,9 @@ describe('OrdersTab', () => {
 
   it('exibe lista de pedidos após carregar', async () => {
     renderTab()
-    await waitFor(
-      () => expect(screen.getAllByText(/Pedido #/i).length).toBeGreaterThan(0),
-      { timeout: 3000 }
-    )
+    await waitFor(() => expect(screen.getAllByText(/Pedido #/i).length).toBeGreaterThan(0), {
+      timeout: 3000,
+    })
   }, 8000)
 
   it('exibe todos os pedidos no filtro "Todos"', async () => {

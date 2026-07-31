@@ -39,10 +39,9 @@ function renderPage(orderId: string) {
 }
 
 async function waitForLoad() {
-  await waitFor(
-    () => expect(screen.queryByText('Carregando...')).not.toBeInTheDocument(),
-    { timeout: 3000 }
-  )
+  await waitFor(() => expect(screen.queryByText('Carregando...')).not.toBeInTheDocument(), {
+    timeout: 3000,
+  })
 }
 
 describe('OrderDetailPage — pedido entregue', () => {
@@ -54,7 +53,9 @@ describe('OrderDetailPage — pedido entregue', () => {
 
   it('exibe status Entregue', async () => {
     renderPage(DELIVERED.id)
-    await waitFor(() => expect(screen.getAllByText('Entregue').length).toBeGreaterThan(0), { timeout: 3000 })
+    await waitFor(() => expect(screen.getAllByText('Entregue').length).toBeGreaterThan(0), {
+      timeout: 3000,
+    })
   }, 8000)
 
   it('exibe itens do pedido', async () => {
@@ -78,7 +79,9 @@ describe('OrderDetailPage — pedido entregue', () => {
 
   it('exibe botão "Comprar novamente"', async () => {
     renderPage(DELIVERED.id)
-    await waitFor(() => screen.getByRole('button', { name: /comprar novamente/i }), { timeout: 3000 })
+    await waitFor(() => screen.getByRole('button', { name: /comprar novamente/i }), {
+      timeout: 3000,
+    })
   }, 8000)
 
   it('não exibe botão de cancelar para pedido entregue', async () => {
@@ -123,9 +126,8 @@ describe('OrderDetailPage — pedido com rastreamento', () => {
 describe('OrderDetailPage — pedido não encontrado', () => {
   it('exibe mensagem de não encontrado', async () => {
     renderPage('ordem-inexistente')
-    await waitFor(
-      () => expect(screen.queryByText(/não encontrado/i)).toBeInTheDocument(),
-      { timeout: 3000 }
-    )
+    await waitFor(() => expect(screen.queryByText(/não encontrado/i)).toBeInTheDocument(), {
+      timeout: 3000,
+    })
   }, 8000)
 })

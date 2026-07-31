@@ -221,7 +221,6 @@ describe('AccountMenu — sair da conta no cabeçalho', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(useAuthStore.getState().user).not.toBeNull()
   })
-
 })
 
 // ---------------------------------------------------------------------------

@@ -20,9 +20,7 @@ test.describe('Checkout', () => {
     await expect(page).toHaveURL(/\/checkout/)
     await expect(page.locator('body')).toBeVisible()
     // Deve mostrar algum passo do checkout (endereço/entrega/pagamento)
-    await expect(
-      page.getByText(/endereço|entrega|pagamento|frete/i).first(),
-    ).toBeVisible()
+    await expect(page.getByText(/endereço|entrega|pagamento|frete/i).first()).toBeVisible()
   })
 
   test('métodos de pagamento Pix/boleto/cartão aparecem no checkout', async ({ page }) => {

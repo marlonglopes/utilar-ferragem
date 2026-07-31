@@ -74,7 +74,9 @@ describe('AliceMessage — avisos no topo', () => {
   })
 
   it('mensagem do usuário nunca carrega aviso de segurança', () => {
-    renderMsg(<AliceMessage message={{ role: 'user', text: 'e a viga?', avisos: [AVISO_ESTRUTURAL] }} />)
+    renderMsg(
+      <AliceMessage message={{ role: 'user', text: 'e a viga?', avisos: [AVISO_ESTRUTURAL] }} />
+    )
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

@@ -60,7 +60,9 @@ export default function TermsPage() {
 
         <h2>3. Cadastro e conta</h2>
         <ul>
-          <li>Para comprar é necessário criar uma conta com dados verdadeiros, completos e atuais.</li>
+          <li>
+            Para comprar é necessário criar uma conta com dados verdadeiros, completos e atuais.
+          </li>
           <li>É preciso ser maior de 18 anos e civilmente capaz.</li>
           <li>
             A senha é pessoal e intransferível. Você é responsável pelas operações realizadas com
@@ -107,8 +109,8 @@ export default function TermsPage() {
             automático.
           </li>
           <li>
-            Preços e condições anunciados podem mudar a qualquer tempo, mas nunca alteram pedidos
-            já confirmados.
+            Preços e condições anunciados podem mudar a qualquer tempo, mas nunca alteram pedidos já
+            confirmados.
           </li>
         </ul>
 
@@ -160,9 +162,9 @@ export default function TermsPage() {
             uso além do necessário para simples avaliação do item.
           </li>
           <li>
-            Enviaremos as instruções e o código de postagem. <strong>Os custos da devolução por
-            arrependimento correm por nossa conta</strong>, conforme entendimento consolidado sobre
-            o art. 49, parágrafo único, do CDC.
+            Enviaremos as instruções e o código de postagem.{' '}
+            <strong>Os custos da devolução por arrependimento correm por nossa conta</strong>,
+            conforme entendimento consolidado sobre o art. 49, parágrafo único, do CDC.
           </li>
         </ol>
         <p>
@@ -176,8 +178,8 @@ export default function TermsPage() {
           O art. 26 do CDC assegura prazo de reclamação de <strong>30 dias</strong> para produtos
           não duráveis e <strong>90 dias</strong> para produtos duráveis, contados do recebimento.
           Constatado vício, o fornecedor tem até 30 dias para saná-lo; não sanado, você pode
-          escolher entre a substituição do produto, a devolução do valor pago corrigido ou o abatimento
-          proporcional do preço.
+          escolher entre a substituição do produto, a devolução do valor pago corrigido ou o
+          abatimento proporcional do preço.
         </p>
         <h3>9.2. Produto errado ou avariado no transporte</h3>
         <p>
@@ -190,7 +192,9 @@ export default function TermsPage() {
           <li>
             sacarias de cimento, argamassa e afins já abertas, por impossibilidade de recomposição;
           </li>
-          <li>itens de uso pessoal cuja devolução seja vedada por razão de higiene ou segurança.</li>
+          <li>
+            itens de uso pessoal cuja devolução seja vedada por razão de higiene ou segurança.
+          </li>
         </ul>
         <p>Essas exceções não afetam a garantia legal por defeito descrita no item 9.1.</p>
         <h3>9.4. Prazos de reembolso</h3>
@@ -216,7 +220,10 @@ export default function TermsPage() {
         <h2>11. Uso da plataforma</h2>
         <p>Ao usar o site, você se compromete a não:</p>
         <ul>
-          <li>praticar atos que comprometam a segurança, a disponibilidade ou a integridade do serviço;</li>
+          <li>
+            praticar atos que comprometam a segurança, a disponibilidade ou a integridade do
+            serviço;
+          </li>
           <li>usar robôs, scrapers ou automações para coletar dados ou fazer pedidos em massa;</li>
           <li>publicar conteúdo ilícito, ofensivo ou que viole direitos de terceiros;</li>
           <li>tentar acessar contas, dados ou áreas restritas sem autorização.</li>

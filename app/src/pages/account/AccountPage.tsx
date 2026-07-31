@@ -1,6 +1,16 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { User, MapPin, CreditCard, LogOut, Plus, Pencil, Trash2, Check, Package } from 'lucide-react'
+import {
+  User,
+  MapPin,
+  CreditCard,
+  LogOut,
+  Plus,
+  Pencil,
+  Trash2,
+  Check,
+  Package,
+} from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAddressStore, type Address, type AddressInput } from '@/store/addressStore'
 import { useNavigate } from 'react-router-dom'
@@ -100,7 +110,10 @@ function AddressForm({
     setLoadingCep(true)
     const data = await fetchCEP(form.cep)
     setLoadingCep(false)
-    if (!data) { setCepError(t('account.cepNotFound')); return }
+    if (!data) {
+      setCepError(t('account.cepNotFound'))
+      return
+    }
     setForm((p) => ({
       ...p,
       street: data.logradouro,
@@ -131,17 +144,43 @@ function AddressForm({
       />
       <div className="grid grid-cols-3 gap-2">
         <div className="col-span-2">
-          <Input label={t('account.street')} value={form.street} onChange={(e) => setField('street', e.target.value)} />
+          <Input
+            label={t('account.street')}
+            value={form.street}
+            onChange={(e) => setField('street', e.target.value)}
+          />
         </div>
-        <Input label={t('account.number')} value={form.number} onChange={(e) => setField('number', e.target.value)} />
+        <Input
+          label={t('account.number')}
+          value={form.number}
+          onChange={(e) => setField('number', e.target.value)}
+        />
       </div>
-      <Input label={t('account.complement')} value={form.complement} onChange={(e) => setField('complement', e.target.value)} placeholder="Apto, bloco..." />
-      <Input label={t('account.neighborhood')} value={form.neighborhood} onChange={(e) => setField('neighborhood', e.target.value)} />
+      <Input
+        label={t('account.complement')}
+        value={form.complement}
+        onChange={(e) => setField('complement', e.target.value)}
+        placeholder="Apto, bloco..."
+      />
+      <Input
+        label={t('account.neighborhood')}
+        value={form.neighborhood}
+        onChange={(e) => setField('neighborhood', e.target.value)}
+      />
       <div className="grid grid-cols-3 gap-2">
         <div className="col-span-2">
-          <Input label={t('account.city')} value={form.city} onChange={(e) => setField('city', e.target.value)} />
+          <Input
+            label={t('account.city')}
+            value={form.city}
+            onChange={(e) => setField('city', e.target.value)}
+          />
         </div>
-        <Input label={t('account.state')} value={form.state} onChange={(e) => setField('state', e.target.value)} maxLength={2} />
+        <Input
+          label={t('account.state')}
+          value={form.state}
+          onChange={(e) => setField('state', e.target.value)}
+          maxLength={2}
+        />
       </div>
       <div className="flex gap-2 mt-1">
         <button
@@ -208,22 +247,36 @@ function AddressesTab() {
               </span>
               <div className="flex gap-2">
                 {!addr.isDefault && (
-                  <button onClick={() => setDefault(addr.id)} className="text-gray-400 hover:text-brand-orange transition-colors" title={t('account.setDefault')}>
+                  <button
+                    onClick={() => setDefault(addr.id)}
+                    className="text-gray-400 hover:text-brand-orange transition-colors"
+                    title={t('account.setDefault')}
+                  >
                     <Check className="h-4 w-4" />
                   </button>
                 )}
-                <button onClick={() => setEditingId(addr.id)} className="text-gray-400 hover:text-brand-blue transition-colors">
+                <button
+                  onClick={() => setEditingId(addr.id)}
+                  className="text-gray-400 hover:text-brand-blue transition-colors"
+                >
                   <Pencil className="h-4 w-4" />
                 </button>
-                <button onClick={() => removeAddress(addr.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                <button
+                  onClick={() => removeAddress(addr.id)}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
+                >
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             </div>
             <p className="text-sm text-gray-600">
-              {addr.street}{addr.number ? `, ${addr.number}` : ''}{addr.complement ? ` - ${addr.complement}` : ''}
+              {addr.street}
+              {addr.number ? `, ${addr.number}` : ''}
+              {addr.complement ? ` - ${addr.complement}` : ''}
             </p>
-            <p className="text-sm text-gray-500">{addr.neighborhood}, {addr.city} – {addr.state} · {addr.cep}</p>
+            <p className="text-sm text-gray-500">
+              {addr.neighborhood}, {addr.city} – {addr.state} · {addr.cep}
+            </p>
           </div>
         )
       )}

@@ -119,44 +119,44 @@ export default defineConfig({
     // /admin/overview (order) caía no catalog e dava 404. Idem /store e /internal.
     proxy: {
       // Catálogo (:8091) — produtos e mídia
-      '/api/v1/products':   { target: 'http://localhost:8091', changeOrigin: true },
+      '/api/v1/products': { target: 'http://localhost:8091', changeOrigin: true },
       '/api/v1/categories': { target: 'http://localhost:8091', changeOrigin: true },
-      '/api/v1/sellers':    { target: 'http://localhost:8091', changeOrigin: true },
-      '/media':             { target: 'http://localhost:8091', changeOrigin: true },
+      '/api/v1/sellers': { target: 'http://localhost:8091', changeOrigin: true },
+      '/media': { target: 'http://localhost:8091', changeOrigin: true },
 
       // /api/v1/admin — específicas (order/auth) ANTES do catch-all (catalog)
-      '/api/v1/admin/overview':  { target: 'http://localhost:8092', changeOrigin: true }, // order
-      '/api/v1/admin/sellers':   { target: 'http://localhost:8092', changeOrigin: true }, // order
-      '/api/v1/admin/orders':    { target: 'http://localhost:8092', changeOrigin: true }, // order
-      '/api/v1/admin/returns':   { target: 'http://localhost:8092', changeOrigin: true }, // order
-      '/api/v1/admin/users':     { target: 'http://localhost:8093', changeOrigin: true }, // auth
+      '/api/v1/admin/overview': { target: 'http://localhost:8092', changeOrigin: true }, // order
+      '/api/v1/admin/sellers': { target: 'http://localhost:8092', changeOrigin: true }, // order
+      '/api/v1/admin/orders': { target: 'http://localhost:8092', changeOrigin: true }, // order
+      '/api/v1/admin/returns': { target: 'http://localhost:8092', changeOrigin: true }, // order
+      '/api/v1/admin/users': { target: 'http://localhost:8093', changeOrigin: true }, // auth
       '/api/v1/admin/customers': { target: 'http://localhost:8093', changeOrigin: true }, // auth
       '/api/v1/admin/operators': { target: 'http://localhost:8093', changeOrigin: true }, // auth
-      '/api/v1/admin/stores':    { target: 'http://localhost:8093', changeOrigin: true }, // auth
-      '/api/v1/admin/me':        { target: 'http://localhost:8093', changeOrigin: true }, // auth
-      '/api/v1/admin':           { target: 'http://localhost:8091', changeOrigin: true }, // catalog (products, observability, import, reviews, recommendations)
+      '/api/v1/admin/stores': { target: 'http://localhost:8093', changeOrigin: true }, // auth
+      '/api/v1/admin/me': { target: 'http://localhost:8093', changeOrigin: true }, // auth
+      '/api/v1/admin': { target: 'http://localhost:8091', changeOrigin: true }, // catalog (products, observability, import, reviews, recommendations)
 
       // /api/v1/store — auth (customers, me) antes do catch-all catalog (products/costs)
       '/api/v1/store/customers': { target: 'http://localhost:8093', changeOrigin: true }, // auth
-      '/api/v1/store/me':        { target: 'http://localhost:8093', changeOrigin: true }, // auth
-      '/api/v1/store':           { target: 'http://localhost:8091', changeOrigin: true }, // catalog
+      '/api/v1/store/me': { target: 'http://localhost:8093', changeOrigin: true }, // auth
+      '/api/v1/store': { target: 'http://localhost:8091', changeOrigin: true }, // catalog
 
       // /api/v1/internal — auth (customers, operators) antes do catch-all catalog (reservations)
       '/api/v1/internal/customers': { target: 'http://localhost:8093', changeOrigin: true }, // auth
       '/api/v1/internal/operators': { target: 'http://localhost:8093', changeOrigin: true }, // auth
-      '/api/v1/internal':           { target: 'http://localhost:8091', changeOrigin: true }, // catalog
+      '/api/v1/internal': { target: 'http://localhost:8091', changeOrigin: true }, // catalog
 
       // Auth (:8093)
-      '/api/v1/auth':       { target: 'http://localhost:8093', changeOrigin: true },
+      '/api/v1/auth': { target: 'http://localhost:8093', changeOrigin: true },
       // Order (:8092)
-      '/api/v1/orders':     { target: 'http://localhost:8092', changeOrigin: true },
-      '/api/v1/shipping':   { target: 'http://localhost:8092', changeOrigin: true },
-      '/api/v1/balcao':     { target: 'http://localhost:8092', changeOrigin: true },
+      '/api/v1/orders': { target: 'http://localhost:8092', changeOrigin: true },
+      '/api/v1/shipping': { target: 'http://localhost:8092', changeOrigin: true },
+      '/api/v1/balcao': { target: 'http://localhost:8092', changeOrigin: true },
       // Payment (:8090)
-      '/api/v1/payments':   { target: 'http://localhost:8090', changeOrigin: true },
-      '/api/v1/ledger':     { target: 'http://localhost:8090', changeOrigin: true },
+      '/api/v1/payments': { target: 'http://localhost:8090', changeOrigin: true },
+      '/api/v1/ledger': { target: 'http://localhost:8090', changeOrigin: true },
       // Assistant (:8094)
-      '/api/v1/assistant':  { target: 'http://localhost:8094', changeOrigin: true },
+      '/api/v1/assistant': { target: 'http://localhost:8094', changeOrigin: true },
     },
   },
   resolve: {

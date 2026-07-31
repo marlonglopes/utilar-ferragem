@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useAuthStore } from '@/store/authStore'
-import { NavLink, useLocation , useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   Activity,
   BookOpenCheck,
@@ -94,7 +94,7 @@ export function AdminShell({
         <nav
           className={cn(
             'border-t border-gray-100 px-2 sm:px-3',
-            menuOpen ? 'block' : 'hidden lg:block',
+            menuOpen ? 'block' : 'hidden lg:block'
           )}
           aria-label="Seções do painel"
         >
@@ -112,7 +112,7 @@ export function AdminShell({
                         'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors',
                         isActive
                           ? 'bg-brand-blue-light text-brand-blue'
-                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                       )
                     }
                   >
@@ -156,7 +156,9 @@ export function AdminShell({
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             <h1 className="font-display text-lg font-bold text-gray-900 sm:text-xl">{title}</h1>
-            {description && <p className="mt-0.5 text-xs text-gray-500 sm:text-sm">{description}</p>}
+            {description && (
+              <p className="mt-0.5 text-xs text-gray-500 sm:text-sm">{description}</p>
+            )}
           </div>
           {toolbar}
         </div>

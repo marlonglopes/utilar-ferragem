@@ -36,10 +36,7 @@ function EmptyState({ query, onClear }: { query: string; onClear: () => void }) 
         </p>
         <p className="text-sm text-gray-500 mt-1">{t('catalog:search.emptySubtitle')}</p>
       </div>
-      <button
-        onClick={onClear}
-        className="text-sm font-semibold text-brand-orange hover:underline"
-      >
+      <button onClick={onClear} className="text-sm font-semibold text-brand-orange hover:underline">
         {t('catalog:search.clearFilters')}
       </button>
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-lg">
@@ -187,7 +184,10 @@ export default function SearchPage() {
             brands={brands}
             priceMin={priceMin}
             priceMax={priceMax}
-            onChange={(u) => { set(u); setDrawerOpen(false) }}
+            onChange={(u) => {
+              set(u)
+              setDrawerOpen(false)
+            }}
           />
         </Drawer>
 
@@ -195,21 +195,28 @@ export default function SearchPage() {
         <div className="flex-1 min-w-0">
           {isLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-              {Array.from({ length: PER_PAGE }).map((_, i) => <ProductCardSkeleton key={i} />)}
+              {Array.from({ length: PER_PAGE }).map((_, i) => (
+                <ProductCardSkeleton key={i} />
+              ))}
             </div>
           ) : total === 0 ? (
             <EmptyState query={filters.q} onClear={clearAll} />
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-                {data!.data.map((p) => <ProductCard key={p.id} product={p} />)}
+                {data!.data.map((p) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
               </div>
               {totalPages > 1 && (
                 <div className="flex justify-center mt-8">
                   <Pagination
                     page={filters.page}
                     totalPages={totalPages}
-                    onPageChange={(p) => { set({ page: p }); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                    onPageChange={(p) => {
+                      set({ page: p })
+                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
                   />
                 </div>
               )}

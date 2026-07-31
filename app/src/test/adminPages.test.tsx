@@ -27,7 +27,7 @@ function renderPage(ui: ReactElement, route = '/admin') {
       >
         {ui}
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   )
 }
 
@@ -51,7 +51,7 @@ describe('Visão geral', () => {
   it('lista os pedidos travados com a severidade em forma, não só em cor', async () => {
     renderPage(<AdminOverviewPage />)
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: /pedidos travados/i })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: /pedidos travados/i })).toBeInTheDocument()
     )
     // O rótulo textual da severidade é o canal redundante da cor.
     expect(screen.getAllByText(/mais de 1 dia|atrasado|recente/i).length).toBeGreaterThan(0)
@@ -60,7 +60,7 @@ describe('Visão geral', () => {
   it('promove os alertas críticos para o topo da tela', async () => {
     renderPage(<AdminOverviewPage />)
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: /alertas? crítico/i })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: /alertas? crítico/i })).toBeInTheDocument()
     )
   })
 
@@ -68,8 +68,8 @@ describe('Visão geral', () => {
     renderPage(<AdminOverviewPage />)
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: /conversão por método de pagamento/i }),
-      ).toBeInTheDocument(),
+        screen.getByRole('heading', { name: /conversão por método de pagamento/i })
+      ).toBeInTheDocument()
     )
   })
 })
@@ -95,7 +95,7 @@ describe('Auditoria contábil', () => {
   it('mostra o livro de lançamentos e confirma que a partida dobrada fecha', async () => {
     renderPage(<AdminAccountingPage />, '/admin/contabil')
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: /livro de lançamentos/i })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: /livro de lançamentos/i })).toBeInTheDocument()
     )
     expect(await screen.findByText(/partida dobrada fecha/i)).toBeInTheDocument()
   })
@@ -104,8 +104,8 @@ describe('Auditoria contábil', () => {
     renderPage(<AdminAccountingPage />, '/admin/contabil')
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: /divergências de reconciliação/i }),
-      ).toBeInTheDocument(),
+        screen.getByRole('heading', { name: /divergências de reconciliação/i })
+      ).toBeInTheDocument()
     )
     expect(await screen.findByText(/falta no nosso livro/i)).toBeInTheDocument()
   })
@@ -157,7 +157,7 @@ describe('Trilha de auditoria', () => {
   it('deixa explícito que o registro é imutável e encadeado por hash', async () => {
     renderPage(<AdminAuditTrailPage />, '/admin/trilha')
     expect(
-      await screen.findByText(/cada registro guarda o hash sha-256 do anterior/i),
+      await screen.findByText(/cada registro guarda o hash sha-256 do anterior/i)
     ).toBeInTheDocument()
   })
 
@@ -169,7 +169,9 @@ describe('Trilha de auditoria', () => {
 
   it('lista os eventos com de → para e oferece os três filtros pedidos', async () => {
     renderPage(<AdminAuditTrailPage />, '/admin/trilha')
-    await waitFor(() => expect(screen.getByRole('heading', { name: /^eventos$/i })).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: /^eventos$/i })).toBeInTheDocument()
+    )
     expect(screen.getByLabelText('Usuário')).toBeInTheDocument()
     expect(screen.getByLabelText('Entidade')).toBeInTheDocument()
     expect(screen.getByLabelText('Ação')).toBeInTheDocument()
@@ -186,7 +188,7 @@ describe('Observabilidade', () => {
   it('coloca a fila do outbox em destaque, com tamanho e idade do mais antigo', async () => {
     renderPage(<AdminObservabilityPage />, '/admin/observabilidade')
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: /fila do outbox/i })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: /fila do outbox/i })).toBeInTheDocument()
     )
     expect(screen.getByText('Eventos pendentes')).toBeInTheDocument()
     expect(screen.getByText('Evento mais antigo')).toBeInTheDocument()
@@ -195,7 +197,7 @@ describe('Observabilidade', () => {
   it('mostra a saúde dos quatro serviços com latência e taxa de erro', async () => {
     renderPage(<AdminObservabilityPage />, '/admin/observabilidade')
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: /saúde dos serviços/i })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: /saúde dos serviços/i })).toBeInTheDocument()
     )
     // getAllBy: o nome do serviço também aparece como origem de um alerta.
     for (const svc of ['auth-service', 'catalog-service', 'order-service', 'payment-service']) {

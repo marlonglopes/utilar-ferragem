@@ -281,16 +281,11 @@ export function useBalcaoCheckout() {
           return done
         }
 
-        const result = await payment.createPayment(
-          order.id,
-          input.method,
-          input.pricing.total,
-          {
-            payer_name: input.customer.name,
-            payer_cpf: input.customer.document.replace(/\D/g, ''),
-            payer_phone: input.customer.phone.replace(/\D/g, ''),
-          }
-        )
+        const result = await payment.createPayment(order.id, input.method, input.pricing.total, {
+          payer_name: input.customer.name,
+          payer_cpf: input.customer.document.replace(/\D/g, ''),
+          payer_phone: input.customer.phone.replace(/\D/g, ''),
+        })
         if (!result) return null
 
         const done: BalcaoChargeOutcome = {

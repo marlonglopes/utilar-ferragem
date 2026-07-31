@@ -92,16 +92,13 @@ export function useAdminPeriod(fallback: AdminPeriodPreset = 'month'): UseAdminP
           sp.delete('pagina')
           return sp
         },
-        { replace: true },
+        { replace: true }
       )
     },
-    [setParams],
+    [setParams]
   )
 
-  const setPreset = useCallback(
-    (p: AdminPeriodPreset) => setPeriod(presetToPeriod(p)),
-    [setPeriod],
-  )
+  const setPreset = useCallback((p: AdminPeriodPreset) => setPeriod(presetToPeriod(p)), [setPeriod])
 
   return { period, preset, setPreset, setPeriod }
 }

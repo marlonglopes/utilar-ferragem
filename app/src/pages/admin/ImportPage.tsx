@@ -38,8 +38,8 @@ export default function AdminImportPage() {
       <div className="space-y-4">
         {!isImportApiEnabled && (
           <p className="rounded-md border border-gray-200 border-l-4 border-l-amber-500 bg-amber-50/60 p-3 text-xs leading-relaxed text-gray-700">
-            <strong>Modo demonstração.</strong> O catálogo não está configurado
-            (<code className="font-mono">VITE_CATALOG_URL</code> vazio): a planilha é lida no seu
+            <strong>Modo demonstração.</strong> O catálogo não está configurado (
+            <code className="font-mono">VITE_CATALOG_URL</code> vazio): a planilha é lida no seu
             navegador, as regras aplicadas são uma amostra das do servidor e{' '}
             <strong>nada é gravado</strong>. Serve para conhecer o fluxo, não para importar de
             verdade.
@@ -95,7 +95,9 @@ export default function AdminImportPage() {
                   data-testid="dryrun-button"
                   className="inline-flex items-center gap-2 rounded-md bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:cursor-not-allowed disabled:bg-gray-300"
                 >
-                  {w.busy === 'dryrun' && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                  {w.busy === 'dryrun' && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  )}
                   {w.busy === 'dryrun' ? 'Simulando…' : 'Simular importação'}
                 </button>
               </div>

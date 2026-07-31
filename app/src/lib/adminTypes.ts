@@ -48,22 +48,10 @@ export interface Paginated<T> {
  * e o front NÃO inventa a distinção. `credit_card`/`debit_card`/`cash` existem
  * para o funil do order-service e para o balcão.
  */
-export type PaymentMethod =
-  | 'pix'
-  | 'boleto'
-  | 'card'
-  | 'credit_card'
-  | 'debit_card'
-  | 'cash'
+export type PaymentMethod = 'pix' | 'boleto' | 'card' | 'credit_card' | 'debit_card' | 'cash'
 
 export type OrderStatus =
-  | 'pending'
-  | 'paid'
-  | 'picking'
-  | 'shipped'
-  | 'delivered'
-  | 'canceled'
-  | 'refunded'
+  'pending' | 'paid' | 'picking' | 'shipped' | 'delivered' | 'canceled' | 'refunded'
 
 // ---------------------------------------------------------------------------
 // 1. Visão geral — GET {ORDER_URL}/api/v1/admin/overview?from&to

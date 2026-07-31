@@ -78,14 +78,19 @@ export function diffInput(initial: FormState, current: FormState): ProductInput 
   if (changed('stock')) out.stock = num(current.stock)
   if (changed('unitOfMeasure')) out.unitOfMeasure = current.unitOfMeasure
   if (changed('barcode')) out.barcode = str(current.barcode)
-  if (changed('weightKg')) out.weightKg = current.weightKg.trim() === '' ? null : (num(current.weightKg) ?? null)
-  if (changed('lengthCm')) out.lengthCm = current.lengthCm.trim() === '' ? null : (num(current.lengthCm) ?? null)
-  if (changed('widthCm')) out.widthCm = current.widthCm.trim() === '' ? null : (num(current.widthCm) ?? null)
-  if (changed('heightCm')) out.heightCm = current.heightCm.trim() === '' ? null : (num(current.heightCm) ?? null)
+  if (changed('weightKg'))
+    out.weightKg = current.weightKg.trim() === '' ? null : (num(current.weightKg) ?? null)
+  if (changed('lengthCm'))
+    out.lengthCm = current.lengthCm.trim() === '' ? null : (num(current.lengthCm) ?? null)
+  if (changed('widthCm'))
+    out.widthCm = current.widthCm.trim() === '' ? null : (num(current.widthCm) ?? null)
+  if (changed('heightCm'))
+    out.heightCm = current.heightCm.trim() === '' ? null : (num(current.heightCm) ?? null)
   if (changed('ncm')) out.ncm = str(current.ncm)
   if (changed('cfop')) out.cfop = str(current.cfop)
   if (changed('cest')) out.cest = str(current.cest)
-  if (changed('origem')) out.origem = current.origem.trim() === '' ? null : (num(current.origem) ?? null)
+  if (changed('origem'))
+    out.origem = current.origem.trim() === '' ? null : (num(current.origem) ?? null)
   if (changed('status')) out.status = current.status as ProductStatus
   if (changed('specs')) {
     try {

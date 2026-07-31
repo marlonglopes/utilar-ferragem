@@ -32,7 +32,9 @@ export function useFacets(params: FacetsParams = {}) {
     queryKey: ['facets', params],
     queryFn: async () => {
       if (!isCatalogEnabled) return getMockFacets(params)
-      const res = await catalogGet<FacetsResponse>(`/api/v1/products/facets?${toQueryString(params)}`)
+      const res = await catalogGet<FacetsResponse>(
+        `/api/v1/products/facets?${toQueryString(params)}`
+      )
       return normalize(res)
     },
     staleTime: 1000 * 60 * 5,

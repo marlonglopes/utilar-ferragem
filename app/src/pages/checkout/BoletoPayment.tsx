@@ -23,7 +23,11 @@ export default function BoletoPayment({ result }: Props) {
   }
 
   const expiryFormatted = result.boletoExpiresAt
-    ? result.boletoExpiresAt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    ? result.boletoExpiresAt.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
     : ''
 
   return (
@@ -60,9 +64,7 @@ export default function BoletoPayment({ result }: Props) {
 
       {/* Expiry */}
       {expiryFormatted && (
-        <p className="text-sm text-gray-500">
-          {t('boleto.expires', { date: expiryFormatted })}
-        </p>
+        <p className="text-sm text-gray-500">{t('boleto.expires', { date: expiryFormatted })}</p>
       )}
 
       {/* Hosted voucher (Stripe-only): página completa do boleto pra impressão */}

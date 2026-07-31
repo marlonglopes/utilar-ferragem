@@ -39,14 +39,23 @@ function externalImage(id: string, url: string, sortOrder: number): ProductImage
   return { id, url, alt: 'foto de referência (Wikimedia, CC0)', sortOrder }
 }
 
-function ownImage(id: string, sortOrder: number, originalBytes: number, bytes: number): ProductImageRecord {
+function ownImage(
+  id: string,
+  sortOrder: number,
+  originalBytes: number,
+  bytes: number
+): ProductImageRecord {
   const base = `/media/produtos/demo/${id}`
   return {
     id,
     url: `${base}-large.jpg`,
     alt: 'foto do produto',
     sortOrder,
-    variants: { thumb: `${base}-thumb.jpg`, medium: `${base}-medium.jpg`, large: `${base}-large.jpg` },
+    variants: {
+      thumb: `${base}-thumb.jpg`,
+      medium: `${base}-medium.jpg`,
+      large: `${base}-large.jpg`,
+    },
     width: 1600,
     height: 1600,
     originalBytes,
@@ -99,17 +108,14 @@ function seed(): AdminProductRow[] {
 function seedImages(): Record<string, ProductImageRecord[]> {
   return {
     // Imagem própria, com variantes e antes/depois.
-    '1': [
-      ownImage('img-1a', 0, 4_821_994, 183_220),
-      ownImage('img-1b', 1, 2_004_112, 121_880),
-    ],
+    '1': [ownImage('img-1a', 0, 4_821_994, 183_220), ownImage('img-1b', 1, 2_004_112, 121_880)],
     // Mistura: própria + externa. É o caso que a galeria precisa distinguir.
     '9': [
       ownImage('img-9a', 0, 3_110_500, 154_002),
       externalImage(
         'img-9b',
         'https://upload.wikimedia.org/wikipedia/commons/thumb/demo/cimento.jpg',
-        1,
+        1
       ),
     ],
     // Só externa.
@@ -117,7 +123,7 @@ function seedImages(): Record<string, ProductImageRecord[]> {
       externalImage(
         'img-13a',
         'https://upload.wikimedia.org/wikipedia/commons/thumb/demo/cabo.jpg',
-        0,
+        0
       ),
     ],
     // '2' fica sem imagem nenhuma, de propósito.
@@ -257,11 +263,19 @@ export function mockUploadImages(productId: string, files: File[]): ImageUploadR
 
   for (const file of files) {
     if (file.size > 12 * 1024 * 1024) {
-      rejected.push({ filename: file.name, code: 'file_too_large', reason: 'arquivo acima de 12 MB' })
+      rejected.push({
+        filename: file.name,
+        code: 'file_too_large',
+        reason: 'arquivo acima de 12 MB',
+      })
       continue
     }
     if (!file.type.startsWith('image/')) {
-      rejected.push({ filename: file.name, code: 'not_an_image', reason: 'tipo declarado não é imagem' })
+      rejected.push({
+        filename: file.name,
+        code: 'not_an_image',
+        reason: 'tipo declarado não é imagem',
+      })
       continue
     }
     const id = `img-demo-${order}-${Math.abs(hash(file.name)).toString(36)}`

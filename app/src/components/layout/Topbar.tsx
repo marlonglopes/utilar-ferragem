@@ -12,8 +12,7 @@ export function Topbar() {
             de cupom nem regra de frete grátis por valor no checkout, o que
             configura publicidade enganosa (CDC art. 37). */}
         <span className="truncate">
-          {t('topbar.promo')}{' '}
-          <strong className="text-brand-gold">{t('topbar.highlight')}</strong>
+          {t('topbar.promo')} <strong className="text-brand-gold">{t('topbar.highlight')}</strong>
         </span>
         <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
           <Link to="/vender" className="text-blue-200 hover:text-white transition-colors">

@@ -42,7 +42,9 @@ const STATUS_TONE: Record<OrderStatus, string> = {
 }
 
 // A próxima ação do FLUXO por status (pago→separar→despachar→entregar).
-const NEXT: Partial<Record<OrderStatus, { action: FulfillmentAction; label: string; Icon: typeof Package }>> = {
+const NEXT: Partial<
+  Record<OrderStatus, { action: FulfillmentAction; label: string; Icon: typeof Package }>
+> = {
   paid: { action: 'picking', label: 'Separar', Icon: Package },
   picking: { action: 'shipped', label: 'Despachar', Icon: Truck },
   shipped: { action: 'delivered', label: 'Entregar', Icon: CheckCircle2 },
@@ -63,7 +65,12 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 
 function OrderStatusPill({ status }: { status: OrderStatus }) {
   return (
-    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-semibold', STATUS_TONE[status])}>
+    <span
+      className={cn(
+        'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold',
+        STATUS_TONE[status]
+      )}
+    >
       {STATUS_LABEL[status]}
     </span>
   )
@@ -100,10 +107,10 @@ export default function OrdersPage() {
           sp.delete('pagina')
           return sp
         },
-        { replace: true },
+        { replace: true }
       )
     },
-    [setParams],
+    [setParams]
   )
 
   const goPage = useCallback(
@@ -114,10 +121,10 @@ export default function OrdersPage() {
           sp.set('pagina', String(p))
           return sp
         },
-        { replace: true },
+        { replace: true }
       )
     },
-    [setParams],
+    [setParams]
   )
 
   const query: AdminOrderQuery = useMemo(
@@ -128,7 +135,7 @@ export default function OrdersPage() {
       page,
       perPage: PAGE_SIZE,
     }),
-    [statusParam, channel, q, page],
+    [statusParam, channel, q, page]
   )
 
   const { data, isLoading, isError, error, refetch } = useAdminOrders(query)
@@ -137,7 +144,10 @@ export default function OrdersPage() {
   const meta = data?.meta
 
   const act = (id: string, action: FulfillmentAction) => {
-    if (action === 'cancel' && !window.confirm('Cancelar este pedido? A reserva de estoque é estornada.')) {
+    if (
+      action === 'cancel' &&
+      !window.confirm('Cancelar este pedido? A reserva de estoque é estornada.')
+    ) {
       return
     }
     fulfill.mutate({ id, action })
@@ -218,19 +228,22 @@ export default function OrdersPage() {
           </div>
         </Section>
 
-        <Section
-          title="Pedidos"
-          description={meta ? `${meta.total} pedido(s)` : undefined}
-        >
+        <Section title="Pedidos" description={meta ? `${meta.total} pedido(s)` : undefined}>
           {isError ? (
             <div className="p-4">
-              <ErrorState message={error instanceof Error ? error.message : 'Falha ao carregar'} onRetry={() => void refetch()} />
+              <ErrorState
+                message={error instanceof Error ? error.message : 'Falha ao carregar'}
+                onRetry={() => void refetch()}
+              />
             </div>
           ) : isLoading ? (
             <LoadingRows rows={8} />
           ) : rows.length === 0 ? (
             <div className="p-4">
-              <EmptyState title="Nenhum pedido" description="Ajuste os filtros ou aguarde uma nova venda." />
+              <EmptyState
+                title="Nenhum pedido"
+                description="Ajuste os filtros ou aguarde uma nova venda."
+              />
             </div>
           ) : (
             <ScrollArea>
@@ -256,12 +269,18 @@ export default function OrdersPage() {
                         <Td>
                           <OrderStatusPill status={o.status} />
                         </Td>
-                        <Td className="text-xs text-gray-600">{o.channel === 'balcao' ? 'Balcão' : 'Loja'}</Td>
-                        <Td className="max-w-[16rem] truncate text-gray-800">{o.customerName ?? '—'}</Td>
+                        <Td className="text-xs text-gray-600">
+                          {o.channel === 'balcao' ? 'Balcão' : 'Loja'}
+                        </Td>
+                        <Td className="max-w-[16rem] truncate text-gray-800">
+                          {o.customerName ?? '—'}
+                        </Td>
                         <Td numeric>
                           <Reais value={o.total} className="font-semibold text-gray-900" />
                         </Td>
-                        <Td className="whitespace-nowrap text-xs text-gray-600">{formatDate(o.createdAt)}</Td>
+                        <Td className="whitespace-nowrap text-xs text-gray-600">
+                          {formatDate(o.createdAt)}
+                        </Td>
                         <Td className="text-right">
                           <div className="inline-flex items-center gap-1.5">
                             {next && (
@@ -286,7 +305,9 @@ export default function OrdersPage() {
                                 Cancelar
                               </button>
                             )}
-                            {!next && !canCancel && <span className="text-xs text-gray-400">—</span>}
+                            {!next && !canCancel && (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
                           </div>
                         </Td>
                       </tr>

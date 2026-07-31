@@ -214,9 +214,8 @@ describe('CheckoutPage — passo pagamento', () => {
     fireEvent.click(screen.getByRole('button', { name: /confirmar e pagar/i }))
 
     // 600ms simulated latency — wait for PixPayment to appear
-    await waitFor(
-      () => expect(screen.getByText(/pague com pix/i)).toBeInTheDocument(),
-      { timeout: 3000 }
-    )
+    await waitFor(() => expect(screen.getByText(/pague com pix/i)).toBeInTheDocument(), {
+      timeout: 3000,
+    })
   }, 10000)
 })

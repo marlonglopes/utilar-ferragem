@@ -43,7 +43,7 @@ export function ImportStepper({
                   active && 'bg-brand-blue-light text-brand-blue',
                   !active && done && 'text-gray-700 hover:bg-gray-100',
                   !active && !done && 'text-gray-400',
-                  !canGo && 'cursor-default',
+                  !canGo && 'cursor-default'
                 )}
               >
                 <span
@@ -51,7 +51,7 @@ export function ImportStepper({
                     'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
                     active && 'bg-brand-blue text-white',
                     !active && done && 'bg-emerald-600 text-white',
-                    !active && !done && 'bg-gray-200 text-gray-500',
+                    !active && !done && 'bg-gray-200 text-gray-500'
                   )}
                 >
                   {done ? <Check className="h-3 w-3" aria-hidden="true" /> : i + 1}

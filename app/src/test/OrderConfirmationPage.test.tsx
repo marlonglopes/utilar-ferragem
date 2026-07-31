@@ -120,17 +120,20 @@ describe('OrderConfirmationPage — recuperação de boleto', () => {
             <Route path="/pedido/:id" element={<Page />} />
           </Routes>
         </MemoryRouter>
-      </I18nextProvider>,
+      </I18nextProvider>
     )
   }
 
   it('faz fetch do payment e renderiza linha digitável + voucher URL', async () => {
     vi.stubEnv('VITE_API_URL', 'http://localhost:8090')
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => BOLETO_DETAIL,
-    } as Response))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => BOLETO_DETAIL,
+      } as Response)
+    )
 
     await renderWithDynamicImport('pay-bol-1', 'boleto')
 
@@ -138,7 +141,9 @@ describe('OrderConfirmationPage — recuperação de boleto', () => {
     // com os dados retornados pelo GET /payments/:id.
     await waitFor(() => {
       expect(
-        screen.getByDisplayValue(BOLETO_DETAIL.psp_payload.next_action.boleto_display_details.number),
+        screen.getByDisplayValue(
+          BOLETO_DETAIL.psp_payload.next_action.boleto_display_details.number
+        )
       ).toBeInTheDocument()
     })
 
@@ -146,7 +151,7 @@ describe('OrderConfirmationPage — recuperação de boleto', () => {
     const voucherLink = screen.getByRole('link', { name: /visualizar boleto/i })
     expect(voucherLink).toHaveAttribute(
       'href',
-      BOLETO_DETAIL.psp_payload.next_action.boleto_display_details.hosted_voucher_url,
+      BOLETO_DETAIL.psp_payload.next_action.boleto_display_details.hosted_voucher_url
     )
   })
 

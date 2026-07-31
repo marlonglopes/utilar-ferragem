@@ -13,7 +13,7 @@ function renderWith(result: PaymentResult) {
   return render(
     <I18nextProvider i18n={i18n}>
       <BoletoPayment result={result} />
-    </I18nextProvider>,
+    </I18nextProvider>
   )
 }
 

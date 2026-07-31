@@ -34,12 +34,12 @@ export default function PrivacyPage() {
         <p>
           O controlador dos dados pessoais tratados neste site é{' '}
           <strong>{COMPANY.legalName}</strong>, inscrita no CNPJ sob o nº{' '}
-          <strong>{COMPANY.cnpj}</strong>, com sede em {formattedAddress()}, que opera o
-          marketplace <strong>{COMPANY.tradeName}</strong>.
+          <strong>{COMPANY.cnpj}</strong>, com sede em {formattedAddress()}, que opera o marketplace{' '}
+          <strong>{COMPANY.tradeName}</strong>.
         </p>
         <p>
-          Nosso Encarregado pelo Tratamento de Dados Pessoais (DPO), previsto no art. 41 da LGPD,
-          é <strong>{COMPANY.contact.dpoName}</strong>, que pode ser contatado pelo e-mail{' '}
+          Nosso Encarregado pelo Tratamento de Dados Pessoais (DPO), previsto no art. 41 da LGPD, é{' '}
+          <strong>{COMPANY.contact.dpoName}</strong>, que pode ser contatado pelo e-mail{' '}
           <strong>{COMPANY.contact.dpoEmail}</strong>.
         </p>
 
@@ -51,12 +51,12 @@ export default function PrivacyPage() {
             apenas em formato criptografado, nunca em texto legível).
           </li>
           <li>
-            <strong>Entrega:</strong> CEP, logradouro, número, complemento, bairro, cidade e
-            estado dos endereços que você cadastra.
+            <strong>Entrega:</strong> CEP, logradouro, número, complemento, bairro, cidade e estado
+            dos endereços que você cadastra.
           </li>
           <li>
-            <strong>Pagamento:</strong> os dados do cartão são digitados diretamente no ambiente
-            do nosso provedor de pagamento e <strong>não trafegam nem são armazenados</strong> nos
+            <strong>Pagamento:</strong> os dados do cartão são digitados diretamente no ambiente do
+            nosso provedor de pagamento e <strong>não trafegam nem são armazenados</strong> nos
             nossos servidores. Guardamos apenas o meio de pagamento escolhido, os quatro últimos
             dígitos, a bandeira e o identificador da transação.
           </li>
@@ -68,8 +68,10 @@ export default function PrivacyPage() {
 
         <h3>2.2. Dados coletados automaticamente</h3>
         <ul>
-          <li>Endereço IP, data e hora de acesso e registros de navegação, cuja guarda por 6 meses é
-            exigida pelo art. 15 do Marco Civil da Internet (Lei 12.965/2014).</li>
+          <li>
+            Endereço IP, data e hora de acesso e registros de navegação, cuja guarda por 6 meses é
+            exigida pelo art. 15 do Marco Civil da Internet (Lei 12.965/2014).
+          </li>
           <li>Tipo de dispositivo, navegador, sistema operacional e idioma.</li>
           <li>Páginas visitadas, produtos consultados e itens adicionados ao carrinho.</li>
           <li>Cookies e identificadores similares, conforme o item 7 desta política.</li>
@@ -82,12 +84,12 @@ export default function PrivacyPage() {
         </p>
         <ul>
           <li>
-            <strong>Processar seus pedidos, pagamentos e entregas</strong> — base legal: execução
-            de contrato (art. 7º, V). Sem esses dados não conseguimos concluir a compra.
+            <strong>Processar seus pedidos, pagamentos e entregas</strong> — base legal: execução de
+            contrato (art. 7º, V). Sem esses dados não conseguimos concluir a compra.
           </li>
           <li>
-            <strong>Criar e manter sua conta e autenticar seu acesso</strong> — base legal:
-            execução de contrato (art. 7º, V).
+            <strong>Criar e manter sua conta e autenticar seu acesso</strong> — base legal: execução
+            de contrato (art. 7º, V).
           </li>
           <li>
             <strong>Emitir nota fiscal e cumprir obrigações fiscais e contábeis</strong> — base
@@ -102,9 +104,9 @@ export default function PrivacyPage() {
             contrato e legítimo interesse (art. 7º, V e IX).
           </li>
           <li>
-            <strong>Enviar comunicações de marketing e ofertas</strong> — base legal:
-            consentimento (art. 7º, I). Você pode retirar esse consentimento a qualquer momento,
-            sem prejuízo às compras já realizadas.
+            <strong>Enviar comunicações de marketing e ofertas</strong> — base legal: consentimento
+            (art. 7º, I). Você pode retirar esse consentimento a qualquer momento, sem prejuízo às
+            compras já realizadas.
           </li>
           <li>
             <strong>Melhorar o site, medir audiência e recomendar produtos</strong> — base legal:
@@ -130,12 +132,12 @@ export default function PrivacyPage() {
             entrega e os itens comprados, exclusivamente para separar e enviar o pedido.
           </li>
           <li>
-            <strong>Provedores de pagamento:</strong> processam a cobrança em Pix, boleto ou
-            cartão e realizam análise antifraude.
+            <strong>Provedores de pagamento:</strong> processam a cobrança em Pix, boleto ou cartão
+            e realizam análise antifraude.
           </li>
           <li>
-            <strong>Transportadoras e Correios:</strong> recebem os dados de destinatário e
-            endereço para a entrega.
+            <strong>Transportadoras e Correios:</strong> recebem os dados de destinatário e endereço
+            para a entrega.
           </li>
           <li>
             <strong>Prestadores de tecnologia:</strong> hospedagem em nuvem, envio de e-mails
@@ -143,8 +145,8 @@ export default function PrivacyPage() {
             contrato a tratar os dados apenas conforme nossas instruções.
           </li>
           <li>
-            <strong>Autoridades públicas:</strong> quando houver ordem judicial, requisição legal
-            ou para defesa de nossos direitos em processo.
+            <strong>Autoridades públicas:</strong> quando houver ordem judicial, requisição legal ou
+            para defesa de nossos direitos em processo.
           </li>
         </ul>
         <p>
@@ -179,9 +181,8 @@ export default function PrivacyPage() {
         <p>Utilizamos três categorias de cookies:</p>
         <ul>
           <li>
-            <strong>Necessários:</strong> mantêm sua sessão autenticada, o conteúdo do carrinho e
-            o idioma escolhido. Sem eles o site não funciona, por isso não dependem de
-            consentimento.
+            <strong>Necessários:</strong> mantêm sua sessão autenticada, o conteúdo do carrinho e o
+            idioma escolhido. Sem eles o site não funciona, por isso não dependem de consentimento.
           </li>
           <li>
             <strong>De desempenho:</strong> medem como o site é usado, para corrigir erros e
@@ -198,15 +199,13 @@ export default function PrivacyPage() {
         </p>
 
         <h2>8. Seus direitos como titular</h2>
-        <p>
-          O art. 18 da LGPD garante a você, a qualquer momento e gratuitamente, o direito de:
-        </p>
+        <p>O art. 18 da LGPD garante a você, a qualquer momento e gratuitamente, o direito de:</p>
         <ol>
           <li>confirmar se tratamos dados seus e acessar esses dados;</li>
           <li>corrigir dados incompletos, inexatos ou desatualizados;</li>
           <li>
-            solicitar a anonimização, o bloqueio ou a eliminação de dados desnecessários ou
-            tratados em desconformidade com a lei;
+            solicitar a anonimização, o bloqueio ou a eliminação de dados desnecessários ou tratados
+            em desconformidade com a lei;
           </li>
           <li>solicitar a portabilidade dos dados a outro fornecedor;</li>
           <li>
@@ -247,9 +246,9 @@ export default function PrivacyPage() {
         <h2>10. Alterações desta política</h2>
         <p>
           Podemos atualizar esta política para refletir mudanças legais ou no serviço. A versão
-          vigente é sempre a publicada nesta página, com a data de atualização no topo. Se a
-          mudança for significativa, avisaremos por e-mail ou por aviso em destaque no site antes
-          de ela passar a valer.
+          vigente é sempre a publicada nesta página, com a data de atualização no topo. Se a mudança
+          for significativa, avisaremos por e-mail ou por aviso em destaque no site antes de ela
+          passar a valer.
         </p>
 
         <h2>11. Fale com a gente</h2>

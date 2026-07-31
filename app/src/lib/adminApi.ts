@@ -73,7 +73,7 @@ export class AdminApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly code?: string,
+    readonly code?: string
   ) {
     super(message)
     this.name = 'AdminApiError'
@@ -137,7 +137,7 @@ export async function adminSend<T>(
   base: string,
   path: string,
   method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
-  body?: unknown,
+  body?: unknown
 ): Promise<T> {
   const res = await adminFetch(base, path, {
     method,
@@ -205,13 +205,13 @@ export const LEDGER_LIMIT = 5000
 export async function fetchLedger(q: LedgerQuery): Promise<LedgerPage> {
   if (!isAdminApiEnabled) {
     const all = mockLedgerEntries().filter(
-      (e) => (!q.kind || e.kind === q.kind) && (!q.method || e.method === q.method),
+      (e) => (!q.kind || e.kind === q.kind) && (!q.method || e.method === q.method)
     )
     return mockLedgerPage(all, q.page, q.pageSize)
   }
   const res = await adminGet<{ entries: ApiEntryRow[] }>(
     PAYMENT_URL,
-    `/api/v1/ledger/entries${qs({ ...q, limit: LEDGER_LIMIT })}`,
+    `/api/v1/ledger/entries${qs({ ...q, limit: LEDGER_LIMIT })}`
   )
   const all = (res.entries ?? [])
     .map(adaptEntry)
@@ -226,7 +226,7 @@ export async function fetchReconciliation(period: AdminPeriod): Promise<Reconcil
   if (!isAdminApiEnabled) return mockReconciliation(period)
   const res = await adminGet<{ discrepancies: ApiDiscrepancy[] }>(
     PAYMENT_URL,
-    '/api/v1/ledger/discrepancies?limit=200',
+    '/api/v1/ledger/discrepancies?limit=200'
   )
   return adaptReconciliation(period, res.discrepancies ?? [])
 }
@@ -246,7 +246,7 @@ export async function fetchReconciliation(period: AdminPeriod): Promise<Reconcil
  */
 export async function fetchAccountingExport(
   period: AdminPeriod,
-  format: 'csv' | 'ofx' | 'balancete' = 'csv',
+  format: 'csv' | 'ofx' | 'balancete' = 'csv'
 ): Promise<{ blob: Blob; filename: string } | null> {
   if (!isAdminApiEnabled) return null
   const token = useAuthStore.getState().user?.token ?? null
@@ -259,7 +259,7 @@ export async function fetchAccountingExport(
       res.status === 403
         ? 'Sua conta não tem permissão de administrador.'
         : `Falha ao gerar o export (HTTP ${res.status})`,
-      res.status,
+      res.status
     )
   }
   // O nome vem do `Content-Disposition` do servidor quando disponível — é ele
@@ -279,12 +279,12 @@ export async function fetchAccountingExport(
 
 export async function fetchSellerPerformance(
   period: AdminPeriod,
-  storeId?: string,
+  storeId?: string
 ): Promise<SellerPerformanceReport> {
   if (!isAdminApiEnabled) return mockSellerPerformance(period)
   return adminGet<SellerPerformanceReport>(
     ORDER_URL,
-    `/api/v1/admin/sellers/performance${qs({ ...period, storeId })}`,
+    `/api/v1/admin/sellers/performance${qs({ ...period, storeId })}`
   )
 }
 
@@ -309,7 +309,7 @@ export async function fetchAuditEvents(q: AuditQuery): Promise<AuditEventPage> {
       (e) =>
         (!q.actorId || e.actorId === q.actorId) &&
         (!q.entityType || e.entityType === q.entityType) &&
-        (!q.action || e.action === q.action),
+        (!q.action || e.action === q.action)
     )
     return mockAuditPage(all, q.page, q.pageSize)
   }
@@ -321,7 +321,7 @@ export async function fetchAuditEvents(q: AuditQuery): Promise<AuditEventPage> {
       entityType: q.entityType,
       actorId: q.actorId,
       limit: AUDIT_LIMIT,
-    })}`,
+    })}`
   )
   const all = (res.records ?? [])
     .map(adaptAuditRecord)

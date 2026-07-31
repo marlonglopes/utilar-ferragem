@@ -18,16 +18,16 @@ Não precisa de backend: o Playwright sobe a SPA em **modo mock** (porta 5180, s
 
 ## Cobertura
 
-| Spec | Feature |
-|------|---------|
-| `smoke.spec.ts` | App carrega, rotas públicas, 404, design system |
-| `catalog.spec.ts` | Vitrine, categoria, abrir produto |
-| `search.spec.ts` | Busca por URL, busca pela navbar, estado vazio |
-| `product.spec.ts` | Detalhe: nome/preço/CTA, abas, produto inexistente |
-| `cart.spec.ts` | Carrinho vazio, adicionar, badge, remover |
-| `auth.spec.ts` | Login, rota protegida + `next`, cadastro, esqueci senha |
+| Spec               | Feature                                                             |
+| ------------------ | ------------------------------------------------------------------- |
+| `smoke.spec.ts`    | App carrega, rotas públicas, 404, design system                     |
+| `catalog.spec.ts`  | Vitrine, categoria, abrir produto                                   |
+| `search.spec.ts`   | Busca por URL, busca pela navbar, estado vazio                      |
+| `product.spec.ts`  | Detalhe: nome/preço/CTA, abas, produto inexistente                  |
+| `cart.spec.ts`     | Carrinho vazio, adicionar, badge, remover                           |
+| `auth.spec.ts`     | Login, rota protegida + `next`, cadastro, esqueci senha             |
 | `checkout.spec.ts` | Rota protegida, fluxo login→carrinho→checkout, métodos de pagamento |
-| `account.spec.ts` | Conta após login, abas, logout |
+| `account.spec.ts`  | Conta após login, abas, logout                                      |
 
 `helpers.ts` centraliza rotas, credenciais e ações reutilizáveis (`login`,
 `openFirstProduct`, `addToCartFromDetail`, `cartCount`).

@@ -11,7 +11,13 @@ import { formatCPF, formatPhone } from '@/lib/format'
 interface RegisterResponse {
   accessToken: string
   refreshToken: string
-  user: { id: string; email: string; name: string; role: 'customer' | 'seller' | 'admin'; emailVerified?: boolean }
+  user: {
+    id: string
+    email: string
+    name: string
+    role: 'customer' | 'seller' | 'admin'
+    emailVerified?: boolean
+  }
 }
 
 export default function RegisterPage() {
@@ -19,9 +25,18 @@ export default function RegisterPage() {
   const navigate = useNavigate()
   const setUser = useAuthStore((s) => s.setUser)
 
-  const [form, setForm] = useState({ name: '', email: '', cpf: '', phone: '', password: '', passwordConfirm: '' })
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    cpf: '',
+    phone: '',
+    password: '',
+    passwordConfirm: '',
+  })
   const [lgpd, setLgpd] = useState(false)
-  const [errors, setErrors] = useState<Partial<typeof form> & { lgpd?: string; general?: string }>({})
+  const [errors, setErrors] = useState<Partial<typeof form> & { lgpd?: string; general?: string }>(
+    {}
+  )
   const [loading, setLoading] = useState(false)
 
   function set(field: keyof typeof form, value: string) {
@@ -43,12 +58,21 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const errs = validate()
-    if (Object.keys(errs).length > 0) { setErrors(errs); return }
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs)
+      return
+    }
     setLoading(true)
 
     try {
       if (!isAuthEnabled) {
-        setUser({ id: 'mock-1', email: form.email, name: form.name, role: 'customer', token: 'mock-token' })
+        setUser({
+          id: 'mock-1',
+          email: form.email,
+          name: form.name,
+          role: 'customer',
+          token: 'mock-token',
+        })
         navigate('/', { replace: true })
         return
       }
@@ -78,7 +102,9 @@ export default function RegisterPage() {
     <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="font-display font-black text-2xl text-gray-900">{t('auth.registerTitle')}</h1>
+          <h1 className="font-display font-black text-2xl text-gray-900">
+            {t('auth.registerTitle')}
+          </h1>
           <p className="text-sm text-gray-500 mt-1">{t('auth.registerSubtitle')}</p>
         </div>
 
@@ -147,7 +173,10 @@ export default function RegisterPage() {
             <input
               type="checkbox"
               checked={lgpd}
-              onChange={(e) => { setLgpd(e.target.checked); setErrors((p) => ({ ...p, lgpd: undefined })) }}
+              onChange={(e) => {
+                setLgpd(e.target.checked)
+                setErrors((p) => ({ ...p, lgpd: undefined }))
+              }}
               className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-orange focus:ring-brand-orange"
             />
             <span className="text-xs text-gray-600 leading-relaxed">{t('auth.lgpdConsent')}</span>

@@ -78,9 +78,7 @@ export default function SellPage() {
       {/* Benefícios */}
       <section className="py-12">
         <div className="container">
-          <h2 className="font-display font-black text-2xl text-gray-900 mb-6">
-            O que você ganha
-          </h2>
+          <h2 className="font-display font-black text-2xl text-gray-900 mb-6">O que você ganha</h2>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {BENEFITS.map(({ icon: Icon, title, text }) => (
               <div key={title} className="rounded-xl border border-gray-200 bg-white p-5">
@@ -134,9 +132,7 @@ export default function SellPage() {
           </ul>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6">
-            <h3 className="font-display font-bold text-lg text-gray-900">
-              Pronto para começar?
-            </h3>
+            <h3 className="font-display font-bold text-lg text-gray-900">Pronto para começar?</h3>
             <p className="mt-2 text-sm leading-relaxed text-gray-600">
               Mande um e-mail com o CNPJ e um resumo do seu sortimento. Retornamos em até 2 dias
               úteis com as condições comerciais e o passo a passo do cadastro.

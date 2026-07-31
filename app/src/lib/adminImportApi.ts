@@ -54,7 +54,7 @@ async function failure(res: Response): Promise<never> {
     throw new AdminApiError(
       'O servidor recusou o arquivo por tamanho. Envie em CSV ou divida a planilha.',
       413,
-      'too_large',
+      'too_large'
     )
   }
   throw new AdminApiError(body.error ?? `HTTP ${res.status}`, res.status, body.code)

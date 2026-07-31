@@ -62,7 +62,7 @@ function renderPage(ui: ReactElement, route = '/admin/produtos') {
           <Route path="/admin/produtos/:id" element={<AdminProductEditPage />} />
         </Routes>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   )
 }
 
@@ -160,20 +160,56 @@ describe('Preço abaixo do custo', () => {
 
 const ROWS: AdminProductRow[] = [
   {
-    id: '1', slug: 'furadeira', sku: 'UTL-1', name: 'Furadeira Bosch', category: 'ferramentas',
-    brand: 'Bosch', price: 300, cost: 200, stock: 5, unitOfMeasure: 'un', status: 'published',
+    id: '1',
+    slug: 'furadeira',
+    sku: 'UTL-1',
+    name: 'Furadeira Bosch',
+    category: 'ferramentas',
+    brand: 'Bosch',
+    price: 300,
+    cost: 200,
+    stock: 5,
+    unitOfMeasure: 'un',
+    status: 'published',
   },
   {
-    id: '2', slug: 'cimento', sku: 'UTL-2', name: 'Cimento Votoran', category: 'construcao',
-    brand: 'Votoran', price: 40, cost: 38, stock: 100, unitOfMeasure: 'sc', status: 'draft',
+    id: '2',
+    slug: 'cimento',
+    sku: 'UTL-2',
+    name: 'Cimento Votoran',
+    category: 'construcao',
+    brand: 'Votoran',
+    price: 40,
+    cost: 38,
+    stock: 100,
+    unitOfMeasure: 'sc',
+    status: 'draft',
   },
   {
-    id: '3', slug: 'cabo', sku: 'UTL-3', name: 'Cabo Flexível', category: 'eletrica',
-    brand: 'Sil', price: 250, cost: null, stock: 60, unitOfMeasure: 'rl', status: 'published',
+    id: '3',
+    slug: 'cabo',
+    sku: 'UTL-3',
+    name: 'Cabo Flexível',
+    category: 'eletrica',
+    brand: 'Sil',
+    price: 250,
+    cost: null,
+    stock: 60,
+    unitOfMeasure: 'rl',
+    status: 'published',
   },
   {
-    id: '4', slug: 'tinta', sku: 'UTL-4', name: 'Tinta Suvinil', category: 'pintura',
-    brand: 'Suvinil', price: 100, cost: 130, stock: 8, unitOfMeasure: 'un', status: 'archived',
+    id: '4',
+    slug: 'tinta',
+    sku: 'UTL-4',
+    name: 'Tinta Suvinil',
+    category: 'pintura',
+    brand: 'Suvinil',
+    price: 100,
+    cost: 130,
+    stock: 8,
+    unitOfMeasure: 'un',
+    status: 'archived',
   },
 ]
 
@@ -217,9 +253,7 @@ describe('Lista — filtro e ordenação', () => {
 describe('Lista — tela', () => {
   it('renderiza as colunas de custo e margem e avisa que é demonstração', async () => {
     renderPage(<AdminProductsPage />)
-    expect(
-      await screen.findByRole('heading', { level: 1, name: /produtos/i }),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: /produtos/i })).toBeInTheDocument()
     expect(screen.getByText(/modo demonstração/i)).toBeInTheDocument()
 
     const table = await screen.findByRole('table')
@@ -395,7 +429,7 @@ describe('Imagens — reordenação e capa', () => {
         <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ProductImageManager productId="1" />
         </MemoryRouter>
-      </QueryClientProvider>,
+      </QueryClientProvider>
     )
 
     const grid = await screen.findByTestId('image-grid')
@@ -438,7 +472,7 @@ describe('Imagens — tamanho antes/depois', () => {
           {/* produto 9 do mock: uma imagem própria + uma externa */}
           <ProductImageManager productId="9" />
         </MemoryRouter>
-      </QueryClientProvider>,
+      </QueryClientProvider>
     )
 
     const grid = await screen.findByTestId('image-grid')
@@ -468,7 +502,7 @@ describe('Upload — recusa por arquivo', () => {
     // Mensagem diferente, código igual → mesmo rótulo. É o que impede a tela de
     // quebrar quando o backend reescreve um texto.
     expect(rejectLabel('not_an_image', 'qualquer texto novo do servidor')).toBe(
-      rejectLabel('not_an_image', 'outro texto totalmente diferente'),
+      rejectLabel('not_an_image', 'outro texto totalmente diferente')
     )
   })
 
@@ -484,7 +518,7 @@ describe('Upload — recusa por arquivo', () => {
         <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ProductImageManager productId="2" />
         </MemoryRouter>
-      </QueryClientProvider>,
+      </QueryClientProvider>
     )
 
     await screen.findByTestId('image-dropzone')
@@ -521,7 +555,7 @@ describe('Upload — recusa por arquivo', () => {
         <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ProductImageManager productId="2" />
         </MemoryRouter>
-      </QueryClientProvider>,
+      </QueryClientProvider>
     )
     expect(await screen.findByText(/nenhuma imagem ainda/i)).toBeInTheDocument()
     expect(screen.getByText(/antes de publicar/i)).toBeInTheDocument()
@@ -565,7 +599,7 @@ describe('Formulário — envia só o que mudou', () => {
 
   it('serializa a ficha técnica como objeto', () => {
     const out = diffInput(inicial, { ...inicial, specs: '{"Potência":"650 W"}' })
-    expect(out.specs).toEqual({ 'Potência': '650 W' })
+    expect(out.specs).toEqual({ Potência: '650 W' })
   })
 })
 
@@ -626,7 +660,7 @@ describe('Formulário — criação', () => {
   it('entra como rascunho e não deixa escolher a situação', async () => {
     renderPage(<AdminProductsPage />, '/admin/produtos/novo')
     expect(
-      await screen.findByRole('heading', { level: 1, name: /novo produto/i }),
+      await screen.findByRole('heading', { level: 1, name: /novo produto/i })
     ).toBeInTheDocument()
     // O campo existe para dar contexto, mas está travado: produto novo não vai
     // para a vitrine sem alguém publicar de propósito.
@@ -680,7 +714,7 @@ describe('Guard de papel nas rotas de produto', () => {
             }
           />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     )
     expect(screen.getByText('gestão de produtos')).toBeInTheDocument()
   })
@@ -725,7 +759,7 @@ describe('Guard de papel nas rotas de produto', () => {
           />
           <Route path="/entrar" element={<div>tela de login</div>} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     )
   }
 

@@ -87,7 +87,7 @@ export default function AdminOverviewPage() {
         value: p.valueCents,
         tooltip: `${p.date.slice(5).split('-').reverse().join('/')}: ${formatCents(p.valueCents)} · ${p.orders} pedidos`,
       })),
-    [data],
+    [data]
   )
 
   const criticalAlerts = (data?.alerts ?? []).filter((a) => a.severity === 'critical')
@@ -100,7 +100,10 @@ export default function AdminOverviewPage() {
     >
       {isError && (
         <div className="rounded-lg border border-gray-200 bg-white">
-          <ErrorState message={(error as Error)?.message ?? 'Erro desconhecido'} onRetry={() => void refetch()} />
+          <ErrorState
+            message={(error as Error)?.message ?? 'Erro desconhecido'}
+            onRetry={() => void refetch()}
+          />
         </div>
       )}
 
@@ -207,7 +210,9 @@ export default function AdminOverviewPage() {
                         style={{ backgroundColor: STATUS_COLOR[b.status] }}
                         aria-hidden="true"
                       />
-                      <span className="flex-1 truncate text-gray-700">{STATUS_LABEL[b.status]}</span>
+                      <span className="flex-1 truncate text-gray-700">
+                        {STATUS_LABEL[b.status]}
+                      </span>
                       <span className="tabular-nums text-gray-500">{formatCount(b.count)}</span>
                       <Money cents={b.valueCents} className="w-24 text-right" />
                     </li>
@@ -277,7 +282,10 @@ export default function AdminOverviewPage() {
             }
           >
             {data.stuckOrders.length === 0 ? (
-              <EmptyState title="Nenhum pedido travado" description="Todo pagamento confirmado virou separação." />
+              <EmptyState
+                title="Nenhum pedido travado"
+                description="Todo pagamento confirmado virou separação."
+              />
             ) : (
               <ScrollArea>
                 <Table>
@@ -303,10 +311,16 @@ export default function AdminOverviewPage() {
                           <Td numeric>
                             <Money cents={o.totalCents} emphasis />
                           </Td>
-                          <Td numeric className="whitespace-nowrap">{o.stuckForHours}h</Td>
+                          <Td numeric className="whitespace-nowrap">
+                            {o.stuckForHours}h
+                          </Td>
                           <Td>
                             <SeverityPill severity={sev}>
-                              {sev === 'critical' ? 'Mais de 1 dia' : sev === 'warn' ? 'Atrasado' : 'Recente'}
+                              {sev === 'critical'
+                                ? 'Mais de 1 dia'
+                                : sev === 'warn'
+                                  ? 'Atrasado'
+                                  : 'Recente'}
                             </SeverityPill>
                           </Td>
                         </tr>

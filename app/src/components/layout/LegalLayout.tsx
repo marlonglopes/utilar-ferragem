@@ -30,9 +30,7 @@ export function LegalLayout({
       <header className="mb-8 max-w-3xl">
         <h1 className="font-display font-black text-3xl text-gray-900 leading-tight">{title}</h1>
         {subtitle && <p className="mt-3 text-gray-600 leading-relaxed">{subtitle}</p>}
-        {updatedAt && (
-          <p className="mt-3 text-sm text-gray-400">Última atualização: {updatedAt}</p>
-        )}
+        {updatedAt && <p className="mt-3 text-sm text-gray-400">Última atualização: {updatedAt}</p>}
       </header>
 
       {reviewNotice && (

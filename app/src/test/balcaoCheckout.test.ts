@@ -97,7 +97,11 @@ describe('useBalcaoCheckout — payload do pedido', () => {
     })
 
     expect(orderPostWithJWT).toHaveBeenCalledTimes(1)
-    const [path, token, payload] = orderPostWithJWT.mock.calls[0] as [string, string, Record<string, unknown>]
+    const [path, token, payload] = orderPostWithJWT.mock.calls[0] as [
+      string,
+      string,
+      Record<string, unknown>,
+    ]
 
     expect(path).toBe('/api/v1/orders')
     expect(token).toBe('jwt-token')
@@ -188,7 +192,7 @@ describe('useBalcaoCheckout — payload do pedido', () => {
 
   it('erro do backend vira mensagem acionável no caixa', async () => {
     orderPostWithJWT.mockRejectedValue(
-      new Error('estoque insuficiente para o produto p1: pedido 2, disponível 1'),
+      new Error('estoque insuficiente para o produto p1: pedido 2, disponível 1')
     )
 
     const { result } = renderHook(() => useBalcaoCheckout())
@@ -214,7 +218,7 @@ describe('useBalcaoCheckout — payload do pedido', () => {
 describe('describeOrderError', () => {
   it('reconhece estoque insuficiente e preserva o detalhe do backend', () => {
     const msg = describeOrderError(
-      new Error('estoque insuficiente para o produto p1: pedido 2, disponível 1'),
+      new Error('estoque insuficiente para o produto p1: pedido 2, disponível 1')
     )
     expect(msg).toMatch(/ajuste a quantidade/i)
     expect(msg).toMatch(/disponível 1/)
@@ -222,7 +226,7 @@ describe('describeOrderError', () => {
 
   it('traduz falta de vínculo de loja em instrução, não em jargão', () => {
     expect(describeOrderError(new Error('store operator role required'))).toMatch(
-      /não está vinculada a uma loja/i,
+      /não está vinculada a uma loja/i
     )
   })
 
@@ -233,14 +237,14 @@ describe('describeOrderError', () => {
   it('explica a recusa de endereço em pedido de balcão', () => {
     expect(
       describeOrderError(
-        new Error('balcao orders are pickup-only and must not carry a shipping address'),
-      ),
+        new Error('balcao orders are pickup-only and must not carry a shipping address')
+      )
     ).toMatch(/não aceita endereço/i)
   })
 
   it('não engole um erro desconhecido', () => {
     expect(describeOrderError(new Error('algo bem específico quebrou'))).toBe(
-      'algo bem específico quebrou',
+      'algo bem específico quebrou'
     )
   })
 })

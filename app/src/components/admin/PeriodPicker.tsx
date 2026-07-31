@@ -33,7 +33,7 @@ export function PeriodPicker({
               'border-r border-gray-200 last:border-r-0',
               preset === p.key
                 ? 'bg-brand-blue text-white'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
             )}
           >
             {p.label}

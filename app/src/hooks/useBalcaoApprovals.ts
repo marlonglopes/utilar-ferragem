@@ -138,7 +138,11 @@ export function useBalcaoApprovals(): UseBalcaoApprovalsResult {
   })
 
   const decide = useMutation({
-    mutationFn: async (input: { orderId: string; decision: 'approve' | 'reject'; note?: string }) => {
+    mutationFn: async (input: {
+      orderId: string
+      decision: 'approve' | 'reject'
+      note?: string
+    }) => {
       if (!live) return
       await orderPatchWithJWT(
         `/api/v1/balcao/orders/${input.orderId}/${input.decision}`,
@@ -173,10 +177,7 @@ export function useBalcaoApprovals(): UseBalcaoApprovalsResult {
   )
 
   const approve = useCallback((orderId: string) => run(orderId, 'approve'), [run])
-  const reject = useCallback(
-    (orderId: string, note: string) => run(orderId, 'reject', note),
-    [run]
-  )
+  const reject = useCallback((orderId: string, note: string) => run(orderId, 'reject', note), [run])
 
   const blockedReason = useCallback(
     (order: BalcaoApprovalOrder) =>

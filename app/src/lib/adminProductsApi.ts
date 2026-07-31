@@ -1,11 +1,6 @@
 import { useAuthStore } from '@/store/authStore'
 import { AdminApiError } from '@/lib/adminApi'
-import {
-  filterProducts,
-  paginate,
-  sortProducts,
-  totalPages,
-} from '@/lib/adminProductFormat'
+import { filterProducts, paginate, sortProducts, totalPages } from '@/lib/adminProductFormat'
 import {
   mockCreateProduct,
   mockDeleteImage,
@@ -110,7 +105,7 @@ async function failure(res: Response): Promise<never> {
       'Sua sessão expirou. Entre de novo para continuar.',
       401,
       'unauthorized',
-      body.details,
+      body.details
     )
   }
   if (res.status === 403) {
@@ -118,7 +113,7 @@ async function failure(res: Response): Promise<never> {
       'Sua conta não tem permissão de administrador.',
       403,
       'forbidden',
-      body.details,
+      body.details
     )
   }
   if (res.status === 404) {
@@ -126,7 +121,7 @@ async function failure(res: Response): Promise<never> {
       body.error ?? 'Produto não encontrado.',
       404,
       body.code ?? 'not_found',
-      body.details,
+      body.details
     )
   }
   if (res.status === 413) {
@@ -134,10 +129,15 @@ async function failure(res: Response): Promise<never> {
       'O servidor recusou o envio por tamanho. O teto do corpo é 64 MB — envie menos imagens por vez.',
       413,
       'too_large',
-      body.details,
+      body.details
     )
   }
-  throw new ProductAdminError(body.error ?? `HTTP ${res.status}`, res.status, body.code, body.details)
+  throw new ProductAdminError(
+    body.error ?? `HTTP ${res.status}`,
+    res.status,
+    body.code,
+    body.details
+  )
 }
 
 async function send<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -215,7 +215,7 @@ export async function fetchAdminProducts(q: AdminProductQuery): Promise<AdminPro
       page: q.page,
       pageSize: q.pageSize,
     })}`,
-    { method: 'GET' },
+    { method: 'GET' }
   )
   const rows = res.data ?? []
   // O servidor pagina; se ele já devolveu `meta`, respeitamos a contagem dele —
@@ -246,7 +246,7 @@ export async function fetchAdminProduct(id: string): Promise<AdminProductDetail>
  */
 export async function patchAdminProduct(
   id: string,
-  input: ProductInput,
+  input: ProductInput
 ): Promise<AdminProductDetail> {
   if (!isProductAdminEnabled) return mockPatchProduct(id, input)
   return send<AdminProductDetail>(`${BASE}/by-id/${encodeURIComponent(id)}`, {
@@ -288,14 +288,14 @@ const BULK_CONCURRENCY = 6
 
 export async function bulkSetStatus(
   items: Array<{ id: string; name: string }>,
-  status: ProductStatus,
+  status: ProductStatus
 ): Promise<BulkStatusResult> {
   const result: BulkStatusResult = { ok: [], failed: [] }
 
   for (let i = 0; i < items.length; i += BULK_CONCURRENCY) {
     const window = items.slice(i, i + BULK_CONCURRENCY)
     const settled = await Promise.allSettled(
-      window.map((it) => patchAdminProduct(it.id, { status })),
+      window.map((it) => patchAdminProduct(it.id, { status }))
     )
     settled.forEach((outcome, idx) => {
       const item = window[idx]
@@ -324,7 +324,7 @@ export async function fetchProductImages(productId: string): Promise<ProductImag
   if (!isProductAdminEnabled) return mockListImages(productId)
   const res = await send<{ data?: ProductImageRecord[] }>(
     `${BASE}/by-id/${encodeURIComponent(productId)}/images`,
-    { method: 'GET' },
+    { method: 'GET' }
   )
   return res.data ?? []
 }
@@ -342,8 +342,7 @@ function parseUploadFailure(err: unknown): ImageRejection[] | null {
   const { details } = err
   if (Array.isArray(details)) {
     return details.filter(
-      (d): d is ImageRejection =>
-        typeof d === 'object' && d !== null && 'filename' in (d as object),
+      (d): d is ImageRejection => typeof d === 'object' && d !== null && 'filename' in (d as object)
     )
   }
   return null
@@ -366,7 +365,7 @@ export async function uploadProductImages(
   productId: string,
   files: File[],
   signal?: AbortSignal,
-  alt?: string,
+  alt?: string
 ): Promise<ImageUploadResponse> {
   if (!isProductAdminEnabled) return mockUploadImages(productId, files)
 
@@ -377,7 +376,7 @@ export async function uploadProductImages(
   try {
     return await send<ImageUploadResponse>(
       `${BASE}/by-id/${encodeURIComponent(productId)}/images/upload`,
-      { method: 'POST', body: fd, signal },
+      { method: 'POST', body: fd, signal }
     )
   } catch (err) {
     const rejected = parseUploadFailure(err)
@@ -393,7 +392,7 @@ export async function uploadProductImages(
  */
 export async function reorderProductImages(
   productId: string,
-  order: string[],
+  order: string[]
 ): Promise<ProductImageRecord[]> {
   if (!isProductAdminEnabled) return mockReorderImages(productId, order)
   await send<unknown>(`${BASE}/by-id/${encodeURIComponent(productId)}/images/order`, {
@@ -406,7 +405,7 @@ export async function reorderProductImages(
 /** Promove a capa sem mandar a lista inteira. */
 export async function setProductImageCover(
   productId: string,
-  imageId: string,
+  imageId: string
 ): Promise<ProductImageRecord[]> {
   if (!isProductAdminEnabled) {
     const current = mockListImages(productId)
@@ -415,14 +414,14 @@ export async function setProductImageCover(
   }
   await send<unknown>(
     `${BASE}/by-id/${encodeURIComponent(productId)}/images/${encodeURIComponent(imageId)}/cover`,
-    { method: 'PUT' },
+    { method: 'PUT' }
   )
   return fetchProductImages(productId)
 }
 
 export async function deleteProductImage(
   productId: string,
-  imageId: string,
+  imageId: string
 ): Promise<ProductImageRecord[]> {
   if (!isProductAdminEnabled) {
     mockDeleteImage(productId, imageId)
@@ -430,7 +429,7 @@ export async function deleteProductImage(
   }
   await send<unknown>(
     `${BASE}/by-id/${encodeURIComponent(productId)}/images/${encodeURIComponent(imageId)}`,
-    { method: 'DELETE' },
+    { method: 'DELETE' }
   )
   return fetchProductImages(productId)
 }

@@ -64,8 +64,8 @@ export function RelatedProducts({
     : complement
       ? t('catalog:product.relatedComplement')
       : categoryLabel
-      ? t('catalog:product.relatedSameCategory', { category: categoryLabel })
-      : t('catalog:product.relatedSameCategoryGeneric')
+        ? t('catalog:product.relatedSameCategory', { category: categoryLabel })
+        : t('catalog:product.relatedSameCategoryGeneric')
 
   const hint = boughtTogether
     ? t('catalog:product.relatedBoughtTogetherHint')

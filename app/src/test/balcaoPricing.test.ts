@@ -22,7 +22,9 @@ describe('computeBalcaoPricing — totais', () => {
   it('soma subtotal, custo e contagem de itens', () => {
     const p = computeBalcaoPricing({
       items: [line({ quantity: 2 }), line({ unitPrice: 50, unitCost: 30, quantity: 3 })],
-      discountPct: 0, ceilingPct: 12 })
+      discountPct: 0,
+      ceilingPct: 12,
+    })
     expect(p.subtotal).toBe(350) // 100*2 + 50*3
     expect(p.cost).toBe(190) // 50*2 + 30*3
     expect(p.itemCount).toBe(5)
@@ -48,12 +50,20 @@ describe('computeBalcaoPricing — totais', () => {
   })
 
   it('limita desconto ao intervalo 0–100', () => {
-    expect(computeBalcaoPricing({ items: [line()], discountPct: -5, ceilingPct: 12 }).discountPct).toBe(0)
-    expect(computeBalcaoPricing({ items: [line()], discountPct: 250, ceilingPct: 12 }).discountPct).toBe(100)
+    expect(
+      computeBalcaoPricing({ items: [line()], discountPct: -5, ceilingPct: 12 }).discountPct
+    ).toBe(0)
+    expect(
+      computeBalcaoPricing({ items: [line()], discountPct: 250, ceilingPct: 12 }).discountPct
+    ).toBe(100)
   })
 
   it('ignora quantidade negativa', () => {
-    const p = computeBalcaoPricing({ items: [line({ quantity: -3 })], discountPct: 0, ceilingPct: 12 })
+    const p = computeBalcaoPricing({
+      items: [line({ quantity: -3 })],
+      discountPct: 0,
+      ceilingPct: 12,
+    })
     expect(p.subtotal).toBe(0)
     expect(p.itemCount).toBe(0)
   })
@@ -61,7 +71,9 @@ describe('computeBalcaoPricing — totais', () => {
   it('arredonda para centavos sem ruído de ponto flutuante', () => {
     const p = computeBalcaoPricing({
       items: [{ unitPrice: 10.1, unitCost: 5.05, quantity: 3 }],
-      discountPct: 7, ceilingPct: 12 })
+      discountPct: 7,
+      ceilingPct: 12,
+    })
     expect(p.subtotal).toBe(30.3)
     expect(p.discountAmount).toBe(2.12)
     expect(p.total).toBe(28.18)
@@ -80,7 +92,9 @@ describe('computeBalcaoPricing — margem', () => {
     // custo 90 de 100: margem base 10% — já abaixo do limite saudável.
     const p = computeBalcaoPricing({
       items: [line({ unitCost: 90 })],
-      discountPct: 0, ceilingPct: 12 })
+      discountPct: 0,
+      ceilingPct: 12,
+    })
     expect(p.marginPct).toBeLessThan(HEALTHY_MARGIN_PCT)
     expect(p.marginPct).toBeGreaterThan(0)
     expect(p.status).toBe('warning')
@@ -119,7 +133,11 @@ describe('computeBalcaoPricing — margem', () => {
   })
 
   it('custo zero rende 100% de margem', () => {
-    const p = computeBalcaoPricing({ items: [line({ unitCost: 0 })], discountPct: 0, ceilingPct: 12 })
+    const p = computeBalcaoPricing({
+      items: [line({ unitCost: 0 })],
+      discountPct: 0,
+      ceilingPct: 12,
+    })
     expect(p.marginPct).toBe(100)
     expect(p.status).toBe('healthy')
   })
@@ -208,9 +226,9 @@ describe('maxDiscountPctBeforeCost', () => {
     const items = [line({ unitCost: 70, quantity: 2 })]
     const max = maxDiscountPctBeforeCost(items)
     expect(computeBalcaoPricing({ items, discountPct: max, ceilingPct: 100 }).blocked).toBe(false)
-    expect(
-      computeBalcaoPricing({ items, discountPct: max + 1, ceilingPct: 100 }).blocked
-    ).toBe(true)
+    expect(computeBalcaoPricing({ items, discountPct: max + 1, ceilingPct: 100 }).blocked).toBe(
+      true
+    )
   })
 })
 

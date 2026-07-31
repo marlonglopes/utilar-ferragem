@@ -1,9 +1,4 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type UseQueryResult,
-} from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import {
   createCategory,
   deleteCategory,
@@ -31,7 +26,8 @@ export function useCreateCategory() {
 export function useUpdateCategory() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateCategoryInput }) => updateCategory(id, input),
+    mutationFn: ({ id, input }: { id: string; input: UpdateCategoryInput }) =>
+      updateCategory(id, input),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.all }),
   })
 }

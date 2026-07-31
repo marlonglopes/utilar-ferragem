@@ -77,7 +77,9 @@ describe('usePayment — mock mode', () => {
     })
     expect(result.current.result?.status).toBe('confirmed')
 
-    await act(async () => { await createPromise })
+    await act(async () => {
+      await createPromise
+    })
     vi.useRealTimers()
   }, 10000)
 
@@ -119,7 +121,9 @@ describe('usePayment — mock mode', () => {
     })
     expect(result.current.result?.status).toBe('pending')
 
-    await act(async () => { await createPromise })
+    await act(async () => {
+      await createPromise
+    })
     vi.useRealTimers()
   }, 10000)
 

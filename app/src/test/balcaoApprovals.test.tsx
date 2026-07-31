@@ -65,13 +65,14 @@ describe('blockedReasonFor — espelho de balcao.CanApproveOrder', () => {
     // O caso perigoso é justamente o gerente que vendeu: ele TEM poder de
     // aprovar, então uma checagem de cargo feita primeiro o deixaria passar.
     // Mesma ordem do backend.
-    expect(blockedReasonFor({ operatorId: 'u-gerente' }, { userId: 'u-gerente', canApprove: true }))
-      .toBe('self_approval')
+    expect(
+      blockedReasonFor({ operatorId: 'u-gerente' }, { userId: 'u-gerente', canApprove: true })
+    ).toBe('self_approval')
   })
 
   it('quem não tem cargo de aprovação é bloqueado por cargo', () => {
     expect(blockedReasonFor({ operatorId: 'u-outro' }, { userId: 'u-eu', canApprove: false })).toBe(
-      'not_approver',
+      'not_approver'
     )
   })
 
@@ -85,7 +86,7 @@ describe('BalcaoApprovalsPage', () => {
     render(<BalcaoApprovalsPage />, { wrapper })
 
     expect(
-      await screen.findByRole('heading', { name: /aprovações pendentes/i }),
+      await screen.findByRole('heading', { name: /aprovações pendentes/i })
     ).toBeInTheDocument()
     expect(await screen.findByText('BAL-0001')).toBeInTheDocument()
     expect(screen.getByText('BAL-0002')).toBeInTheDocument()
@@ -136,7 +137,7 @@ describe('BalcaoApprovalsPage', () => {
 
     await user.type(
       screen.getByLabelText(/motivo da recusa/i),
-      'Desconto acima da política para este cliente',
+      'Desconto acima da política para este cliente'
     )
     await user.click(screen.getByRole('button', { name: /confirmar recusa/i }))
 
@@ -152,7 +153,7 @@ describe('BalcaoApprovalsPage', () => {
     render(<BalcaoApprovalsPage />, { wrapper })
 
     expect(
-      await screen.findByRole('heading', { name: /fila de aprovação restrita/i }),
+      await screen.findByRole('heading', { name: /fila de aprovação restrita/i })
     ).toBeInTheDocument()
     expect(screen.queryByText('BAL-0001')).not.toBeInTheDocument()
   })

@@ -38,7 +38,7 @@ function renderPage(ui: ReactElement) {
       >
         {ui}
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   )
 }
 
@@ -63,7 +63,9 @@ function csvFile(content = CSV_FORNECEDOR, name = 'exemplo-fornecedor.csv'): Fil
 describe('Importação — os quatro passos', () => {
   it('passo 1: mostra a área de envio e o aviso de modo demonstração', () => {
     renderPage(<AdminImportPage />)
-    expect(screen.getByRole('heading', { level: 1, name: /importar produtos/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: /importar produtos/i })
+    ).toBeInTheDocument()
     expect(screen.getByText(/arraste a planilha aqui/i)).toBeInTheDocument()
     expect(screen.getByText(/\.csv, \.xlsx, \.json/i)).toBeInTheDocument()
     // Sem este aviso alguém acredita ter importado de verdade num ambiente sem backend.
@@ -77,7 +79,7 @@ describe('Importação — os quatro passos', () => {
     await user.upload(input, csvFile())
 
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: /conferir o mapeamento/i })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: /conferir o mapeamento/i })).toBeInTheDocument()
     )
     expect(screen.getByTestId('mapping-row-CODIGO')).toBeInTheDocument()
     expect(screen.getByTestId('mapping-row-VLR VENDA')).toBeInTheDocument()
@@ -116,7 +118,7 @@ describe('Importação — os quatro passos', () => {
 
     await user.click(screen.getByTestId('approve-button'))
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: /importação aplicada/i })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: /importação aplicada/i })).toBeInTheDocument()
     )
     expect(screen.getByTestId('result-created')).toBeInTheDocument()
     expect(screen.getByTestId('result-failed')).toBeInTheDocument()
@@ -126,7 +128,7 @@ describe('Importação — os quatro passos', () => {
   it('mostra o histórico de lotes, marcando o que foi conferido e nunca aplicado', async () => {
     renderPage(<AdminImportPage />)
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: /histórico de importações/i })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: /histórico de importações/i })).toBeInTheDocument()
     )
     expect(await screen.findByText('tabela-fornecedor-julho.csv')).toBeInTheDocument()
     // O estado mais traiçoeiro do histórico precisa ser nomeado, não inferido.
@@ -151,7 +153,9 @@ describe('Upload é entrada hostil', () => {
     expect(within(alert).getByText(/arquivo não aceito/i)).toBeInTheDocument()
     expect(within(alert).getByText(/catalogo\.pdf/)).toBeInTheDocument()
     // Recusou e NÃO avançou de passo.
-    expect(screen.queryByRole('heading', { name: /conferir o mapeamento/i })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: /conferir o mapeamento/i })
+    ).not.toBeInTheDocument()
   })
 
   it('valida extensão, arquivo vazio e tamanho antes de gastar rede', () => {
@@ -183,7 +187,9 @@ describe('Destaque de confiança baixa', () => {
     const user = userEvent.setup()
     const { container } = renderPage(<AdminImportPage />)
     await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, csvFile())
-    await waitFor(() => expect(screen.getByTestId('mapping-row-COD_ERP_ANTIGO')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByTestId('mapping-row-COD_ERP_ANTIGO')).toBeInTheDocument()
+    )
 
     const row = screen.getByTestId('mapping-row-COD_ERP_ANTIGO')
     expect(row).toHaveAttribute('data-confidence', 'unrecognized')
@@ -287,7 +293,15 @@ describe('Formatação dos contadores', () => {
       batchId: 'b2',
       status: 'validated',
       dryRun: true,
-      summary: { total: 4200, creates: 1234, updates: 2966, skips: 0, reviews: 0, rejects: 0, toArchive: 0 },
+      summary: {
+        total: 4200,
+        creates: 1234,
+        updates: 2966,
+        skips: 0,
+        reviews: 0,
+        rejects: 0,
+        toArchive: 0,
+      },
       rows: [],
     }
     render(<ImportDiff plan={plan} />)
@@ -318,7 +332,7 @@ describe('Commit parcial', () => {
           failed: 7,
           errors: [{ field: 'price', message: 'linha 91: violação de restrição' }],
         }}
-      />,
+      />
     )
     expect(screen.getByRole('heading', { name: /aplicada parcialmente/i })).toBeInTheDocument()
     expect(within(screen.getByTestId('result-created')).getByText('30')).toBeInTheDocument()

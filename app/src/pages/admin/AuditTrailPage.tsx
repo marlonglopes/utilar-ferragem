@@ -99,10 +99,10 @@ export default function AdminAuditTrailPage() {
           if (key !== 'pagina') sp.delete('pagina')
           return sp
         },
-        { replace: true },
+        { replace: true }
       )
     },
-    [setParams],
+    [setParams]
   )
 
   const chain = useAdminChainVerification(period)
@@ -119,7 +119,7 @@ export default function AdminAuditTrailPage() {
 
   /** Lista de atores do recorte carregado — filtro sem uma chamada extra. */
   const actors = Array.from(
-    new Map((events.data?.items ?? []).map((e) => [e.actorId, e.actorName])).entries(),
+    new Map((events.data?.items ?? []).map((e) => [e.actorId, e.actorName])).entries()
   )
 
   return (
@@ -140,7 +140,10 @@ export default function AdminAuditTrailPage() {
           >
             <div className="flex flex-wrap items-start gap-3">
               {chain.data.valid ? (
-                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
+                <ShieldCheck
+                  className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600"
+                  aria-hidden="true"
+                />
               ) : (
                 <ShieldX className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
               )}
@@ -181,10 +184,12 @@ export default function AdminAuditTrailPage() {
 
         {chain.isError && (
           <div className="rounded-lg border border-gray-200 border-l-4 border-l-amber-500 bg-white p-3">
-            <p className="text-sm font-semibold text-amber-900">Verificação de integridade indisponível</p>
+            <p className="text-sm font-semibold text-amber-900">
+              Verificação de integridade indisponível
+            </p>
             <p className="mt-0.5 text-xs text-gray-600">
-              Os eventos abaixo continuam sendo exibidos, mas sem confirmação de que a cadeia não foi
-              adulterada. {(chain.error as Error)?.message}
+              Os eventos abaixo continuam sendo exibidos, mas sem confirmação de que a cadeia não
+              foi adulterada. {(chain.error as Error)?.message}
             </p>
           </div>
         )}
@@ -194,7 +199,9 @@ export default function AdminAuditTrailPage() {
           description="Mais recentes primeiro. A numeração da cadeia é contígua — um salto indica remoção."
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <label className="sr-only" htmlFor="audit-actor">Usuário</label>
+              <label className="sr-only" htmlFor="audit-actor">
+                Usuário
+              </label>
               <select
                 id="audit-actor"
                 className={selectCls}
@@ -203,10 +210,14 @@ export default function AdminAuditTrailPage() {
               >
                 <option value="">Todos os usuários</option>
                 {actors.map(([id, name]) => (
-                  <option key={id} value={id}>{name}</option>
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
                 ))}
               </select>
-              <label className="sr-only" htmlFor="audit-entity">Entidade</label>
+              <label className="sr-only" htmlFor="audit-entity">
+                Entidade
+              </label>
               <select
                 id="audit-entity"
                 className={selectCls}
@@ -214,10 +225,14 @@ export default function AdminAuditTrailPage() {
                 onChange={(e) => setParam('entidade', e.target.value)}
               >
                 {ENTITY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
                 ))}
               </select>
-              <label className="sr-only" htmlFor="audit-action">Ação</label>
+              <label className="sr-only" htmlFor="audit-action">
+                Ação
+              </label>
               <select
                 id="audit-action"
                 className={selectCls}
@@ -225,7 +240,9 @@ export default function AdminAuditTrailPage() {
                 onChange={(e) => setParam('acao', e.target.value)}
               >
                 {ACTION_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -247,7 +264,9 @@ export default function AdminAuditTrailPage() {
                 <Table>
                   <thead>
                     <tr>
-                      <Th numeric className="w-16">#</Th>
+                      <Th numeric className="w-16">
+                        #
+                      </Th>
                       <Th>Quando</Th>
                       <Th>Quem</Th>
                       <Th>Ação</Th>
@@ -260,7 +279,9 @@ export default function AdminAuditTrailPage() {
                   <tbody>
                     {events.data.items.map((e) => (
                       <tr key={e.id} className="hover:bg-gray-50">
-                        <Td numeric className="font-mono text-xs text-gray-400">{e.sequence}</Td>
+                        <Td numeric className="font-mono text-xs text-gray-400">
+                          {e.sequence}
+                        </Td>
                         <Td className="whitespace-nowrap text-xs tabular-nums text-gray-600">
                           {formatDateTime(e.occurredAt)}
                         </Td>
@@ -268,15 +289,21 @@ export default function AdminAuditTrailPage() {
                           <span className="font-medium text-gray-900">{e.actorName}</span>
                           <span className="ml-1.5 text-[11px] text-gray-400">{e.actorRole}</span>
                         </Td>
-                        <Td><Chip>{ACTION_LABEL[e.action]}</Chip></Td>
+                        <Td>
+                          <Chip>{ACTION_LABEL[e.action]}</Chip>
+                        </Td>
                         <Td className="max-w-[16rem]">
                           <span className="block truncate text-gray-800">{e.entityLabel}</span>
                           <span className="block truncate font-mono text-[11px] text-gray-400">
                             {e.entityType} · {e.entityId}
                           </span>
                         </Td>
-                        <Td><ValueDiff event={e} /></Td>
-                        <Td className="whitespace-nowrap font-mono text-[11px] text-gray-500">{e.ip}</Td>
+                        <Td>
+                          <ValueDiff event={e} />
+                        </Td>
+                        <Td className="whitespace-nowrap font-mono text-[11px] text-gray-500">
+                          {e.ip}
+                        </Td>
                         <Td>
                           {/* O elo é o que torna a promessa verificável — mostrá-lo
                               é o que separa "confie em nós" de "confira você". */}

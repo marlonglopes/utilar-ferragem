@@ -20,11 +20,7 @@ import {
 } from '@/components/admin/primitives'
 import { CHART } from '@/components/admin/tokens'
 import { useAdminPeriod } from '@/hooks/useAdminPeriod'
-import {
-  useAdminAccounting,
-  useAdminLedger,
-  useAdminReconciliation,
-} from '@/hooks/useAdminQueries'
+import { useAdminAccounting, useAdminLedger, useAdminReconciliation } from '@/hooks/useAdminQueries'
 import { fetchAccountingExport } from '@/lib/adminApi'
 import {
   accountingImbalanceCents,
@@ -101,10 +97,10 @@ export default function AdminAccountingPage() {
           if (key !== 'pagina') sp.delete('pagina')
           return sp
         },
-        { replace: true },
+        { replace: true }
       )
     },
-    [setParams],
+    [setParams]
   )
 
   const summary = useAdminAccounting(period)
@@ -155,7 +151,7 @@ export default function AdminAccountingPage() {
 
   const netSeries = useMemo(
     () => (summary.data?.series ?? []).map((p) => p.valueCents),
-    [summary.data],
+    [summary.data]
   )
 
   return (
@@ -215,7 +211,11 @@ export default function AdminAccountingPage() {
 
           {/* Resultado */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <StatTile label="Receita bruta" value={formatCentsCompact(summary.data.grossCents)} series={netSeries} />
+            <StatTile
+              label="Receita bruta"
+              value={formatCentsCompact(summary.data.grossCents)}
+              series={netSeries}
+            />
             <StatTile
               label="Taxas do PSP"
               value={formatCentsCompact(summary.data.pspFeeCents)}
@@ -230,7 +230,8 @@ export default function AdminAccountingPage() {
               label="Chargebacks"
               value={formatCentsCompact(summary.data.chargebackCents)}
               severity={
-                summary.data.grossCents > 0 && summary.data.chargebackCents / summary.data.grossCents > 0.01
+                summary.data.grossCents > 0 &&
+                summary.data.chargebackCents / summary.data.grossCents > 0.01
                   ? 'warn'
                   : undefined
               }
@@ -271,22 +272,35 @@ export default function AdminAccountingPage() {
                         {methodLabel(m.method)}
                       </Td>
                       <Td numeric>{formatCount(m.transactions)}</Td>
-                      <Td numeric><Money cents={m.grossCents} /></Td>
-                      <Td numeric><Money cents={m.pspFeeCents} /></Td>
-                      <Td numeric className="text-gray-600">{formatPercent(m.effectiveFeeRate, 2)}</Td>
-                      <Td numeric><Money cents={m.refundCents} /></Td>
+                      <Td numeric>
+                        <Money cents={m.grossCents} />
+                      </Td>
+                      <Td numeric>
+                        <Money cents={m.pspFeeCents} />
+                      </Td>
+                      <Td numeric className="text-gray-600">
+                        {formatPercent(m.effectiveFeeRate, 2)}
+                      </Td>
+                      <Td numeric>
+                        <Money cents={m.refundCents} />
+                      </Td>
                       <Td numeric>
                         {/* `null` = a rota não recorta chargeback por método.
                             "—" diz "não sabemos"; um zero afirmaria "não houve". */}
                         {m.chargebackCents === null ? (
-                          <span className="text-gray-300" title="Não recortado por método nesta fonte">
+                          <span
+                            className="text-gray-300"
+                            title="Não recortado por método nesta fonte"
+                          >
                             —
                           </span>
                         ) : (
                           <Money cents={m.chargebackCents} />
                         )}
                       </Td>
-                      <Td numeric><Money cents={m.netCents} emphasis /></Td>
+                      <Td numeric>
+                        <Money cents={m.netCents} emphasis />
+                      </Td>
                     </tr>
                   ))}
                 </tbody>
@@ -296,17 +310,29 @@ export default function AdminAccountingPage() {
                     <Td numeric>
                       {formatCount(summary.data.byMethod.reduce((a, m) => a + m.transactions, 0))}
                     </Td>
-                    <Td numeric><Money cents={summary.data.grossCents} emphasis /></Td>
-                    <Td numeric><Money cents={summary.data.pspFeeCents} emphasis /></Td>
+                    <Td numeric>
+                      <Money cents={summary.data.grossCents} emphasis />
+                    </Td>
+                    <Td numeric>
+                      <Money cents={summary.data.pspFeeCents} emphasis />
+                    </Td>
                     <Td numeric className="text-gray-600">
                       {formatPercent(
-                        summary.data.grossCents > 0 ? summary.data.pspFeeCents / summary.data.grossCents : 0,
-                        2,
+                        summary.data.grossCents > 0
+                          ? summary.data.pspFeeCents / summary.data.grossCents
+                          : 0,
+                        2
                       )}
                     </Td>
-                    <Td numeric><Money cents={summary.data.refundCents} emphasis /></Td>
-                    <Td numeric><Money cents={summary.data.chargebackCents} emphasis /></Td>
-                    <Td numeric><Money cents={summary.data.netCents} emphasis /></Td>
+                    <Td numeric>
+                      <Money cents={summary.data.refundCents} emphasis />
+                    </Td>
+                    <Td numeric>
+                      <Money cents={summary.data.chargebackCents} emphasis />
+                    </Td>
+                    <Td numeric>
+                      <Money cents={summary.data.netCents} emphasis />
+                    </Td>
                   </tr>
                 </tfoot>
               </Table>
@@ -334,7 +360,10 @@ export default function AdminAccountingPage() {
           >
             {recon.isLoading && !recon.data && <LoadingRows rows={3} />}
             {recon.data && recon.data.items.length === 0 && (
-              <EmptyState title="Sem divergências" description="O livro bate com o extrato do PSP no período." />
+              <EmptyState
+                title="Sem divergências"
+                description="O livro bate com o extrato do PSP no período."
+              />
             )}
             {recon.data && recon.data.items.length > 0 && (
               <ScrollArea>
@@ -357,10 +386,16 @@ export default function AdminAccountingPage() {
                           {it.date.split('-').reverse().join('/')}
                         </Td>
                         <Td>
-                          <SeverityPill severity={it.severity}>{RECON_TYPE_LABEL[it.type]}</SeverityPill>
+                          <SeverityPill severity={it.severity}>
+                            {RECON_TYPE_LABEL[it.type]}
+                          </SeverityPill>
                         </Td>
-                        <Td numeric><Money cents={it.ledgerCents} /></Td>
-                        <Td numeric><Money cents={it.pspCents} /></Td>
+                        <Td numeric>
+                          <Money cents={it.ledgerCents} />
+                        </Td>
+                        <Td numeric>
+                          <Money cents={it.pspCents} />
+                        </Td>
                         <Td numeric>
                           <span
                             className={
@@ -390,7 +425,9 @@ export default function AdminAccountingPage() {
             description="Partida dobrada. Cada linha aponta para o pedido que a originou."
             actions={
               <div className="flex flex-wrap items-center gap-2">
-                <label className="sr-only" htmlFor="ledger-kind">Natureza</label>
+                <label className="sr-only" htmlFor="ledger-kind">
+                  Natureza
+                </label>
                 <select
                   id="ledger-kind"
                   className={selectCls}
@@ -398,10 +435,14 @@ export default function AdminAccountingPage() {
                   onChange={(e) => setParam('natureza', e.target.value)}
                 >
                   {KIND_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
                   ))}
                 </select>
-                <label className="sr-only" htmlFor="ledger-method">Método</label>
+                <label className="sr-only" htmlFor="ledger-method">
+                  Método
+                </label>
                 <select
                   id="ledger-method"
                   className={selectCls}
@@ -409,7 +450,9 @@ export default function AdminAccountingPage() {
                   onChange={(e) => setParam('metodo', e.target.value)}
                 >
                   {METHOD_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -417,7 +460,10 @@ export default function AdminAccountingPage() {
           >
             {ledger.isLoading && !ledger.data && <LoadingRows rows={8} />}
             {ledger.data && ledger.data.items.length === 0 && (
-              <EmptyState title="Nenhum lançamento" description="Nenhum lançamento bate com os filtros." />
+              <EmptyState
+                title="Nenhum lançamento"
+                description="Nenhum lançamento bate com os filtros."
+              />
             )}
             {ledger.data && ledger.data.items.length > 0 && (
               <>
@@ -445,13 +491,25 @@ export default function AdminAccountingPage() {
                             <span className="font-mono text-xs text-gray-500">{e.accountCode}</span>{' '}
                             <span className="text-gray-800">{e.account}</span>
                           </Td>
-                          <Td><Chip>{ledgerKindLabel(e.kind)}</Chip></Td>
-                          <Td className="whitespace-nowrap text-gray-600">{methodLabel(e.method)}</Td>
-                          <Td numeric>
-                            {e.debitCents > 0 ? <Money cents={e.debitCents} emphasis /> : <span className="text-gray-300">—</span>}
+                          <Td>
+                            <Chip>{ledgerKindLabel(e.kind)}</Chip>
+                          </Td>
+                          <Td className="whitespace-nowrap text-gray-600">
+                            {methodLabel(e.method)}
                           </Td>
                           <Td numeric>
-                            {e.creditCents > 0 ? <Money cents={e.creditCents} emphasis /> : <span className="text-gray-300">—</span>}
+                            {e.debitCents > 0 ? (
+                              <Money cents={e.debitCents} emphasis />
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </Td>
+                          <Td numeric>
+                            {e.creditCents > 0 ? (
+                              <Money cents={e.creditCents} emphasis />
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
                           </Td>
                           <Td className="whitespace-nowrap">
                             {e.orderNumber ? (
@@ -474,14 +532,21 @@ export default function AdminAccountingPage() {
                         <Td colSpan={4} className="text-xs text-gray-600">
                           Totais do filtro ({formatCount(ledger.data.total)} lançamentos)
                         </Td>
-                        <Td numeric><Money cents={ledger.data.totalDebitCents} emphasis /></Td>
-                        <Td numeric><Money cents={ledger.data.totalCreditCents} emphasis /></Td>
+                        <Td numeric>
+                          <Money cents={ledger.data.totalDebitCents} emphasis />
+                        </Td>
+                        <Td numeric>
+                          <Money cents={ledger.data.totalCreditCents} emphasis />
+                        </Td>
                         <Td colSpan={2}>
                           {ledger.data.totalDebitCents === ledger.data.totalCreditCents ? (
                             <SeverityPill severity="ok">Partida dobrada fecha</SeverityPill>
                           ) : (
                             <SeverityPill severity="critical">
-                              Diferença de {formatCents(ledger.data.totalDebitCents - ledger.data.totalCreditCents)}
+                              Diferença de{' '}
+                              {formatCents(
+                                ledger.data.totalDebitCents - ledger.data.totalCreditCents
+                              )}
                             </SeverityPill>
                           )}
                         </Td>
@@ -518,7 +583,13 @@ export default function AdminAccountingPage() {
           </Section>
 
           <p className="flex items-center gap-2 px-1 text-[11px] text-gray-500">
-            <Sparkline values={netSeries.slice(-20)} width={60} height={16} filled={false} showLast={false} />
+            <Sparkline
+              values={netSeries.slice(-20)}
+              width={60}
+              height={16}
+              filled={false}
+              showLast={false}
+            />
             Receita líquida diária no período. Valores em centavos no contrato da API; nenhum dado
             desta tela é gravado no navegador.
           </p>

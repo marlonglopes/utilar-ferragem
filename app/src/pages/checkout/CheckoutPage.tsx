@@ -67,12 +67,22 @@ function Stepper({ current }: { current: Step }) {
               >
                 {done ? <Check className="h-4 w-4" /> : idx + 1}
               </div>
-              <span className={cn('text-xs font-medium', active ? 'text-brand-orange' : 'text-gray-400')}>
+              <span
+                className={cn(
+                  'text-xs font-medium',
+                  active ? 'text-brand-orange' : 'text-gray-400'
+                )}
+              >
                 {t(`steps.${step}`)}
               </span>
             </div>
             {idx < STEPS.length - 1 && (
-              <div className={cn('w-16 h-0.5 mb-4 mx-1', idx < currentIdx ? 'bg-green-400' : 'bg-gray-200')} />
+              <div
+                className={cn(
+                  'w-16 h-0.5 mb-4 mx-1',
+                  idx < currentIdx ? 'bg-green-400' : 'bg-gray-200'
+                )}
+              />
             )}
           </div>
         )
@@ -83,11 +93,7 @@ function Stepper({ current }: { current: Step }) {
 
 // ─── Address step ─────────────────────────────────────────────────────────────
 
-function AddressStep({
-  onNext,
-}: {
-  onNext: (addr: Address) => void
-}) {
+function AddressStep({ onNext }: { onNext: (addr: Address) => void }) {
   const { t } = useTranslation('checkout')
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn())
   const savedAddresses = useAddressStore((s) => s.addresses)
@@ -104,7 +110,13 @@ function AddressStep({
   const [saveForLater, setSaveForLater] = useState(isLoggedIn)
 
   const [form, setForm] = useState<Address>({
-    cep: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '',
+    cep: '',
+    street: '',
+    number: '',
+    complement: '',
+    neighborhood: '',
+    city: '',
+    state: '',
   })
   const [label, setLabel] = useState('')
   const [cepLoading, setCepLoading] = useState(false)
@@ -129,7 +141,9 @@ function AddressStep({
           state: data.uf ?? prev.state,
         }))
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setCepLoading(false)
   }
 
@@ -186,7 +200,9 @@ function AddressStep({
                   )}
                 </p>
                 <p className="text-xs text-gray-600 mt-0.5">
-                  {addr.street}{addr.number ? `, ${addr.number}` : ''}{addr.complement ? ` - ${addr.complement}` : ''}
+                  {addr.street}
+                  {addr.number ? `, ${addr.number}` : ''}
+                  {addr.complement ? ` - ${addr.complement}` : ''}
                 </p>
                 <p className="text-xs text-gray-500">
                   {addr.neighborhood}, {addr.city} – {addr.state} · {addr.cep}
@@ -195,7 +211,10 @@ function AddressStep({
               {selectedId === addr.id && (
                 <button
                   type="button"
-                  onClick={(e) => { e.preventDefault(); pickSavedAddress(addr) }}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    pickSavedAddress(addr)
+                  }}
                   className="text-xs font-semibold text-brand-orange hover:text-brand-orange-dark whitespace-nowrap"
                 >
                   {t('address.useThis')}
@@ -304,7 +323,9 @@ function AddressStep({
               onChange={(e) => setSaveForLater(e.target.checked)}
               className="accent-brand-orange"
             />
-            {t('address.saveForLater', { defaultValue: 'Salvar este endereço para próximas compras' })}
+            {t('address.saveForLater', {
+              defaultValue: 'Salvar este endereço para próximas compras',
+            })}
           </label>
         </>
       )}
@@ -384,7 +405,10 @@ function ShippingStep({
 
       {error && (
         <div className="flex flex-col gap-2">
-          <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <p
+            role="alert"
+            className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+          >
             {error}
           </p>
           <button
@@ -494,9 +518,9 @@ function PaymentStep({
   const displayTotal = method === 'pix' ? pixTotal : total
 
   // Boleto requer CPF + nome (Stripe rejeita sem isso). Validação simples client-side.
-  const boletoReady = method !== 'boleto' || (
-    payerCPF.replace(/\D/g, '').length === 11 && payerName.trim().length >= 3
-  )
+  const boletoReady =
+    method !== 'boleto' ||
+    (payerCPF.replace(/\D/g, '').length === 11 && payerName.trim().length >= 3)
 
   // Garante que existe um order id real do backend antes de criar payment.
   // Usa cache (committedOrderId) — só cria UMA order por sessão de checkout.
@@ -517,9 +541,10 @@ function PaymentStep({
   async function handleConfirm() {
     const orderId = await getOrCreateOrderId()
     if (!orderId) return
-    const extras = method === 'boleto'
-      ? { payer_cpf: payerCPF.replace(/\D/g, ''), payer_name: payerName.trim() }
-      : undefined
+    const extras =
+      method === 'boleto'
+        ? { payer_cpf: payerCPF.replace(/\D/g, ''), payer_name: payerName.trim() }
+        : undefined
     const res = await createPayment(orderId, method, displayTotal, extras)
     if (!res) return
     // Pix/Boleto: navega imediatamente pra página de status (poll continua lá ou aqui).
@@ -530,7 +555,7 @@ function PaymentStep({
   }
 
   async function handleRegenerate() {
-    const orderId = committedOrderId ?? await getOrCreateOrderId()
+    const orderId = committedOrderId ?? (await getOrCreateOrderId())
     if (!orderId) return
     await createPayment(orderId, method, displayTotal)
   }
@@ -562,9 +587,8 @@ function PaymentStep({
   }, [method, displayTotal])
 
   // Result que efetivamente é desta sessão pra esse método (renderiza componente específico).
-  const activeResult = result && result.method === method && result.status !== 'creating'
-    ? result
-    : null
+  const activeResult =
+    result && result.method === method && result.status !== 'creating' ? result : null
   // Só considera "creating" se for do método atual — evita travar botão quando
   // user troca de método durante criação anterior em flight.
   const isCreating = result?.status === 'creating' && result?.method === method
@@ -574,10 +598,14 @@ function PaymentStep({
       <h2 className="text-lg font-bold text-gray-900">{t('payment.title')}</h2>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {error}
+        </p>
       )}
       {orderError && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{orderError}</p>
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {orderError}
+        </p>
       )}
 
       {/* Method selector — sempre visível pra permitir trocar de método */}
@@ -809,12 +837,12 @@ export default function CheckoutPage() {
       const order = await orderPostWithJWT<{ id: string; number: string }>(
         '/api/v1/orders',
         accessToken,
-        payload,
+        payload
       )
       setCommittedOrderNumber(order.number)
       return order.id
     },
-    [accessToken, address, items, shipping, shippingCost],
+    [accessToken, address, items, shipping, shippingCost]
   )
 
   const handlePaymentCreated = useCallback(
@@ -824,7 +852,7 @@ export default function CheckoutPage() {
         state: committedOrderNumber ? { orderNumber: committedOrderNumber } : undefined,
       })
     },
-    [clearCart, navigate, committedOrderNumber],
+    [clearCart, navigate, committedOrderNumber]
   )
 
   if (items.length === 0 && step === 'address') {
@@ -839,9 +867,7 @@ export default function CheckoutPage() {
         <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6">
           <Stepper current={step} />
 
-          {step === 'address' && (
-            <AddressStep onNext={handleAddressDone} />
-          )}
+          {step === 'address' && <AddressStep onNext={handleAddressDone} />}
           {step === 'shipping' && address && (
             <ShippingStep
               cep={address.cep}

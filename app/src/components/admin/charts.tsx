@@ -63,7 +63,9 @@ export function Sparkline({
       const y = pad + (1 - (v - min) / span) * (height - pad * 2)
       return [x, y] as const
     })
-    const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ')
+    const line = pts
+      .map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`)
+      .join(' ')
     const area = `${line} L${pts[pts.length - 1][0].toFixed(2)},${height} L${pts[0][0].toFixed(2)},${height} Z`
     return { pts, line, area, last: pts[pts.length - 1] }
   }, [values, width, height])
@@ -168,11 +170,7 @@ export function BarSeries({
         {/* gap-[2px]: o espaçador de superfície que separa barras vizinhas. */}
         <div className="absolute inset-0 flex items-end gap-[2px]">
           {points.map((p) => (
-            <div
-              key={p.label}
-              className="group relative min-w-0 flex-1"
-              style={{ height: '100%' }}
-            >
+            <div key={p.label} className="group relative min-w-0 flex-1" style={{ height: '100%' }}>
               <div
                 className="absolute bottom-0 w-full rounded-t transition-opacity group-hover:opacity-80"
                 style={{
@@ -246,7 +244,13 @@ export interface StackSegment {
  * cor da superfície (o "surface gap") — nunca por borda desenhada, que
  * adicionaria tinta que não é dado.
  */
-export function StackedBar({ segments, className }: { segments: StackSegment[]; className?: string }) {
+export function StackedBar({
+  segments,
+  className,
+}: {
+  segments: StackSegment[]
+  className?: string
+}) {
   const total = segments.reduce((a, s) => a + s.value, 0) || 1
   return (
     <div className={cn('flex h-3 w-full gap-[2px] overflow-hidden rounded-full', className)}>

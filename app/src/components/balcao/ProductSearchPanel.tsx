@@ -4,12 +4,7 @@ import { Skeleton } from '@/components/ui'
 import { formatCurrency } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { StockChip } from './StockChip'
-import {
-  useBalcaoProducts,
-  deriveSku,
-  deriveUnit,
-  type QueryKind,
-} from '@/hooks/useBalcaoProducts'
+import { useBalcaoProducts, deriveSku, deriveUnit, type QueryKind } from '@/hooks/useBalcaoProducts'
 import type { Product } from '@/types/product'
 
 const KIND_HINT: Record<QueryKind, string> = {
@@ -148,9 +143,7 @@ export const ProductSearchPanel = forwardRef<HTMLInputElement, ProductSearchPane
           ) : products.length === 0 ? (
             <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 text-center">
               <p className="font-semibold text-gray-700">Nenhum produto encontrado</p>
-              <p className="mt-1 text-sm text-gray-500">
-                Confira o SKU ou tente parte do nome.
-              </p>
+              <p className="mt-1 text-sm text-gray-500">Confira o SKU ou tente parte do nome.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">

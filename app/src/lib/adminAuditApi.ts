@@ -72,11 +72,61 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 const MOCK: AuditEntry[] = [
-  { id: '1', actorId: 'admin@utilar.com.br', actorRole: 'admin', action: 'product.update', entity: 'product', entityId: 'p-100', changes: { price: { old: 299.9, new: 249.9 }, stock: { old: 15, new: 8 } }, requestId: 'req-1', createdAt: '2026-07-30T10:12:00Z' },
-  { id: '2', actorId: 'admin@utilar.com.br', actorRole: 'admin', action: 'product.update', entity: 'product', entityId: 'p-101', changes: { status: { old: 'draft', new: 'published' } }, requestId: 'req-2', createdAt: '2026-07-30T09:40:00Z' },
-  { id: '3', actorId: 'ingestor', actorRole: 'admin', action: 'product.images.upload', entity: 'product', entityId: 'p-102', changes: {}, requestId: 'req-3', createdAt: '2026-07-29T18:02:00Z' },
-  { id: '4', actorId: 'admin@utilar.com.br', actorRole: 'admin', action: 'product.create', entity: 'product', entityId: 'p-103', changes: { status: { old: null, new: 'draft' } }, requestId: 'req-4', createdAt: '2026-07-29T14:20:00Z' },
-  { id: '5', actorId: 'admin@utilar.com.br', actorRole: 'admin', action: 'product.archive', entity: 'product', entityId: 'p-104', changes: { status: { old: 'published', new: 'archived' } }, requestId: 'req-5', createdAt: '2026-07-28T16:00:00Z' },
+  {
+    id: '1',
+    actorId: 'admin@utilar.com.br',
+    actorRole: 'admin',
+    action: 'product.update',
+    entity: 'product',
+    entityId: 'p-100',
+    changes: { price: { old: 299.9, new: 249.9 }, stock: { old: 15, new: 8 } },
+    requestId: 'req-1',
+    createdAt: '2026-07-30T10:12:00Z',
+  },
+  {
+    id: '2',
+    actorId: 'admin@utilar.com.br',
+    actorRole: 'admin',
+    action: 'product.update',
+    entity: 'product',
+    entityId: 'p-101',
+    changes: { status: { old: 'draft', new: 'published' } },
+    requestId: 'req-2',
+    createdAt: '2026-07-30T09:40:00Z',
+  },
+  {
+    id: '3',
+    actorId: 'ingestor',
+    actorRole: 'admin',
+    action: 'product.images.upload',
+    entity: 'product',
+    entityId: 'p-102',
+    changes: {},
+    requestId: 'req-3',
+    createdAt: '2026-07-29T18:02:00Z',
+  },
+  {
+    id: '4',
+    actorId: 'admin@utilar.com.br',
+    actorRole: 'admin',
+    action: 'product.create',
+    entity: 'product',
+    entityId: 'p-103',
+    changes: { status: { old: null, new: 'draft' } },
+    requestId: 'req-4',
+    createdAt: '2026-07-29T14:20:00Z',
+  },
+  {
+    id: '5',
+    actorId: 'admin@utilar.com.br',
+    actorRole: 'admin',
+    action: 'product.archive',
+    entity: 'product',
+    entityId: 'p-104',
+    changes: { status: { old: 'published', new: 'archived' } },
+    requestId: 'req-5',
+    createdAt: '2026-07-28T16:00:00Z',
+  },
 ]
 
 function mockAudit(q: AuditQuery): AuditPage {
@@ -90,6 +140,11 @@ function mockAudit(q: AuditQuery): AuditPage {
   const perPage = q.perPage ?? 30
   return {
     data: rows,
-    meta: { page: q.page ?? 1, per_page: perPage, total: rows.length, total_pages: Math.max(1, Math.ceil(rows.length / perPage)) },
+    meta: {
+      page: q.page ?? 1,
+      per_page: perPage,
+      total: rows.length,
+      total_pages: Math.max(1, Math.ceil(rows.length / perPage)),
+    },
   }
 }

@@ -19,7 +19,15 @@ interface FacetSidebarProps {
   showCategoryFacet?: boolean
 }
 
-function FacetGroup({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+function FacetGroup({
+  title,
+  defaultOpen = true,
+  children,
+}: {
+  title: string
+  defaultOpen?: boolean
+  children: React.ReactNode
+}) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -28,7 +36,9 @@ function FacetGroup({ title, defaultOpen = true, children }: { title: string; de
         className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
       >
         {title}
-        <ChevronDown className={cn('h-4 w-4 text-gray-400 transition-transform', open && 'rotate-180')} />
+        <ChevronDown
+          className={cn('h-4 w-4 text-gray-400 transition-transform', open && 'rotate-180')}
+        />
       </button>
       {open && <div className="px-4 pb-4 flex flex-col gap-2">{children}</div>}
     </div>
@@ -61,30 +71,32 @@ export function FacetSidebar({
     <aside className="flex flex-col gap-3">
       {/* Category */}
       {showCategoryFacet && (
-      <FacetGroup title={t('common:home.categories')}>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="radio"
-            name="category"
-            checked={!filters.category}
-            onChange={() => onChange({ category: '' })}
-            className="text-brand-orange focus:ring-brand-orange"
-          />
-          <span className="text-gray-700">{t('catalog:search.allCategories')}</span>
-        </label>
-        {TOP_LEVEL_CATEGORIES.map((cat) => (
-          <label key={cat.slug} className="flex items-center gap-2 text-sm cursor-pointer">
+        <FacetGroup title={t('common:home.categories')}>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="radio"
               name="category"
-              checked={filters.category === cat.slug}
-              onChange={() => onChange({ category: cat.slug })}
+              checked={!filters.category}
+              onChange={() => onChange({ category: '' })}
               className="text-brand-orange focus:ring-brand-orange"
             />
-            <span className="text-gray-700">{cat.icon} {t(cat.labelKey)}</span>
+            <span className="text-gray-700">{t('catalog:search.allCategories')}</span>
           </label>
-        ))}
-      </FacetGroup>
+          {TOP_LEVEL_CATEGORIES.map((cat) => (
+            <label key={cat.slug} className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name="category"
+                checked={filters.category === cat.slug}
+                onChange={() => onChange({ category: cat.slug })}
+                className="text-brand-orange focus:ring-brand-orange"
+              />
+              <span className="text-gray-700">
+                {cat.icon} {t(cat.labelKey)}
+              </span>
+            </label>
+          ))}
+        </FacetGroup>
       )}
 
       {/* Brand — o filtro aceita UMA marca por vez (o backend recebe `brand`

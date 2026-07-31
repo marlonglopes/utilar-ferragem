@@ -18,7 +18,11 @@ import {
   useDeleteCategory,
   useUpdateCategory,
 } from '@/hooks/useAdminCategories'
-import { isCategoriesAdminEnabled, isValidCategoryId, type Category } from '@/lib/adminCategoriesApi'
+import {
+  isCategoriesAdminEnabled,
+  isValidCategoryId,
+  type Category,
+} from '@/lib/adminCategoriesApi'
 
 const inputCls =
   'w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue'
@@ -50,7 +54,7 @@ export default function CategoriesPage() {
           setNewName('')
           setNewIcon('')
         },
-      },
+      }
     )
   }
 
@@ -64,17 +68,21 @@ export default function CategoriesPage() {
   const saveEdit = (id: string) => {
     updateCat.mutate(
       { id, input: { name: draft.name.trim() || undefined, icon: draft.icon.trim() || undefined } },
-      { onSuccess: () => setEditing(null) },
+      { onSuccess: () => setEditing(null) }
     )
   }
 
   const remove = (id: string) => {
-    if (!window.confirm(`Excluir a categoria "${id}"? Só é possível se não houver produtos nela.`)) return
+    if (!window.confirm(`Excluir a categoria "${id}"? Só é possível se não houver produtos nela.`))
+      return
     deleteCat.mutate(id)
   }
 
   return (
-    <AdminShell title="Categorias" description="Organize o catálogo: criar, renomear e excluir categorias.">
+    <AdminShell
+      title="Categorias"
+      description="Organize o catálogo: criar, renomear e excluir categorias."
+    >
       <div className="space-y-4">
         {!isCategoriesAdminEnabled && (
           <p className="rounded-md border border-gray-200 border-l-4 border-l-amber-500 bg-amber-50/60 p-3 text-xs leading-relaxed text-gray-700">
@@ -83,7 +91,10 @@ export default function CategoriesPage() {
           </p>
         )}
 
-        <Section title="Nova categoria" description="O identificador (slug) é fixo depois de criado — é a chave dos produtos.">
+        <Section
+          title="Nova categoria"
+          description="O identificador (slug) é fixo depois de criado — é a chave dos produtos."
+        >
           <div className="grid gap-3 p-3 sm:grid-cols-4 sm:p-4">
             <div>
               <label htmlFor="nc-id" className="block text-xs font-semibold text-gray-700">
@@ -126,7 +137,9 @@ export default function CategoriesPage() {
               <button
                 type="button"
                 onClick={create}
-                disabled={!newName.trim() || !isValidCategoryId(newId.toLowerCase()) || createCat.isPending}
+                disabled={
+                  !newName.trim() || !isValidCategoryId(newId.toLowerCase()) || createCat.isPending
+                }
                 className="inline-flex items-center gap-1.5 rounded-md bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-orange/90 disabled:opacity-50"
               >
                 <Plus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -144,7 +157,10 @@ export default function CategoriesPage() {
         <Section title="Categorias" description={`${cats.length} categoria(s)`}>
           {isError ? (
             <div className="p-4">
-              <ErrorState message={error instanceof Error ? error.message : 'Falha ao carregar'} onRetry={() => void refetch()} />
+              <ErrorState
+                message={error instanceof Error ? error.message : 'Falha ao carregar'}
+                onRetry={() => void refetch()}
+              />
             </div>
           ) : isLoading ? (
             <LoadingRows rows={6} />
@@ -192,7 +208,9 @@ export default function CategoriesPage() {
                             <span className="text-gray-800">{c.name}</span>
                           )}
                         </Td>
-                        <Td numeric className="tabular-nums text-gray-600">{c.sortOrder}</Td>
+                        <Td numeric className="tabular-nums text-gray-600">
+                          {c.sortOrder}
+                        </Td>
                         <Td className="text-right">
                           <div className="inline-flex items-center gap-1.5">
                             {isEditing ? (

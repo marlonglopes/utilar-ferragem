@@ -55,15 +55,18 @@ describe('BalcaoPage', () => {
     const user = userEvent.setup()
     render(<BalcaoPage />, { wrapper })
 
-    const tile = await screen.findByRole('button', { name: /furadeira de impacto bosch gsb 13 re/i })
+    const tile = await screen.findByRole('button', {
+      name: /furadeira de impacto bosch gsb 13 re/i,
+    })
     await user.click(tile)
 
     await waitFor(() => {
       expect(selectActiveComanda(useBalcaoStore.getState()).items).toHaveLength(1)
     })
 
-    const panel = screen.getByRole('heading', { name: /pedido do balcão/i }).closest('div')!
-      .parentElement!
+    const panel = screen
+      .getByRole('heading', { name: /pedido do balcão/i })
+      .closest('div')!.parentElement!
     expect(within(panel).getByText(/1 item/i)).toBeInTheDocument()
   })
 

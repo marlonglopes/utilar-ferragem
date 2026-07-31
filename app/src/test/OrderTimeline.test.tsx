@@ -79,7 +79,9 @@ describe('OrderTimeline — etapas e datas', () => {
   })
 
   it('etapa futura não mostra data nenhuma', () => {
-    renderTimeline(order({ status: 'paid', createdAt: '2026-04-10T13:00:00Z', paidAt: '2026-04-10T14:00:00Z' }))
+    renderTimeline(
+      order({ status: 'paid', createdAt: '2026-04-10T13:00:00Z', paidAt: '2026-04-10T14:00:00Z' })
+    )
 
     const entregue = screen.getAllByRole('listitem')[4]
     expect(within(entregue).getByText(/Entregue/)).toBeInTheDocument()
@@ -133,9 +135,9 @@ describe('OrderTimeline — acessibilidade', () => {
   it('marca a etapa atual com aria-current para o leitor de tela', () => {
     renderTimeline(order({ status: 'picking' }))
 
-    const current = screen.getAllByRole('listitem').filter(
-      (li) => li.getAttribute('aria-current') === 'step'
-    )
+    const current = screen
+      .getAllByRole('listitem')
+      .filter((li) => li.getAttribute('aria-current') === 'step')
     expect(current).toHaveLength(1)
     expect(within(current[0]).getByText(/Separando pedido/)).toBeInTheDocument()
   })

@@ -31,8 +31,20 @@ function Stars({ rating, count }: { rating: number; count: number }) {
 
 export function ProductCard({ product, className }: ProductCardProps) {
   const {
-    slug, name, icon, seller, price, originalPrice, rating, reviewCount,
-    cashbackAmount, badge, badgeLabel, installments, stock, images,
+    slug,
+    name,
+    icon,
+    seller,
+    price,
+    originalPrice,
+    rating,
+    reviewCount,
+    cashbackAmount,
+    badge,
+    badgeLabel,
+    installments,
+    stock,
+    images,
   } = product
 
   // A listagem devolve só a capa (ver loadThumbnails no catalog-service).
@@ -107,15 +119,15 @@ export function ProductCard({ product, className }: ProductCardProps) {
           {originalPrice && (
             <p className="text-xs text-gray-400 line-through">
               {formatCurrency(originalPrice)}
-              {discount && <span className="ml-1 text-brand-orange font-semibold">-{discount}%</span>}
+              {discount && (
+                <span className="ml-1 text-brand-orange font-semibold">-{discount}%</span>
+              )}
             </p>
           )}
           <p className="text-base font-bold text-gray-900">
             {formatCurrency(price)}
             {installments && (
-              <span className="ml-1 text-xs font-normal text-gray-500">
-                em {installments}x
-              </span>
+              <span className="ml-1 text-xs font-normal text-gray-500">em {installments}x</span>
             )}
           </p>
 
@@ -132,7 +144,12 @@ export function ProductCard({ product, className }: ProductCardProps) {
 
 export function ProductCardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden', className)}>
+    <div
+      className={cn(
+        'flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden',
+        className
+      )}
+    >
       <Skeleton className="h-40 w-full rounded-none" />
       <div className="p-3 flex flex-col gap-2">
         <Skeleton className="h-3 w-16" />

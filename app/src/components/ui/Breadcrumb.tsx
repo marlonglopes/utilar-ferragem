@@ -20,12 +20,12 @@ function Breadcrumb({ items, className }: BreadcrumbProps) {
           const isLast = i === items.length - 1
           return (
             <li key={i} className="flex items-center gap-1">
-              {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" aria-hidden />}
+              {i > 0 && (
+                <ChevronRight className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" aria-hidden />
+              )}
               {isLast || !item.href ? (
                 <span
-                  className={cn(
-                    isLast ? 'text-gray-900 font-medium' : 'text-gray-500'
-                  )}
+                  className={cn(isLast ? 'text-gray-900 font-medium' : 'text-gray-500')}
                   aria-current={isLast ? 'page' : undefined}
                 >
                   {item.label}

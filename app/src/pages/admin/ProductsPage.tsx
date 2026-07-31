@@ -13,11 +13,7 @@ import {
   Td,
   Th,
 } from '@/components/admin/primitives'
-import {
-  MarginCell,
-  Reais,
-  StatusPill,
-} from '@/components/admin/products/productPrimitives'
+import { MarginCell, Reais, StatusPill } from '@/components/admin/products/productPrimitives'
 import { cn } from '@/lib/cn'
 import { formatCount } from '@/lib/adminFormat'
 import { STATUS_LABEL } from '@/lib/adminProductFormat'
@@ -92,15 +88,15 @@ export default function AdminProductsPage() {
           if (resetPage) sp.delete('pagina')
           return sp
         },
-        { replace: true },
+        { replace: true }
       )
     },
-    [setParams],
+    [setParams]
   )
 
   const query: AdminProductQuery = useMemo(
     () => ({ q, category, status, sort, dir, page, pageSize: PAGE_SIZE }),
-    [q, category, status, sort, dir, page],
+    [q, category, status, sort, dir, page]
   )
 
   const { data, isLoading, isError, error, refetch } = useAdminProductList(query)
@@ -126,10 +122,10 @@ export default function AdminProductsPage() {
           }
           return sp
         },
-        { replace: true },
+        { replace: true }
       )
     },
-    [setParams],
+    [setParams]
   )
 
   const toggleOne = useCallback((id: string) => {
@@ -154,7 +150,7 @@ export default function AdminProductsPage() {
 
   const selectedRows: AdminProductRow[] = useMemo(
     () => rows.filter((r) => selected.has(r.id)),
-    [rows, selected],
+    [rows, selected]
   )
 
   const runBulk = useCallback(
@@ -162,10 +158,10 @@ export default function AdminProductsPage() {
       if (selectedRows.length === 0) return
       bulk.mutate(
         { items: selectedRows.map((r) => ({ id: r.id, name: r.name })), status: next },
-        { onSuccess: () => setSelected(new Set()) },
+        { onSuccess: () => setSelected(new Set()) }
       )
     },
-    [bulk, selectedRows],
+    [bulk, selectedRows]
   )
 
   const totalPagesCount = meta?.totalPages ?? 1
@@ -302,7 +298,7 @@ export default function AdminProductsPage() {
               'rounded-md border p-3 text-xs leading-relaxed',
               bulk.data.failed.length > 0
                 ? 'border-amber-200 border-l-4 border-l-amber-500 bg-amber-50/70 text-amber-900'
-                : 'border-green-200 border-l-4 border-l-green-600 bg-green-50 text-green-900',
+                : 'border-green-200 border-l-4 border-l-green-600 bg-green-50 text-green-900'
             )}
           >
             <p className="font-semibold">

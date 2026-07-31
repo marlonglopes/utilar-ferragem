@@ -1,10 +1,5 @@
 export type OrderStatus =
-  | 'pending_payment'
-  | 'paid'
-  | 'picking'
-  | 'shipped'
-  | 'delivered'
-  | 'cancelled'
+  'pending_payment' | 'paid' | 'picking' | 'shipped' | 'delivered' | 'cancelled'
 
 export type PaymentMethod = 'pix' | 'boleto' | 'card'
 

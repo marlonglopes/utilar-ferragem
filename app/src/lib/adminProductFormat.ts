@@ -211,7 +211,7 @@ export function formatBytes(bytes: number | null | undefined): string {
  */
 export function byteSavings(
   originalBytes: number | null | undefined,
-  bytes: number | null | undefined,
+  bytes: number | null | undefined
 ): number | null {
   if (!originalBytes || !bytes) return null
   if (!Number.isFinite(originalBytes) || !Number.isFinite(bytes)) return null
@@ -265,7 +265,7 @@ export function sortImages(images: ProductImageRecord[]): ProductImageRecord[] {
 export function moveImage(
   images: ProductImageRecord[],
   from: number,
-  to: number,
+  to: number
 ): ProductImageRecord[] {
   if (from === to) return images
   if (from < 0 || from >= images.length) return images
@@ -282,10 +282,7 @@ export function moveImage(
  * Preserva a ordem relativa das demais — promover a 4ª foto não pode
  * reembaralhar as outras três, que o dono já ordenou.
  */
-export function promoteCover(
-  images: ProductImageRecord[],
-  imageId: string,
-): ProductImageRecord[] {
+export function promoteCover(images: ProductImageRecord[], imageId: string): ProductImageRecord[] {
   const idx = images.findIndex((i) => i.id === imageId)
   if (idx <= 0) return images
   return moveImage(images, idx, 0)
@@ -321,7 +318,7 @@ export function filterProducts(
   rows: AdminProductRow[],
   q: string,
   category: string,
-  status: string,
+  status: string
 ): AdminProductRow[] {
   const needle = normalizeSearch(q)
   return rows.filter((r) => {
@@ -342,7 +339,7 @@ export function filterProducts(
 export function sortProducts(
   rows: AdminProductRow[],
   key: string,
-  dir: 'asc' | 'desc',
+  dir: 'asc' | 'desc'
 ): AdminProductRow[] {
   const mult = dir === 'desc' ? -1 : 1
   const value = (r: AdminProductRow): number | null => {

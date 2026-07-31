@@ -41,7 +41,10 @@ export default function ContactPage() {
       />
 
       <div className="container py-8">
-        <Breadcrumb items={[{ label: 'Início', href: '/' }, { label: 'Contato' }]} className="mb-6" />
+        <Breadcrumb
+          items={[{ label: 'Início', href: '/' }, { label: 'Contato' }]}
+          className="mb-6"
+        />
 
         <header className="mb-8 max-w-3xl">
           <h1 className="font-display font-black text-3xl text-gray-900">Fale com a gente</h1>
@@ -89,9 +92,15 @@ export default function ContactPage() {
           </h2>
           <p className="text-sm text-gray-600 leading-relaxed">
             Prazo de entrega, troca, devolução, formas de pagamento e status do pedido estão
-            explicados na <Link to="/ajuda" className="text-brand-orange underline">Central de
-            ajuda</Link>. Condições de compra e o direito de arrependimento de 7 dias estão nos{' '}
-            <Link to="/termos" className="text-brand-orange underline">Termos de Uso</Link>.
+            explicados na{' '}
+            <Link to="/ajuda" className="text-brand-orange underline">
+              Central de ajuda
+            </Link>
+            . Condições de compra e o direito de arrependimento de 7 dias estão nos{' '}
+            <Link to="/termos" className="text-brand-orange underline">
+              Termos de Uso
+            </Link>
+            .
           </p>
         </div>
       </div>

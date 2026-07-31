@@ -11,11 +11,7 @@ import { ChargeModal } from '@/components/balcao/ChargeModal'
 import { toBalcaoItem } from '@/hooks/useBalcaoProducts'
 import { useBalcaoCheckout, type BalcaoPaymentMethod } from '@/hooks/useBalcaoCheckout'
 import { useBalcaoOperator } from '@/hooks/useBalcaoOperator'
-import {
-  useBalcaoStore,
-  selectActiveComanda,
-  computeBalcaoPricing,
-} from '@/store/balcaoStore'
+import { useBalcaoStore, selectActiveComanda, computeBalcaoPricing } from '@/store/balcaoStore'
 import type { Product } from '@/types/product'
 
 /**

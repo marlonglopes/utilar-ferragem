@@ -70,7 +70,7 @@ export function ImportApprovePanel({
                 'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white transition-colors',
                 busy || nothingToDo
                   ? 'cursor-not-allowed bg-gray-300'
-                  : 'bg-emerald-600 hover:bg-emerald-700',
+                  : 'bg-emerald-600 hover:bg-emerald-700'
               )}
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
@@ -125,7 +125,7 @@ export function ImportResult({
       <div
         className={cn(
           'rounded-lg border border-gray-200 bg-white p-3 sm:p-4',
-          partial || error ? 'border-l-4 border-l-amber-500' : 'border-l-4 border-l-emerald-500',
+          partial || error ? 'border-l-4 border-l-amber-500' : 'border-l-4 border-l-emerald-500'
         )}
       >
         <div className="flex items-start gap-2">
@@ -185,14 +185,16 @@ export function ImportResult({
                 data-testid={`result-${r.key}`}
                 className={cn(
                   'rounded-lg border border-gray-200 bg-white p-3',
-                  alarming && 'border-l-4 border-l-red-600',
+                  alarming && 'border-l-4 border-l-red-600'
                 )}
               >
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{r.label}</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  {r.label}
+                </p>
                 <p
                   className={cn(
                     'mt-0.5 font-display text-2xl font-bold tabular-nums leading-tight',
-                    value === 0 ? 'text-gray-300' : alarming ? 'text-red-700' : 'text-gray-900',
+                    value === 0 ? 'text-gray-300' : alarming ? 'text-red-700' : 'text-gray-900'
                   )}
                 >
                   {formatCount(value)}

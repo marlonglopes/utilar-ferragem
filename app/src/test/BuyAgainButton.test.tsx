@@ -129,7 +129,12 @@ describe('BuyAgainButton — item indisponível', () => {
     expect(within(dialog).getByText(/1 fora de linha/i)).toBeInTheDocument()
 
     // Só os disponíveis entraram no carrinho.
-    expect(useCartStore.getState().items.map((i) => i.productId).sort()).toEqual(['31', '9'])
+    expect(
+      useCartStore
+        .getState()
+        .items.map((i) => i.productId)
+        .sort()
+    ).toEqual(['31', '9'])
   }, 8000)
 
   it('lista o resultado item a item, nomeando o que não entrou', async () => {
@@ -163,7 +168,9 @@ describe('BuyAgainButton — item indisponível', () => {
     const dialog = await clickBuyAgain()
 
     expect(within(dialog).getByText(/nenhum item deste pedido/i)).toBeInTheDocument()
-    expect(within(dialog).queryByRole('link', { name: /ir para o carrinho/i })).not.toBeInTheDocument()
+    expect(
+      within(dialog).queryByRole('link', { name: /ir para o carrinho/i })
+    ).not.toBeInTheDocument()
     expect(useCartStore.getState().items).toHaveLength(0)
   }, 8000)
 
@@ -203,7 +210,11 @@ describe('BuyAgainButton — interação', () => {
     render(
       <I18nextProvider i18n={i18n}>
         <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <div onClick={() => { navegou = true }}>
+          <div
+            onClick={() => {
+              navegou = true
+            }}
+          >
             <BuyAgainButton order={order([item({ productId: '9' })])} variant="compact" />
           </div>
         </MemoryRouter>

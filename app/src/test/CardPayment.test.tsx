@@ -11,7 +11,9 @@ import type { PaymentResult } from '@/hooks/usePayment'
 const confirmPaymentMock = vi.fn()
 
 vi.mock('@stripe/react-stripe-js', () => ({
-  Elements: ({ children }: { children: React.ReactNode }) => <div data-testid="elements-provider">{children}</div>,
+  Elements: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="elements-provider">{children}</div>
+  ),
   PaymentElement: ({ onReady }: { onReady?: () => void }) => {
     // Simula o "ready" event imediatamente
     queueMicrotask(() => onReady?.())
@@ -44,7 +46,7 @@ function renderWith(props: Partial<Parameters<typeof CardPayment>[0]> & { result
         onFailed={onFailed}
         onSimulateConfirm={props.onSimulateConfirm}
       />
-    </I18nextProvider>,
+    </I18nextProvider>
   )
   return { ...utils, onConfirmed, onFailed }
 }

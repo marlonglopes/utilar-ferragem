@@ -124,57 +124,54 @@ export function useImportWizard(): ImportWizard {
     setError(null)
   }, [])
 
-  const selectFile = useCallback(
-    (next: File | null) => {
-      // Qualquer plano anterior morre AQUI. É a invariante central da tela.
-      setPlan(null)
-      setCommit(null)
-      setCommittedBatchId(null)
-      setError(null)
-      setSuggestion(null)
-      setMapping({})
-      if (!next) {
-        setFile(null)
-        setFileError(null)
-        return
-      }
-      const invalid = validateImportFile(next)
-      if (invalid) {
-        setFile(null)
-        setFileError(invalid)
-        return
-      }
-      setFile(next)
+  const selectFile = useCallback((next: File | null) => {
+    // Qualquer plano anterior morre AQUI. É a invariante central da tela.
+    setPlan(null)
+    setCommit(null)
+    setCommittedBatchId(null)
+    setError(null)
+    setSuggestion(null)
+    setMapping({})
+    if (!next) {
+      setFile(null)
       setFileError(null)
-      setProfileName((prev) => prev || next.name.replace(/\.[^.]+$/, ''))
+      return
+    }
+    const invalid = validateImportFile(next)
+    if (invalid) {
+      setFile(null)
+      setFileError(invalid)
+      return
+    }
+    setFile(next)
+    setFileError(null)
+    setProfileName((prev) => prev || next.name.replace(/\.[^.]+$/, ''))
 
-      abortRef.current?.abort()
-      const ctl = new AbortController()
-      abortRef.current = ctl
-      setBusy('suggest')
-      void suggestMapping(next, ctl.signal)
-        .then((res) => {
-          if (ctl.signal.aborted) return
-          setSuggestion(res)
-          const draft: MappingDraft = {}
-          for (const c of res.columns) {
-            // Coluna não reconhecida entra como IGNORADA, nunca chutada num
-            // campo. Palpite silencioso é como "OBS VENDEDOR" vira descrição.
-            draft[c.column] = c.recognized && c.field ? { field: c.field, parser: c.parser } : null
-          }
-          setMapping(draft)
-          setStep('mapping')
-        })
-        .catch((err: unknown) => {
-          if (ctl.signal.aborted) return
-          setError(messageOf(err))
-        })
-        .finally(() => {
-          if (!ctl.signal.aborted) setBusy(null)
-        })
-    },
-    [],
-  )
+    abortRef.current?.abort()
+    const ctl = new AbortController()
+    abortRef.current = ctl
+    setBusy('suggest')
+    void suggestMapping(next, ctl.signal)
+      .then((res) => {
+        if (ctl.signal.aborted) return
+        setSuggestion(res)
+        const draft: MappingDraft = {}
+        for (const c of res.columns) {
+          // Coluna não reconhecida entra como IGNORADA, nunca chutada num
+          // campo. Palpite silencioso é como "OBS VENDEDOR" vira descrição.
+          draft[c.column] = c.recognized && c.field ? { field: c.field, parser: c.parser } : null
+        }
+        setMapping(draft)
+        setStep('mapping')
+      })
+      .catch((err: unknown) => {
+        if (ctl.signal.aborted) return
+        setError(messageOf(err))
+      })
+      .finally(() => {
+        if (!ctl.signal.aborted) setBusy(null)
+      })
+  }, [])
 
   const setColumnField = useCallback((column: string, field: ImportField | '') => {
     setPlan(null)
@@ -233,8 +230,13 @@ export function useImportWizard(): ImportWizard {
         options: { archiveMissing: false },
       })
       const result = await createBatch(
-        { file, profileId: profile.id, supplierId: supplierId.trim() || undefined, mapping: confirmedColumns },
-        ctl.signal,
+        {
+          file,
+          profileId: profile.id,
+          supplierId: supplierId.trim() || undefined,
+          mapping: confirmedColumns,
+        },
+        ctl.signal
       )
       if (ctl.signal.aborted) return
       setPlan(result)
@@ -275,7 +277,7 @@ export function useImportWizard(): ImportWizard {
       if (target === 'mapping' && suggestion) setStep('mapping')
       if (target === 'review' && plan) setStep('review')
     },
-    [reset, suggestion, plan],
+    [reset, suggestion, plan]
   )
 
   return {

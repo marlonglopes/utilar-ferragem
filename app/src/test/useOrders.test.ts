@@ -26,7 +26,9 @@ describe('useOrders — mock mode', () => {
 
   it('returns orders with correct fields', async () => {
     const { result } = renderHook(() => useOrders())
-    await act(async () => { await new Promise((r) => setTimeout(r, 400)) })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 400))
+    })
 
     const first = result.current.orders[0]
     expect(first).toHaveProperty('id')
@@ -37,7 +39,9 @@ describe('useOrders — mock mode', () => {
 
   it('cancelOrder transitions status to cancelled', async () => {
     const { result } = renderHook(() => useOrders())
-    await act(async () => { await new Promise((r) => setTimeout(r, 400)) })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 400))
+    })
 
     const pending = result.current.orders.find((o) => o.status === 'pending_payment')
     expect(pending).toBeDefined()
@@ -54,7 +58,9 @@ describe('useOrders — mock mode', () => {
 
   it('cancelOrder on non-existent id still returns true in mock mode', async () => {
     const { result } = renderHook(() => useOrders())
-    await act(async () => { await new Promise((r) => setTimeout(r, 400)) })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 400))
+    })
 
     let ok = false
     await act(async () => {
@@ -65,7 +71,9 @@ describe('useOrders — mock mode', () => {
 
   it('provides a refresh function that re-fetches', async () => {
     const { result } = renderHook(() => useOrders())
-    await act(async () => { await new Promise((r) => setTimeout(r, 400)) })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 400))
+    })
 
     expect(typeof result.current.refresh).toBe('function')
     await act(async () => {
@@ -81,7 +89,9 @@ describe('useOrder — mock mode', () => {
     const target = MOCK_ORDERS[0]
     const { result } = renderHook(() => useOrder(target.id))
 
-    await act(async () => { await new Promise((r) => setTimeout(r, 300)) })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 300))
+    })
 
     expect(result.current.order?.id).toBe(target.id)
     expect(result.current.loading).toBe(false)
@@ -90,7 +100,9 @@ describe('useOrder — mock mode', () => {
 
   it('returns null for unknown id', async () => {
     const { result } = renderHook(() => useOrder('does-not-exist'))
-    await act(async () => { await new Promise((r) => setTimeout(r, 300)) })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 300))
+    })
 
     expect(result.current.order).toBeNull()
     expect(result.current.loading).toBe(false)

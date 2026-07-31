@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  orderGet, orderPatch,
-  orderGetWithJWT, orderPatchWithJWT,
-  isOrderEnabled, isAuthEnabled,
+  orderGet,
+  orderPatch,
+  orderGetWithJWT,
+  orderPatchWithJWT,
+  isOrderEnabled,
+  isAuthEnabled,
 } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 import { MOCK_ORDERS, type Order, type OrderStatus } from '@/lib/mockOrders'
@@ -75,27 +78,35 @@ export function useOrders(): UseOrdersReturn {
     fetchOrders()
   }, [fetchOrders])
 
-  const cancelOrder = useCallback(async (id: string): Promise<boolean> => {
-    try {
-      if (!isOrderEnabled) {
-        await new Promise((r) => setTimeout(r, 400))
-        setOrders((prev) =>
-          prev.map((o) =>
-            o.id === id
-              ? { ...o, status: 'cancelled' as OrderStatus, cancelledAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-              : o
+  const cancelOrder = useCallback(
+    async (id: string): Promise<boolean> => {
+      try {
+        if (!isOrderEnabled) {
+          await new Promise((r) => setTimeout(r, 400))
+          setOrders((prev) =>
+            prev.map((o) =>
+              o.id === id
+                ? {
+                    ...o,
+                    status: 'cancelled' as OrderStatus,
+                    cancelledAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                  }
+                : o
+            )
           )
-        )
+          return true
+        }
+        if (!userId) return false
+        await patchCancel(id, userId, token)
+        await fetchOrders()
         return true
+      } catch {
+        return false
       }
-      if (!userId) return false
-      await patchCancel(id, userId, token)
-      await fetchOrders()
-      return true
-    } catch {
-      return false
-    }
-  }, [userId, token, fetchOrders])
+    },
+    [userId, token, fetchOrders]
+  )
 
   return { orders, loading, error, refresh: fetchOrders, cancelOrder }
 }

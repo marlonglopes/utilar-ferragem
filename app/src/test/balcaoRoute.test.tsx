@@ -65,7 +65,7 @@ function renderWith(Guard: typeof BalcaoRouteType) {
         />
         <Route path="/entrar" element={<div>tela de login</div>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   )
 }
 

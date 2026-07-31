@@ -13,9 +13,7 @@ test.describe('Conta do cliente', () => {
     await login(page)
     await page.goto(routes.account)
     // Ao menos uma seção de conta é visível.
-    await expect(
-      page.getByText(/perfil|endere[çc]o|pedido|meus dados|sair/i).first(),
-    ).toBeVisible()
+    await expect(page.getByText(/perfil|endere[çc]o|pedido|meus dados|sair/i).first()).toBeVisible()
   })
 
   test('logout volta pro estado deslogado', async ({ page }) => {

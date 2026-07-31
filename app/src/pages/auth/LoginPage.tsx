@@ -14,7 +14,6 @@ interface LoginResponse {
   user: { id: string; email: string; name: string; role: AuthUser['role']; emailVerified?: boolean }
 }
 
-
 export default function LoginPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -37,7 +36,13 @@ export default function LoginPage() {
     try {
       if (!isAuthEnabled) {
         // Stub: accept any credentials em dev (sem auth-service).
-        setUser({ id: 'mock-1', email, name: email.split('@')[0], role: 'customer', token: 'mock-token' })
+        setUser({
+          id: 'mock-1',
+          email,
+          name: email.split('@')[0],
+          role: 'customer',
+          token: 'mock-token',
+        })
         mergeCarts([])
         navigate(nextPath, { replace: true })
         return
@@ -73,7 +78,6 @@ export default function LoginPage() {
       }
       navigate(nextPath, { replace: true })
       return
-
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.invalidCredentials'))
     } finally {
@@ -109,9 +113,7 @@ export default function LoginPage() {
             leftIcon={<Lock className="h-4 w-4" />}
           />
 
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
 
           <div className="flex justify-end">
             <Link to="/esqueci-senha" className="text-sm text-brand-orange hover:underline">

@@ -19,7 +19,12 @@ import {
   useUpdateOperator,
   useUsersSearch,
 } from '@/hooks/useAdminStaff'
-import { isStaffAdminEnabled, LEVEL_LABEL, type Operator, type StoreLevel } from '@/lib/adminStaffApi'
+import {
+  isStaffAdminEnabled,
+  LEVEL_LABEL,
+  type Operator,
+  type StoreLevel,
+} from '@/lib/adminStaffApi'
 
 const LEVELS: StoreLevel[] = ['operator', 'supervisor', 'manager']
 const inputCls =
@@ -61,7 +66,7 @@ export default function StaffPage() {
           setQ('')
           setCeiling('')
         },
-      },
+      }
     )
   }
 
@@ -86,7 +91,7 @@ export default function StaffPage() {
           active: draft.active,
         },
       },
-      { onSuccess: () => setEditing(null) },
+      { onSuccess: () => setEditing(null) }
     )
   }
 
@@ -185,7 +190,9 @@ export default function StaffPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700">Teto desc. (%)</label>
+                  <label className="block text-xs font-semibold text-gray-700">
+                    Teto desc. (%)
+                  </label>
                   <input
                     type="number"
                     min={0}
@@ -266,7 +273,9 @@ export default function StaffPage() {
                           {isEditing ? (
                             <select
                               value={draft.level}
-                              onChange={(e) => setDraft((d) => ({ ...d, level: e.target.value as StoreLevel }))}
+                              onChange={(e) =>
+                                setDraft((d) => ({ ...d, level: e.target.value as StoreLevel }))
+                              }
                               className={cn(inputCls, 'py-1')}
                             >
                               {LEVELS.map((l) => (
@@ -290,7 +299,9 @@ export default function StaffPage() {
                               className={cn(inputCls, 'w-20 py-1 text-right')}
                             />
                           ) : (
-                            <span className="tabular-nums text-gray-700">{op.discountCeilingPct}</span>
+                            <span className="tabular-nums text-gray-700">
+                              {op.discountCeilingPct}
+                            </span>
                           )}
                         </Td>
                         <Td>
@@ -298,13 +309,17 @@ export default function StaffPage() {
                             <input
                               type="checkbox"
                               checked={draft.active}
-                              onChange={(e) => setDraft((d) => ({ ...d, active: e.target.checked }))}
+                              onChange={(e) =>
+                                setDraft((d) => ({ ...d, active: e.target.checked }))
+                              }
                             />
                           ) : (
                             <span
                               className={cn(
                                 'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold',
-                                op.active ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600',
+                                op.active
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-gray-200 text-gray-600'
                               )}
                             >
                               {op.active ? 'Ativo' : 'Inativo'}

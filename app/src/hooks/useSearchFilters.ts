@@ -27,27 +27,38 @@ export function useSearchFilters() {
     page: Number(params.get('pagina') ?? '1'),
   }
 
-  const set = useCallback((updates: Partial<SearchFilters>) => {
-    setParams((prev) => {
-      const next = new URLSearchParams(prev)
-      const map: Record<keyof SearchFilters, string> = {
-        q: 'q', category: 'categoria', brand: 'marca',
-        priceMin: 'preco_min', priceMax: 'preco_max',
-        inStock: 'em_estoque', sort: 'ordem', page: 'pagina',
-      }
-      for (const [k, v] of Object.entries(updates) as [keyof SearchFilters, unknown][]) {
-        const key = map[k]
-        if (v === '' || v === false || v === 'relevance' || v === 1) {
-          next.delete(key)
-        } else {
-          next.set(key, String(v))
-        }
-      }
-      next.delete('pagina')
-      if ('page' in updates) next.set('pagina', String(updates.page))
-      return next
-    }, { replace: true })
-  }, [setParams])
+  const set = useCallback(
+    (updates: Partial<SearchFilters>) => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          const map: Record<keyof SearchFilters, string> = {
+            q: 'q',
+            category: 'categoria',
+            brand: 'marca',
+            priceMin: 'preco_min',
+            priceMax: 'preco_max',
+            inStock: 'em_estoque',
+            sort: 'ordem',
+            page: 'pagina',
+          }
+          for (const [k, v] of Object.entries(updates) as [keyof SearchFilters, unknown][]) {
+            const key = map[k]
+            if (v === '' || v === false || v === 'relevance' || v === 1) {
+              next.delete(key)
+            } else {
+              next.set(key, String(v))
+            }
+          }
+          next.delete('pagina')
+          if ('page' in updates) next.set('pagina', String(updates.page))
+          return next
+        },
+        { replace: true }
+      )
+    },
+    [setParams]
+  )
 
   const toProductsParams = (): ProductsParams => ({
     q: filters.q || undefined,
@@ -70,11 +81,14 @@ export function useSearchFilters() {
   ].filter(Boolean).length
 
   const clearAll = useCallback(() => {
-    setParams((prev) => {
-      const next = new URLSearchParams()
-      if (prev.get('q')) next.set('q', prev.get('q')!)
-      return next
-    }, { replace: true })
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams()
+        if (prev.get('q')) next.set('q', prev.get('q')!)
+        return next
+      },
+      { replace: true }
+    )
   }, [setParams])
 
   return { filters, set, toProductsParams, activeCount, clearAll }

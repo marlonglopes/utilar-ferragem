@@ -72,13 +72,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
-  const toast = useCallback(
-    (message: string, variant: ToastVariant = 'info', duration = 4000) => {
-      const id = Math.random().toString(36).slice(2)
-      setToasts((prev) => [...prev, { id, message, variant, duration }])
-    },
-    []
-  )
+  const toast = useCallback((message: string, variant: ToastVariant = 'info', duration = 4000) => {
+    const id = Math.random().toString(36).slice(2)
+    setToasts((prev) => [...prev, { id, message, variant, duration }])
+  }, [])
 
   return (
     <ToastContext.Provider value={{ toast }}>
@@ -98,4 +95,3 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     </ToastContext.Provider>
   )
 }
-

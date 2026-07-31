@@ -20,7 +20,7 @@ export function StatusPill({ status }: { status: ProductStatus }) {
     <span
       className={cn(
         'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
-        STATUS_PILL[status],
+        STATUS_PILL[status]
       )}
     >
       {STATUS_LABEL[status]}
@@ -37,7 +37,13 @@ export function StatusPill({ status }: { status: ProductStatus }) {
  * painel usando o mesmo `formatCents` de sempre e evita duas formatações de
  * dinheiro convivendo na mesma tela.
  */
-export function Reais({ value, className }: { value: number | null | undefined; className?: string }) {
+export function Reais({
+  value,
+  className,
+}: {
+  value: number | null | undefined
+  className?: string
+}) {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return <span className={cn('text-gray-400', className)}>—</span>
   }
@@ -59,7 +65,10 @@ export function MarginCell({ price, cost }: { price: number; cost: number | null
   const m = readMargin(price, cost)
   if (m.unknown || m.fraction === null) {
     return (
-      <span className="text-gray-400" title="Custo não cadastrado — a margem não pode ser calculada">
+      <span
+        className="text-gray-400"
+        title="Custo não cadastrado — a margem não pode ser calculada"
+      >
         —
       </span>
     )
@@ -68,7 +77,7 @@ export function MarginCell({ price, cost }: { price: number; cost: number | null
     <span
       className={cn(
         'inline-flex items-center gap-1 font-semibold tabular-nums',
-        m.severity ? SEVERITY_TEXT[m.severity] : 'text-gray-700',
+        m.severity ? SEVERITY_TEXT[m.severity] : 'text-gray-700'
       )}
     >
       {m.belowCost && <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
@@ -107,7 +116,7 @@ export function MarginReadout({
       className={cn(
         'rounded-lg border p-3',
         m.belowCost ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50',
-        className,
+        className
       )}
       // `polite` e não `assertive`: o valor muda a cada tecla digitada no campo
       // de preço, e um leitor de tela interrompendo a digitação a cada dígito
@@ -125,7 +134,7 @@ export function MarginReadout({
                 ? 'text-gray-400'
                 : m.severity
                   ? SEVERITY_TEXT[m.severity]
-                  : 'text-gray-900',
+                  : 'text-gray-900'
             )}
             data-testid="margin-value"
           >
@@ -133,7 +142,9 @@ export function MarginReadout({
           </p>
         </div>
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Lucro por unidade</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            Lucro por unidade
+          </p>
           <p className="font-display text-lg font-semibold text-gray-900">
             <Reais value={m.profit} />
           </p>
@@ -203,10 +214,7 @@ export function Field({
   )
 }
 
-export function TextInput({
-  className,
-  ...rest
-}: React.InputHTMLAttributes<HTMLInputElement>) {
+export function TextInput({ className, ...rest }: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn(CONTROL, className)} {...rest} />
 }
 
@@ -240,10 +248,7 @@ export function Select({
  * automático do navegador guarda valores digitados em formulário, e custo de
  * fornecedor não pode ficar no perfil do Chrome da máquina da loja.
  */
-export function MoneyInput({
-  className,
-  ...rest
-}: React.InputHTMLAttributes<HTMLInputElement>) {
+export function MoneyInput({ className, ...rest }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       type="number"

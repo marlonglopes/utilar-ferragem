@@ -105,7 +105,10 @@ describe('cartStore.mergeCarts', () => {
   it('merges quantity for existing items without exceeding stock', () => {
     useCartStore.getState().addItem(makeItem({ productId: 'prod-1', quantity: 4, stock: 10 }))
     const incoming: CartItem[] = [
-      { ...makeItem({ productId: 'prod-1', quantity: 3, stock: 10 }), addedAt: new Date().toISOString() },
+      {
+        ...makeItem({ productId: 'prod-1', quantity: 3, stock: 10 }),
+        addedAt: new Date().toISOString(),
+      },
     ]
     useCartStore.getState().mergeCarts(incoming)
     expect(useCartStore.getState().items[0].quantity).toBe(7)
@@ -114,7 +117,10 @@ describe('cartStore.mergeCarts', () => {
   it('does not exceed stock on merge', () => {
     useCartStore.getState().addItem(makeItem({ productId: 'prod-1', quantity: 8, stock: 10 }))
     const incoming: CartItem[] = [
-      { ...makeItem({ productId: 'prod-1', quantity: 5, stock: 10 }), addedAt: new Date().toISOString() },
+      {
+        ...makeItem({ productId: 'prod-1', quantity: 5, stock: 10 }),
+        addedAt: new Date().toISOString(),
+      },
     ]
     useCartStore.getState().mergeCarts(incoming)
     expect(useCartStore.getState().items[0].quantity).toBe(10)

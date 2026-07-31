@@ -1,13 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import {
-  RotateCcw,
-  Loader2,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  TrendingUp,
-} from 'lucide-react'
+import { RotateCcw, Loader2, CheckCircle2, AlertTriangle, XCircle, TrendingUp } from 'lucide-react'
 import { useBuyAgain } from '@/hooks/useBuyAgain'
 import { formatCurrency } from '@/lib/format'
 import { cn } from '@/lib/cn'
@@ -48,11 +41,7 @@ function ResultDialog({ result, onClose }: { result: BuyAgainResult; onClose: ()
 
   const allGood = !result.partial && !result.nothingAdded && problems.length === 0
   const Icon = result.nothingAdded ? XCircle : allGood ? CheckCircle2 : AlertTriangle
-  const tone = result.nothingAdded
-    ? 'text-red-500'
-    : allGood
-      ? 'text-green-500'
-      : 'text-amber-500'
+  const tone = result.nothingAdded ? 'text-red-500' : allGood ? 'text-green-500' : 'text-amber-500'
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
@@ -99,9 +88,7 @@ function ResultDialog({ result, onClose }: { result: BuyAgainResult; onClose: ()
             {result.lines.map((line) => (
               <li key={line.productId} className="flex items-start justify-between gap-3 text-sm">
                 <span className="min-w-0 flex-1 text-gray-700">{line.name}</span>
-                <span
-                  className={cn('flex-shrink-0 text-right text-xs', outcomeTone(line.outcome))}
-                >
+                <span className={cn('flex-shrink-0 text-right text-xs', outcomeTone(line.outcome))}>
                   <span className="block font-medium">
                     {t(`orders.outcome.${line.outcome}`, {
                       added: line.addedQty,
@@ -182,7 +169,10 @@ export function BuyAgainButton({ order, variant = 'full', className }: BuyAgainB
         )}
       >
         {loading ? (
-          <Loader2 className={cn('animate-spin', variant === 'full' ? 'h-4 w-4' : 'h-3.5 w-3.5')} aria-hidden />
+          <Loader2
+            className={cn('animate-spin', variant === 'full' ? 'h-4 w-4' : 'h-3.5 w-3.5')}
+            aria-hidden
+          />
         ) : (
           <RotateCcw className={variant === 'full' ? 'h-4 w-4' : 'h-3.5 w-3.5'} aria-hidden />
         )}

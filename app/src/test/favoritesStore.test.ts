@@ -49,9 +49,9 @@ describe('favoritesStore — básico', () => {
   })
 
   it('guarda um snapshot do produto, não só o id', () => {
-    useFavoritesStore.getState().add(
-      product({ images: [{ url: 'https://x/cimento.jpg', alt: 'Cimento' }] })
-    )
+    useFavoritesStore
+      .getState()
+      .add(product({ images: [{ url: 'https://x/cimento.jpg', alt: 'Cimento' }] }))
     const fav = useFavoritesStore.getState().items[0]
 
     // A página /favoritos precisa renderizar sem consultar o catálogo item a
@@ -157,7 +157,10 @@ describe('favoritesStore — merge com o servidor (caminho pronto pro backend)',
       },
     ])
 
-    const ids = useFavoritesStore.getState().items.map((i) => i.productId).sort()
+    const ids = useFavoritesStore
+      .getState()
+      .items.map((i) => i.productId)
+      .sort()
     expect(ids).toEqual(['do-servidor', 'local-so-daqui'])
   })
 

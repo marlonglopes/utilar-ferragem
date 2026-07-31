@@ -19,7 +19,7 @@ describe('adminOrdersApi (modo mock)', () => {
   it('filtra pelo grupo "em aberto" (active)', async () => {
     const p = await fetchAdminOrders({ status: 'active' })
     expect(
-      p.data.every((o) => ['pending_payment', 'paid', 'picking', 'shipped'].includes(o.status)),
+      p.data.every((o) => ['pending_payment', 'paid', 'picking', 'shipped'].includes(o.status))
     ).toBe(true)
   })
 
@@ -30,8 +30,6 @@ describe('adminOrdersApi (modo mock)', () => {
 
   it('busca pelo nome do cliente', async () => {
     const p = await fetchAdminOrders({ q: 'ana' })
-    expect(
-      p.data.some((o) => (o.customerName ?? '').toLowerCase().includes('ana')),
-    ).toBe(true)
+    expect(p.data.some((o) => (o.customerName ?? '').toLowerCase().includes('ana'))).toBe(true)
   })
 })

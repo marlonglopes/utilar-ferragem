@@ -64,8 +64,7 @@ export function NegotiationBlock({
   } = pricing
 
   // Barra nunca fica negativa visualmente: margem < 0 vira barra cheia vermelha.
-  const fillPct =
-    marginPct < 0 ? 100 : Math.min(100, (marginPct / MARGIN_BAR_SCALE) * 100)
+  const fillPct = marginPct < 0 ? 100 : Math.min(100, (marginPct / MARGIN_BAR_SCALE) * 100)
 
   return (
     <div className="border-t border-gray-200 bg-gray-50 p-4">
@@ -77,7 +76,10 @@ export function NegotiationBlock({
         <span className="text-xs font-medium text-gray-500">
           Seu teto: {ceilingPct}%
           {!ceilingFromBackend && (
-            <span className="ml-1 font-semibold text-amber-700" title="Teto não confirmado pelo servidor">
+            <span
+              className="ml-1 font-semibold text-amber-700"
+              title="Teto não confirmado pelo servidor"
+            >
               (não confirmado)
             </span>
           )}

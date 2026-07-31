@@ -39,7 +39,8 @@ export function formatReais(value: number | null | undefined): string {
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return '—'
   if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} KB`
+  if (bytes < 1024 * 1024)
+    return `${(bytes / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} KB`
   return `${(bytes / (1024 * 1024)).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`
 }
 
@@ -99,7 +100,7 @@ export const CONFIDENCE_HINT: Record<ImportConfidence, string> = {
  */
 export function confidenceSeverity(
   confidence: ImportConfidence | undefined,
-  recognized: boolean,
+  recognized: boolean
 ): Severity | null {
   if (!recognized) return 'warn'
   if (confidence === 'low') return 'critical'
@@ -108,7 +109,10 @@ export function confidenceSeverity(
 }
 
 /** Precisa de conferência explícita do operador antes de virar perfil. */
-export function needsHumanReview(confidence: ImportConfidence | undefined, recognized: boolean): boolean {
+export function needsHumanReview(
+  confidence: ImportConfidence | undefined,
+  recognized: boolean
+): boolean {
   return recognized && confidence !== 'exact'
 }
 
@@ -139,7 +143,7 @@ export function priceChangeSeverity(
   oldPrice?: number,
   newPrice?: number,
   maxDropPct = DEFAULT_MAX_DROP_PCT,
-  maxRisePct = DEFAULT_MAX_RISE_PCT,
+  maxRisePct = DEFAULT_MAX_RISE_PCT
 ): Severity | null {
   const pct = priceChangePct(oldPrice, newPrice)
   if (pct === null || pct === 0) return null
@@ -233,7 +237,13 @@ export function summaryCounters(summary: ImportSummary): CounterTile[] {
 
 /** Linhas que exigem decisão primeiro. `skip` num lote de 4.000 é ruído. */
 export function sortRowsByAttention(rows: ImportRow[]): ImportRow[] {
-  const weight: Record<ImportAction, number> = { reject: 0, review: 1, update: 2, create: 3, skip: 4 }
+  const weight: Record<ImportAction, number> = {
+    reject: 0,
+    review: 1,
+    update: 2,
+    create: 3,
+    skip: 4,
+  }
   return [...rows].sort((a, b) => {
     const d = (weight[a.action] ?? 9) - (weight[b.action] ?? 9)
     return d !== 0 ? d : a.rowNumber - b.rowNumber

@@ -78,7 +78,12 @@ const STORES = [
 const METHODS: PaymentMethod[] = ['pix', 'credit_card', 'boleto', 'debit_card', 'cash']
 
 /** Série diária com sazonalidade de ferragem: sábado forte, domingo fechado. */
-function buildSeries(days: number, seed: number, baseCents: number, base = new Date()): TimePoint[] {
+function buildSeries(
+  days: number,
+  seed: number,
+  baseCents: number,
+  base = new Date()
+): TimePoint[] {
   const rng = makeRng(seed)
   const out: TimePoint[] = []
   for (let i = days - 1; i >= 0; i--) {
@@ -264,7 +269,12 @@ export function mockAccountingSummary(period: AdminPeriod, base = new Date()): A
     const g = Math.round(grossCents * METHOD_SHARE[method])
     const fee = Math.round(g * FEE_RATE[method])
     // Estorno e chargeback só existem onde há disputa: cartão e boleto.
-    const refund = method === 'credit_card' ? Math.round(g * 0.021) : method === 'pix' ? Math.round(g * 0.004) : 0
+    const refund =
+      method === 'credit_card'
+        ? Math.round(g * 0.021)
+        : method === 'pix'
+          ? Math.round(g * 0.004)
+          : 0
     const chargeback = method === 'credit_card' ? Math.round(g * 0.0068) : 0
     return {
       method,
@@ -336,7 +346,7 @@ export function mockLedgerEntries(count = 140, base = new Date()): LedgerEntry[]
     const amount = Math.round((80 + rng() * 9200) * 100)
     const dayOffset = Math.floor(rng() * 30)
     const occurredAt = new Date(
-      daysAgo(dayOffset, base).setHours(8 + Math.floor(rng() * 11), Math.floor(rng() * 60), 0, 0),
+      daysAgo(dayOffset, base).setHours(8 + Math.floor(rng() * 11), Math.floor(rng() * 60), 0, 0)
     ).toISOString()
     const orderNumber = `2026-${8000 + Math.floor(rng() * 900)}`
     const acct = ACCOUNTS[kind]
@@ -377,11 +387,7 @@ export function mockLedgerEntries(count = 140, base = new Date()): LedgerEntry[]
   return out.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
 }
 
-export function mockLedgerPage(
-  all: LedgerEntry[],
-  page: number,
-  pageSize: number,
-): LedgerPage {
+export function mockLedgerPage(all: LedgerEntry[], page: number, pageSize: number): LedgerPage {
   const start = (page - 1) * pageSize
   return {
     items: all.slice(start, start + pageSize),
@@ -460,7 +466,7 @@ export function mockReconciliation(period: AdminPeriod, base = new Date()): Reco
 
 export function mockSellerPerformance(
   period: AdminPeriod,
-  base = new Date(),
+  base = new Date()
 ): SellerPerformanceReport {
   const rng = makeRng(777)
   const sellers: SellerPerformance[] = SELLERS.map((s, i) => {
@@ -544,7 +550,7 @@ const AUDIT_TEMPLATES: Array<{
     action: 'refund_issued',
     entityType: 'pagamento',
     make: (rng) => ({
-      label: `Estorno R$ ${((50 + rng() * 1800)).toFixed(2).replace('.', ',')}`,
+      label: `Estorno R$ ${(50 + rng() * 1800).toFixed(2).replace('.', ',')}`,
       id: `pay-${Math.floor(rng() * 1e6).toString(36)}`,
       from: 'capturado',
       to: 'estornado',
@@ -582,7 +588,9 @@ function fakeHash(input: string): string {
     h1 = Math.imul(h1 ^ input.charCodeAt(i), 0x01000193) >>> 0
     h2 = Math.imul(h2 + input.charCodeAt(i) * (i + 1), 0x85ebca6b) >>> 0
   }
-  return (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0')).repeat(4).slice(0, 64)
+  return (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0'))
+    .repeat(4)
+    .slice(0, 64)
 }
 
 export function mockAuditEvents(count = 180, base = new Date()): AuditEvent[] {
@@ -594,8 +602,9 @@ export function mockAuditEvents(count = 180, base = new Date()): AuditEvent[] {
     const actor = ACTORS[Math.floor(rng() * ACTORS.length)]
     const detail = tpl.make(rng)
     const sequence = i + 1
-    const occurredAt = new Date(base.getTime() - i * (37 * 60_000 + Math.floor(rng() * 900_000)))
-      .toISOString()
+    const occurredAt = new Date(
+      base.getTime() - i * (37 * 60_000 + Math.floor(rng() * 900_000))
+    ).toISOString()
     const payload = `${sequence}|${occurredAt}|${actor.id}|${tpl.action}|${detail.id}|${prevHash ?? ''}`
     const hash = fakeHash(payload)
     out.push({

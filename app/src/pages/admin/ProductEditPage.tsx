@@ -39,7 +39,7 @@ export default function AdminProductEditPage() {
         onSuccess: () => setSaved(true),
       })
     },
-    [save],
+    [save]
   )
 
   return (

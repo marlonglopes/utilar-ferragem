@@ -29,7 +29,7 @@ export default function AdminProductNewPage() {
         onSuccess: (product) => navigate(`/admin/produtos/${product.id}`),
       })
     },
-    [create, navigate],
+    [create, navigate]
   )
 
   return (

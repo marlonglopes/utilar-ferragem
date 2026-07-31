@@ -54,9 +54,7 @@ export default function PixPayment({ result, onRegenerate, onSimulateConfirm }: 
       <div className="flex flex-col items-center gap-4 py-10 text-center">
         <CheckCircle2 className="h-16 w-16 text-green-500" />
         <p className="text-xl font-bold text-gray-900">{t('pix.confirmed')}</p>
-        {result.expiresAt && (
-          <p className="text-sm text-green-600">{t('pix.discount')}</p>
-        )}
+        {result.expiresAt && <p className="text-sm text-green-600">{t('pix.discount')}</p>}
       </div>
     )
   }
@@ -103,7 +101,11 @@ export default function PixPayment({ result, onRegenerate, onSimulateConfirm }: 
             {result.expiresAt && (
               <p className="text-sm text-gray-500">
                 {t('pix.expiresIn')}{' '}
-                <span className={remaining < 60 ? 'text-red-500 font-bold' : 'font-semibold text-gray-900'}>
+                <span
+                  className={
+                    remaining < 60 ? 'text-red-500 font-bold' : 'font-semibold text-gray-900'
+                  }
+                >
                   {formatted}
                 </span>
               </p>

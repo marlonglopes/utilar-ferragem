@@ -70,7 +70,7 @@ describe('describeOrderError — classifica por code, não por texto', () => {
         code: 'insufficient_stock',
         details: { productId: 'p-1', requested: 5, available: 3 },
       },
-      409,
+      409
     )
     const msg = describeOrderError(err)
     // "tem 3, você pediu 5" é acionável no balcão; "não deu" não é.
@@ -83,29 +83,30 @@ describe('describeOrderError — classifica por code, não por texto', () => {
     // O ponto da mudança: a classificação não depende mais do texto.
     const err = new ApiError(
       { error: 'not enough stock', code: 'insufficient_stock', details: { available: 0 } },
-      409,
+      409
     )
     expect(describeOrderError(err)).toMatch(/estoque insuficiente/i)
   })
 
   it('traduz sessão expirada e falta de permissão', () => {
-    expect(describeOrderError(new ApiError({ error: 'x', code: 'unauthorized' }, 401)))
-      .toMatch(/sessão expirada/i)
-    expect(describeOrderError(new ApiError({ error: 'x', code: 'forbidden' }, 403)))
-      .toMatch(/permissão/i)
+    expect(describeOrderError(new ApiError({ error: 'x', code: 'unauthorized' }, 401))).toMatch(
+      /sessão expirada/i
+    )
+    expect(describeOrderError(new ApiError({ error: 'x', code: 'forbidden' }, 403))).toMatch(
+      /permissão/i
+    )
   })
 
   it('mantém o texto quando é validação — o campo diz mais que o código', () => {
     const err = new ApiError(
       { error: 'Telefone do cliente é obrigatório', code: 'validation_error' },
-      400,
+      400
     )
     expect(describeOrderError(err)).toMatch(/telefone/i)
   })
 
   it('ainda trata erro de rede, que não tem envelope', () => {
-    expect(describeOrderError(new TypeError('Failed to fetch')))
-      .toMatch(/sem conexão/i)
+    expect(describeOrderError(new TypeError('Failed to fetch'))).toMatch(/sem conexão/i)
   })
 
   it('nunca devolve string vazia', () => {

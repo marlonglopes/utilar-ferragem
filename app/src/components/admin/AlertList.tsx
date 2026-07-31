@@ -42,7 +42,9 @@ export function AlertList({ alerts, compact = false }: { alerts: Alert[]; compac
             />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-gray-900">{a.title}</p>
-              {!compact && <p className="mt-0.5 text-xs leading-relaxed text-gray-600">{a.detail}</p>}
+              {!compact && (
+                <p className="mt-0.5 text-xs leading-relaxed text-gray-600">{a.detail}</p>
+              )}
               <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-gray-500">
                 <span className="font-mono">{a.source}</span>
                 <span aria-hidden="true">·</span>
@@ -54,7 +56,10 @@ export function AlertList({ alerts, compact = false }: { alerts: Alert[]; compac
         return (
           <li key={a.id}>
             {a.href ? (
-              <Link to={a.href} className="block hover:bg-gray-50 focus:bg-gray-50 focus:outline-none">
+              <Link
+                to={a.href}
+                className="block hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+              >
                 {body}
               </Link>
             ) : (

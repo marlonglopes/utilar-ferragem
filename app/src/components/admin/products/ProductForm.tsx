@@ -25,7 +25,22 @@ import type { AdminProductDetail, ProductInput, ProductStatus } from '@/lib/admi
  */
 
 /** Unidades aceitas pelo `normalizeUnit` do catalog-service. */
-const UNITS = ['un', 'cx', 'pc', 'kg', 'g', 'm', 'm2', 'm3', 'l', 'ml', 'sc', 'rl', 'pt', 'br'] as const
+const UNITS = [
+  'un',
+  'cx',
+  'pc',
+  'kg',
+  'g',
+  'm',
+  'm2',
+  'm3',
+  'l',
+  'ml',
+  'sc',
+  'rl',
+  'pt',
+  'br',
+] as const
 
 /** Origem da mercadoria — tabela do CST, usada na NF-e. */
 const ORIGENS: Array<{ value: number; label: string }> = [
@@ -107,7 +122,7 @@ export function ProductForm({
       if (belowCost && !acceptedLoss) return
       onSubmit(product ? diffInput(initial, form) : diffInput(toForm({}), form))
     },
-    [validate, belowCost, acceptedLoss, onSubmit, product, initial, form],
+    [validate, belowCost, acceptedLoss, onSubmit, product, initial, form]
   )
 
   const blocked = belowCost && !acceptedLoss
@@ -128,9 +143,18 @@ export function ProductForm({
       )}
 
       {/* ------------------------------------------------ Identificação */}
-      <Section title="Identificação" description="O que o cliente vê e o que o estoque usa para achar o item.">
+      <Section
+        title="Identificação"
+        description="O que o cliente vê e o que o estoque usa para achar o item."
+      >
         <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-3">
-          <Field label="Nome" htmlFor="p-name" required error={errors.name} className="sm:col-span-2 lg:col-span-3">
+          <Field
+            label="Nome"
+            htmlFor="p-name"
+            required
+            error={errors.name}
+            className="sm:col-span-2 lg:col-span-3"
+          >
             <TextInput
               id="p-name"
               value={form.name}
@@ -143,7 +167,12 @@ export function ProductForm({
             <TextInput id="p-sku" value={form.sku} onChange={(e) => set('sku', e.target.value)} />
           </Field>
 
-          <Field label="Código de barras" htmlFor="p-barcode" hint="EAN-8/13. A pontuação é removida." error={errors.barcode}>
+          <Field
+            label="Código de barras"
+            htmlFor="p-barcode"
+            hint="EAN-8/13. A pontuação é removida."
+            error={errors.barcode}
+          >
             <TextInput
               id="p-barcode"
               inputMode="numeric"
@@ -153,11 +182,19 @@ export function ProductForm({
           </Field>
 
           <Field label="Marca" htmlFor="p-brand">
-            <TextInput id="p-brand" value={form.brand} onChange={(e) => set('brand', e.target.value)} />
+            <TextInput
+              id="p-brand"
+              value={form.brand}
+              onChange={(e) => set('brand', e.target.value)}
+            />
           </Field>
 
           <Field label="Categoria" htmlFor="p-category" required error={errors.category}>
-            <Select id="p-category" value={form.category} onChange={(e) => set('category', e.target.value)}>
+            <Select
+              id="p-category"
+              value={form.category}
+              onChange={(e) => set('category', e.target.value)}
+            >
               {TOP_LEVEL_CATEGORIES.map((c) => (
                 <option key={c.slug} value={c.slug}>
                   {c.slug}
@@ -166,7 +203,11 @@ export function ProductForm({
             </Select>
           </Field>
 
-          <Field label="Situação" htmlFor="p-status" hint={STATUS_HINT[form.status as ProductStatus]}>
+          <Field
+            label="Situação"
+            htmlFor="p-status"
+            hint={STATUS_HINT[form.status as ProductStatus]}
+          >
             <Select
               id="p-status"
               value={form.status}
@@ -200,7 +241,11 @@ export function ProductForm({
       >
         <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-4">
           <Field label="Preço de venda (R$)" htmlFor="p-price" required error={errors.price}>
-            <MoneyInput id="p-price" value={form.price} onChange={(e) => set('price', e.target.value)} />
+            <MoneyInput
+              id="p-price"
+              value={form.price}
+              onChange={(e) => set('price', e.target.value)}
+            />
           </Field>
 
           <Field
@@ -209,7 +254,11 @@ export function ProductForm({
             hint="Visível só no painel. Nunca vai para a loja."
             error={errors.cost}
           >
-            <MoneyInput id="p-cost" value={form.cost} onChange={(e) => set('cost', e.target.value)} />
+            <MoneyInput
+              id="p-cost"
+              value={form.cost}
+              onChange={(e) => set('cost', e.target.value)}
+            />
           </Field>
 
           <Field label="Estoque" htmlFor="p-stock" error={errors.stock}>
@@ -222,7 +271,11 @@ export function ProductForm({
           </Field>
 
           <Field label="Unidade" htmlFor="p-unit" hint="Como o item é vendido.">
-            <Select id="p-unit" value={form.unitOfMeasure} onChange={(e) => set('unitOfMeasure', e.target.value)}>
+            <Select
+              id="p-unit"
+              value={form.unitOfMeasure}
+              onChange={(e) => set('unitOfMeasure', e.target.value)}
+            >
               {UNITS.map((u) => (
                 <option key={u} value={u}>
                   {u}
@@ -244,7 +297,8 @@ export function ProductForm({
                 className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-blue focus:ring-brand-blue"
               />
               <span className="text-xs leading-relaxed text-gray-700">
-                Confirmo que a venda abaixo do custo é <strong>intencional</strong> para este produto.
+                Confirmo que a venda abaixo do custo é <strong>intencional</strong> para este
+                produto.
               </span>
             </label>
           )}
@@ -252,37 +306,82 @@ export function ProductForm({
       </Section>
 
       {/* ------------------------------------------------ Logística */}
-      <Section title="Peso e dimensões" description="Usados pelo cálculo de frete real, em vez de uma estimativa por item.">
+      <Section
+        title="Peso e dimensões"
+        description="Usados pelo cálculo de frete real, em vez de uma estimativa por item."
+      >
         <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-4">
           <Field label="Peso (kg)" htmlFor="p-weight">
-            <MoneyInput id="p-weight" step="0.001" value={form.weightKg} onChange={(e) => set('weightKg', e.target.value)} />
+            <MoneyInput
+              id="p-weight"
+              step="0.001"
+              value={form.weightKg}
+              onChange={(e) => set('weightKg', e.target.value)}
+            />
           </Field>
           <Field label="Comprimento (cm)" htmlFor="p-length">
-            <MoneyInput id="p-length" step="0.1" value={form.lengthCm} onChange={(e) => set('lengthCm', e.target.value)} />
+            <MoneyInput
+              id="p-length"
+              step="0.1"
+              value={form.lengthCm}
+              onChange={(e) => set('lengthCm', e.target.value)}
+            />
           </Field>
           <Field label="Largura (cm)" htmlFor="p-width">
-            <MoneyInput id="p-width" step="0.1" value={form.widthCm} onChange={(e) => set('widthCm', e.target.value)} />
+            <MoneyInput
+              id="p-width"
+              step="0.1"
+              value={form.widthCm}
+              onChange={(e) => set('widthCm', e.target.value)}
+            />
           </Field>
           <Field label="Altura (cm)" htmlFor="p-height">
-            <MoneyInput id="p-height" step="0.1" value={form.heightCm} onChange={(e) => set('heightCm', e.target.value)} />
+            <MoneyInput
+              id="p-height"
+              step="0.1"
+              value={form.heightCm}
+              onChange={(e) => set('heightCm', e.target.value)}
+            />
           </Field>
         </div>
       </Section>
 
       {/* ------------------------------------------------ Fiscal */}
-      <Section title="Dados fiscais" description="Vão para a nota. Errar aqui é problema com o contador, não com o cliente.">
+      <Section
+        title="Dados fiscais"
+        description="Vão para a nota. Errar aqui é problema com o contador, não com o cliente."
+      >
         <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-4">
           <Field label="NCM" htmlFor="p-ncm" hint="8 dígitos.">
-            <TextInput id="p-ncm" inputMode="numeric" value={form.ncm} onChange={(e) => set('ncm', e.target.value)} />
+            <TextInput
+              id="p-ncm"
+              inputMode="numeric"
+              value={form.ncm}
+              onChange={(e) => set('ncm', e.target.value)}
+            />
           </Field>
           <Field label="CFOP" htmlFor="p-cfop" hint="4 dígitos.">
-            <TextInput id="p-cfop" inputMode="numeric" value={form.cfop} onChange={(e) => set('cfop', e.target.value)} />
+            <TextInput
+              id="p-cfop"
+              inputMode="numeric"
+              value={form.cfop}
+              onChange={(e) => set('cfop', e.target.value)}
+            />
           </Field>
           <Field label="CEST" htmlFor="p-cest" hint="Só para itens com substituição tributária.">
-            <TextInput id="p-cest" inputMode="numeric" value={form.cest} onChange={(e) => set('cest', e.target.value)} />
+            <TextInput
+              id="p-cest"
+              inputMode="numeric"
+              value={form.cest}
+              onChange={(e) => set('cest', e.target.value)}
+            />
           </Field>
           <Field label="Origem" htmlFor="p-origem">
-            <Select id="p-origem" value={form.origem} onChange={(e) => set('origem', e.target.value)}>
+            <Select
+              id="p-origem"
+              value={form.origem}
+              onChange={(e) => set('origem', e.target.value)}
+            >
               <option value="">—</option>
               {ORIGENS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -295,7 +394,10 @@ export function ProductForm({
       </Section>
 
       {/* ------------------------------------------------ Ficha técnica */}
-      <Section title="Ficha técnica" description="Pares de característica e valor exibidos na página do produto.">
+      <Section
+        title="Ficha técnica"
+        description="Pares de característica e valor exibidos na página do produto."
+      >
         <div className="p-3 sm:p-4">
           <Field
             label="Especificações (JSON)"

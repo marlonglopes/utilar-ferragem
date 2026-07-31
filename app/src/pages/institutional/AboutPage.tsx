@@ -32,15 +32,15 @@ export default function AboutPage() {
         <p>
           A UtiLar existe para resolver os dois lados. Para quem compra, um catálogo único com
           estoque e preço reais, pagamento em Pix, boleto ou cartão e acompanhamento do pedido do
-          pagamento à entrega. Para quem vende, uma vitrine digital sem a complexidade de montar
-          e operar uma loja própria.
+          pagamento à entrega. Para quem vende, uma vitrine digital sem a complexidade de montar e
+          operar uma loja própria.
         </p>
 
         <h2>Como trabalhamos</h2>
         <ul>
           <li>
-            <strong>Vendedor verificado.</strong> Todo parceiro passa por checagem de CNPJ e situação
-            cadastral antes de publicar. Toda venda sai com nota fiscal.
+            <strong>Vendedor verificado.</strong> Todo parceiro passa por checagem de CNPJ e
+            situação cadastral antes de publicar. Toda venda sai com nota fiscal.
           </li>
           <li>
             <strong>Estoque honesto.</strong> A disponibilidade exibida vem do vendedor. Quando um

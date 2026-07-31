@@ -154,7 +154,7 @@ describe('sumSeries', () => {
       sumSeries([
         { date: '2026-07-01', valueCents: 100, orders: 1 },
         { date: '2026-07-02', valueCents: 250, orders: 2 },
-      ]),
+      ])
     ).toBe(350)
   })
 })
@@ -283,8 +283,20 @@ describe('sortSellers', () => {
 describe('sellerTotals', () => {
   it('soma volumes e pondera médias por valor vendido', () => {
     const t = sellerTotals([
-      seller({ totalCents: 900_00, orderCount: 90, avgMarginPct: 0.1, avgDiscountPct: 0.2, managerApprovals: 3 }),
-      seller({ totalCents: 100_00, orderCount: 10, avgMarginPct: 0.5, avgDiscountPct: 0.0, managerApprovals: 1 }),
+      seller({
+        totalCents: 900_00,
+        orderCount: 90,
+        avgMarginPct: 0.1,
+        avgDiscountPct: 0.2,
+        managerApprovals: 3,
+      }),
+      seller({
+        totalCents: 100_00,
+        orderCount: 10,
+        avgMarginPct: 0.5,
+        avgDiscountPct: 0.0,
+        managerApprovals: 1,
+      }),
     ])
     expect(t.totalCents).toBe(1_000_00)
     expect(t.orderCount).toBe(100)

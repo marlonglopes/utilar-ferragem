@@ -112,14 +112,68 @@ async function readTable(file: File): Promise<ParsedTable> {
 }
 
 const FALLBACK_TABLE: ParsedTable = {
-  header: ['CODIGO', 'DESCRICAO DO PRODUTO', 'GRUPO', 'MARCA', 'UN', 'VLR VENDA', 'VLR CUSTO', 'ESTOQUE'],
+  header: [
+    'CODIGO',
+    'DESCRICAO DO PRODUTO',
+    'GRUPO',
+    'MARCA',
+    'UN',
+    'VLR VENDA',
+    'VLR CUSTO',
+    'ESTOQUE',
+  ],
   rows: [
-    ['FORN-0001', 'Cimento CP-II-E-32 saco 50kg', 'construcao', 'Votoran', 'saco', 'R$ 34,90', 'R$ 27,10', '240'],
-    ['FORN-0002', 'Argamassa AC-III 20kg', 'construcao', 'Quartzolit', 'saco', '28,40', '21,90', '180'],
-    ['FORN-0004', 'Furadeira de Impacto 750W', 'ferramentas', 'Bosch', 'un', 'R$ 429,90', 'R$ 296,00', '12'],
-    ['FORN-0014', 'Categoria que não existe', 'departamento-inventado', 'Marca Y', 'un', 'R$ 10,00', 'R$ 5,00', '5'],
+    [
+      'FORN-0001',
+      'Cimento CP-II-E-32 saco 50kg',
+      'construcao',
+      'Votoran',
+      'saco',
+      'R$ 34,90',
+      'R$ 27,10',
+      '240',
+    ],
+    [
+      'FORN-0002',
+      'Argamassa AC-III 20kg',
+      'construcao',
+      'Quartzolit',
+      'saco',
+      '28,40',
+      '21,90',
+      '180',
+    ],
+    [
+      'FORN-0004',
+      'Furadeira de Impacto 750W',
+      'ferramentas',
+      'Bosch',
+      'un',
+      'R$ 429,90',
+      'R$ 296,00',
+      '12',
+    ],
+    [
+      'FORN-0014',
+      'Categoria que não existe',
+      'departamento-inventado',
+      'Marca Y',
+      'un',
+      'R$ 10,00',
+      'R$ 5,00',
+      '5',
+    ],
     ['', 'Linha sem código', 'ferramentas', 'Marca Z', 'un', 'R$ 99,00', 'R$ 70,00', '3'],
-    ['FORN-0017', 'Cimento CP-V ARI saco 50kg', 'construcao', 'Votoran', 'saco', 'R$ 1,23', 'R$ 31,40', '80'],
+    [
+      'FORN-0017',
+      'Cimento CP-V ARI saco 50kg',
+      'construcao',
+      'Votoran',
+      'saco',
+      'R$ 1,23',
+      'R$ 31,40',
+      '80',
+    ],
   ],
 }
 
@@ -182,7 +236,7 @@ export function suggestColumns(header: string[]): ColumnSuggestion[] {
 
   const used = new Set<ImportField>()
   const best: ({ field: ImportField; conf: ImportConfidence; alias: string } | null)[] = header.map(
-    () => null,
+    () => null
   )
 
   for (let pass = 0; pass < 3; pass++) {
@@ -194,8 +248,13 @@ export function suggestColumns(header: string[]): ColumnSuggestion[] {
         if (used.has(c.field)) continue
         let conf: ImportConfidence | null = null
         if (pass === 0 && n === c.alias) conf = 'exact'
-        else if (pass === 1 && new RegExp(`\\b${c.alias.replace(/\s+/g, '\\s+')}\\b`).test(n)) conf = 'high'
-        else if (pass === 2 && c.alias.length >= 4 && n.replace(/\s/g, '').includes(c.alias.replace(/\s/g, '')))
+        else if (pass === 1 && new RegExp(`\\b${c.alias.replace(/\s+/g, '\\s+')}\\b`).test(n))
+          conf = 'high'
+        else if (
+          pass === 2 &&
+          c.alias.length >= 4 &&
+          n.replace(/\s/g, '').includes(c.alias.replace(/\s/g, ''))
+        )
           conf = 'low'
         if (conf) {
           best[i] = { field: c.field, conf, alias: c.alias }
@@ -240,7 +299,9 @@ export async function mockSuggest(file: File): Promise<SuggestResponse> {
       columns: table.header.length,
       recognized: columns.filter((c) => c.recognized).length,
       ignored: columns.filter((c) => !c.recognized).map((c) => c.column),
-      needsReview: columns.filter((c) => c.recognized && c.confidence !== 'exact').map((c) => c.column),
+      needsReview: columns
+        .filter((c) => c.recognized && c.confidence !== 'exact')
+        .map((c) => c.column),
       rows: table.rows.length,
     },
     fields: [...IMPORT_FIELDS],
@@ -267,7 +328,10 @@ const KNOWN_CATEGORIES = [
 export function parseMoneyBR(raw: string): number | null {
   const s = (raw ?? '').trim()
   if (s === '' || s === '-' || /^n\/?a$/i.test(s) || s.startsWith('#')) return null
-  const cleaned = s.replace(/[R$\s\u00a0]/gi, '').replace(/\./g, '').replace(',', '.')
+  const cleaned = s
+    .replace(/[R$\s\u00a0]/gi, '')
+    .replace(/\./g, '')
+    .replace(',', '.')
   const n = Number(cleaned)
   return Number.isFinite(n) ? n : null
 }
@@ -277,7 +341,10 @@ function looksLikeFormula(s: string): boolean {
   return /^[=+@]/.test(s.trim()) || /^-[a-zA-Z]/.test(s.trim())
 }
 
-export async function mockPlan(file: File, mapping: Record<string, ColumnMapping>): Promise<ImportPlan> {
+export async function mockPlan(
+  file: File,
+  mapping: Record<string, ColumnMapping>
+): Promise<ImportPlan> {
   const table = await readTable(file)
   const colOf = (field: ImportField): number => {
     const entry = Object.entries(mapping).find(([, m]) => m.field === field)
@@ -306,20 +373,37 @@ export async function mockPlan(file: File, mapping: Record<string, ColumnMapping
     const category = at(idx.category)
     const price = parseMoneyBR(at(idx.price))
     const cost = parseMoneyBR(at(idx.cost))
-    const base: ImportRow = { rowNumber, sku, raw, mapped: { sku, name, category, price, cost }, action: 'create' }
+    const base: ImportRow = {
+      rowNumber,
+      sku,
+      raw,
+      mapped: { sku, name, category, price, cost },
+      action: 'create',
+    }
 
     if (!sku.trim()) {
       return {
         ...base,
         action: 'reject',
-        errors: [{ field: 'sku', message: 'SKU ausente — sem código não há como identificar o produto; a linha não é importada' }],
+        errors: [
+          {
+            field: 'sku',
+            message:
+              'SKU ausente — sem código não há como identificar o produto; a linha não é importada',
+          },
+        ],
       }
     }
     if (looksLikeFormula(name)) {
       return {
         ...base,
         action: 'reject',
-        errors: [{ field: 'name', message: 'conteúdo com aparência de fórmula de planilha — recusado por segurança' }],
+        errors: [
+          {
+            field: 'name',
+            message: 'conteúdo com aparência de fórmula de planilha — recusado por segurança',
+          },
+        ],
       }
     }
     if (price === null) {
@@ -345,7 +429,10 @@ export async function mockPlan(file: File, mapping: Record<string, ColumnMapping
         oldPrice: Number((cost * 1.28).toFixed(2)),
         newPrice: price,
         warnings: [
-          { field: 'price', message: `preço (${price}) abaixo do custo (${cost}) — confira separador decimal` },
+          {
+            field: 'price',
+            message: `preço (${price}) abaixo do custo (${cost}) — confira separador decimal`,
+          },
         ],
       }
     }

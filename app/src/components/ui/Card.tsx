@@ -20,7 +20,14 @@ const shadows = {
   md: 'shadow-md',
 }
 
-function Card({ padding = 'md', shadow = 'sm', border = true, className, children, ...props }: CardProps) {
+function Card({
+  padding = 'md',
+  shadow = 'sm',
+  border = true,
+  className,
+  children,
+  ...props
+}: CardProps) {
   return (
     <div
       className={cn(
@@ -51,7 +58,10 @@ function CardBody({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
 
 function CardFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('mt-4 pt-4 border-t border-gray-100 flex items-center gap-2', className)} {...props} />
+    <div
+      className={cn('mt-4 pt-4 border-t border-gray-100 flex items-center gap-2', className)}
+      {...props}
+    />
   )
 }
 

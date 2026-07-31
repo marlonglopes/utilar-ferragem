@@ -33,7 +33,9 @@ export default function ForgotPasswordPage() {
     <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="font-display font-black text-2xl text-gray-900">{t('auth.forgotPasswordTitle')}</h1>
+          <h1 className="font-display font-black text-2xl text-gray-900">
+            {t('auth.forgotPasswordTitle')}
+          </h1>
           <p className="text-sm text-gray-500 mt-1">{t('auth.forgotPasswordHint')}</p>
         </div>
 
@@ -57,7 +59,9 @@ export default function ForgotPasswordPage() {
               required
               leftIcon={<Mail className="h-4 w-4" />}
             />
-            {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+            {error && (
+              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+            )}
             <button
               type="submit"
               disabled={loading}

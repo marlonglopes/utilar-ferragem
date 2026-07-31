@@ -25,10 +25,16 @@ function Hero() {
               {t('hero.description')}
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link to="/categoria/ferramentas" className="inline-flex items-center gap-2 bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold px-5 py-2.5 rounded-lg transition-colors">
+              <Link
+                to="/categoria/ferramentas"
+                className="inline-flex items-center gap-2 bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold px-5 py-2.5 rounded-lg transition-colors"
+              >
                 {t('hero.cta.catalog')} →
               </Link>
-              <Link to="/vender" className="inline-flex items-center gap-2 border border-white/30 hover:bg-white/10 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors">
+              <Link
+                to="/vender"
+                className="inline-flex items-center gap-2 border border-white/30 hover:bg-white/10 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors"
+              >
                 {t('hero.cta.sell')}
               </Link>
             </div>
@@ -38,9 +44,11 @@ function Hero() {
               <div
                 key={i}
                 className={`w-16 h-16 rounded-xl flex items-center justify-center text-2xl select-none ${
-                  i === 4 ? 'bg-brand-orange/30 text-brand-orange-light' :
-                  i === 1 || i === 7 ? 'bg-white/10 text-white/60' :
-                  'bg-white/10 text-white/80'
+                  i === 4
+                    ? 'bg-brand-orange/30 text-brand-orange-light'
+                    : i === 1 || i === 7
+                      ? 'bg-white/10 text-white/60'
+                      : 'bg-white/10 text-white/80'
                 }`}
               >
                 {icon}
@@ -92,7 +100,10 @@ function FeaturedProducts() {
       <div className="container">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display font-black text-xl text-gray-900">{t('home.featured')}</h2>
-          <Link to="/categoria/ferramentas" className="text-sm text-brand-orange hover:underline font-medium">
+          <Link
+            to="/categoria/ferramentas"
+            className="text-sm text-brand-orange hover:underline font-medium"
+          >
             {t('home.seeAll')} →
           </Link>
         </div>

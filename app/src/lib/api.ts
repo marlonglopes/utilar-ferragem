@@ -54,7 +54,10 @@ export function tunnelFetch(input: string, init: RequestInit = {}): Promise<Resp
   if (!sameOrigin) return globalThis.fetch(input, init)
   return globalThis.fetch(input, {
     ...init,
-    headers: { ...(init.headers as Record<string, string> | undefined), 'ngrok-skip-browser-warning': 'true' },
+    headers: {
+      ...(init.headers as Record<string, string> | undefined),
+      'ngrok-skip-browser-warning': 'true',
+    },
   })
 }
 
@@ -260,7 +263,7 @@ function applyIdempotency(
   headers: Record<string, string>,
   path: string,
   body: unknown,
-  explicitKey?: string,
+  explicitKey?: string
 ): void {
   if (explicitKey) {
     headers['Idempotency-Key'] = explicitKey
@@ -278,9 +281,7 @@ export function __resetIdempotencyMemo(): void {
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    const body: ApiErrorEnvelope = await res
-      .json()
-      .catch(() => ({ error: `HTTP ${res.status}` }))
+    const body: ApiErrorEnvelope = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
     throw new ApiError(body, res.status)
   }
   return res.json() as Promise<T>
@@ -290,7 +291,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
 // Retorna a Response final (já com retry feito ou a 401 original se refresh falhou).
 async function fetchWithAutoRefresh(
   doFetch: (token: string | null) => Promise<Response>,
-  initialToken?: string,
+  initialToken?: string
 ): Promise<Response> {
   const tokenAttempt1 = initialToken ?? null
   let res = await doFetch(tokenAttempt1)
@@ -309,13 +310,17 @@ export async function apiPost<T>(
   path: string,
   body: unknown,
   token?: string,
-  idempotencyKey?: string,
+  idempotencyKey?: string
 ): Promise<T> {
   const res = await fetchWithAutoRefresh((tok) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (tok) headers['Authorization'] = `Bearer ${tok}`
     applyIdempotency(headers, path, body, idempotencyKey)
-    return tunnelFetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
+    return tunnelFetch(`${BASE_URL}${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    })
   }, token)
   return handleResponse<T>(res)
 }
@@ -333,7 +338,11 @@ export async function apiPatch<T>(path: string, body: unknown, token?: string): 
   const res = await fetchWithAutoRefresh((tok) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (tok) headers['Authorization'] = `Bearer ${tok}`
-    return tunnelFetch(`${BASE_URL}${path}`, { method: 'PATCH', headers, body: JSON.stringify(body) })
+    return tunnelFetch(`${BASE_URL}${path}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(body),
+    })
   }, token)
   return handleResponse<T>(res)
 }
@@ -362,7 +371,7 @@ export async function orderPost<T>(
   path: string,
   userId: string,
   body: unknown,
-  idempotencyKey?: string,
+  idempotencyKey?: string
 ): Promise<T> {
   const headers = orderHeaders(userId, true)
   applyIdempotency(headers, path, body, idempotencyKey)
@@ -427,7 +436,7 @@ export async function authPost<T>(path: string, body: unknown, token?: string): 
  */
 export async function authLogout(
   accessToken: string | null,
-  refreshToken: string | null,
+  refreshToken: string | null
 ): Promise<boolean> {
   // Sem auth-service (modo mock) ou sem token não há o que revogar.
   if (!isAuthEnabled || !accessToken) return false
@@ -474,22 +483,34 @@ export async function orderPostWithJWT<T>(
   path: string,
   token: string,
   body: unknown,
-  idempotencyKey?: string,
+  idempotencyKey?: string
 ): Promise<T> {
   const res = await fetchWithAutoRefresh((tok) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (tok) headers['Authorization'] = `Bearer ${tok}`
     applyIdempotency(headers, path, body, idempotencyKey)
-    return tunnelFetch(`${ORDER_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
+    return tunnelFetch(`${ORDER_URL}${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    })
   }, token)
   return handleResponse<T>(res)
 }
 
-export async function orderPatchWithJWT<T>(path: string, token: string, body: unknown = {}): Promise<T> {
+export async function orderPatchWithJWT<T>(
+  path: string,
+  token: string,
+  body: unknown = {}
+): Promise<T> {
   const res = await fetchWithAutoRefresh((tok) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (tok) headers['Authorization'] = `Bearer ${tok}`
-    return tunnelFetch(`${ORDER_URL}${path}`, { method: 'PATCH', headers, body: JSON.stringify(body) })
+    return tunnelFetch(`${ORDER_URL}${path}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(body),
+    })
   }, token)
   return handleResponse<T>(res)
 }

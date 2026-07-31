@@ -27,7 +27,10 @@ import type { ImportBatch } from '@/lib/adminImportTypes'
 
 const STATUS_STYLE: Record<string, { label: string; chip: string }> = {
   committed: { label: 'Aplicado', chip: 'bg-emerald-50 text-emerald-800 ring-emerald-600/20' },
-  validated: { label: 'Conferido, não aplicado', chip: 'bg-amber-50 text-amber-900 ring-amber-600/25' },
+  validated: {
+    label: 'Conferido, não aplicado',
+    chip: 'bg-amber-50 text-amber-900 ring-amber-600/25',
+  },
   failed: { label: 'Falhou', chip: 'bg-red-50 text-red-800 ring-red-600/25' },
   uploaded: { label: 'Enviado', chip: 'bg-gray-100 text-gray-600 ring-gray-300' },
   staged: { label: 'Em preparo', chip: 'bg-gray-100 text-gray-600 ring-gray-300' },
@@ -70,7 +73,10 @@ export function ImportHistory({
             </thead>
             <tbody>
               {batches.map((b) => {
-                const st = STATUS_STYLE[b.status] ?? { label: b.status, chip: 'bg-gray-100 text-gray-600 ring-gray-300' }
+                const st = STATUS_STYLE[b.status] ?? {
+                  label: b.status,
+                  chip: 'bg-gray-100 text-gray-600 ring-gray-300',
+                }
                 return (
                   <tr key={b.id} className="hover:bg-gray-50">
                     <Td className="whitespace-nowrap text-xs tabular-nums text-gray-600">
@@ -83,20 +89,38 @@ export function ImportHistory({
                     <Td className="whitespace-nowrap text-xs text-gray-600">
                       {b.profile ? `${b.profile} v${b.profileVersion ?? 1}` : '—'}
                     </Td>
-                    <Td className="whitespace-nowrap text-xs text-gray-600">{b.createdBy || '—'}</Td>
-                    <Td numeric className="text-xs text-gray-700">{formatCount(b.summary.creates)}</Td>
-                    <Td numeric className="text-xs text-gray-700">{formatCount(b.summary.updates)}</Td>
-                    <Td numeric className={cn('text-xs', b.summary.reviews > 0 ? 'font-semibold text-amber-700' : 'text-gray-400')}>
+                    <Td className="whitespace-nowrap text-xs text-gray-600">
+                      {b.createdBy || '—'}
+                    </Td>
+                    <Td numeric className="text-xs text-gray-700">
+                      {formatCount(b.summary.creates)}
+                    </Td>
+                    <Td numeric className="text-xs text-gray-700">
+                      {formatCount(b.summary.updates)}
+                    </Td>
+                    <Td
+                      numeric
+                      className={cn(
+                        'text-xs',
+                        b.summary.reviews > 0 ? 'font-semibold text-amber-700' : 'text-gray-400'
+                      )}
+                    >
                       {formatCount(b.summary.reviews)}
                     </Td>
-                    <Td numeric className={cn('text-xs', b.summary.rejects > 0 ? 'font-semibold text-red-700' : 'text-gray-400')}>
+                    <Td
+                      numeric
+                      className={cn(
+                        'text-xs',
+                        b.summary.rejects > 0 ? 'font-semibold text-red-700' : 'text-gray-400'
+                      )}
+                    >
                       {formatCount(b.summary.rejects)}
                     </Td>
                     <Td>
                       <span
                         className={cn(
                           'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset',
-                          st.chip,
+                          st.chip
                         )}
                       >
                         {st.label}

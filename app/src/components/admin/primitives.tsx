@@ -43,7 +43,7 @@ export function Money({
         'tabular-nums',
         emphasis ? 'font-semibold text-gray-900' : 'text-gray-700',
         cents < 0 && 'text-red-700',
-        className,
+        className
       )}
     >
       {formatCents(cents)}
@@ -73,10 +73,13 @@ export function SeverityPill({
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
         SEVERITY_PILL[severity],
-        className,
+        className
       )}
     >
-      <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', SEVERITY_DOT[severity])} aria-hidden="true" />
+      <span
+        className={cn('h-1.5 w-1.5 shrink-0 rounded-full', SEVERITY_DOT[severity])}
+        aria-hidden="true"
+      />
       {children ?? SEVERITY_LABEL[severity]}
     </span>
   )
@@ -88,7 +91,7 @@ export function Chip({ children, className }: { children: ReactNode; className?:
     <span
       className={cn(
         'inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-200',
-        className,
+        className
       )}
     >
       {children}
@@ -132,12 +135,7 @@ export function StatTile({
 }: StatTileProps) {
   const ds = severity ?? deltaSeverity(delta ?? null, higherIsBetter)
   return (
-    <div
-      className={cn(
-        'rounded-lg border border-gray-200 bg-white p-3 sm:p-4',
-        className,
-      )}
-    >
+    <div className={cn('rounded-lg border border-gray-200 bg-white p-3 sm:p-4', className)}>
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
         {severity && <SeverityPill severity={severity} />}
@@ -154,7 +152,12 @@ export function StatTile({
                 <span className="text-gray-400">sem base de comparação</span>
               ) : (
                 <>
-                  <span className={cn('font-semibold tabular-nums', ds ? SEVERITY_TEXT[ds] : 'text-gray-500')}>
+                  <span
+                    className={cn(
+                      'font-semibold tabular-nums',
+                      ds ? SEVERITY_TEXT[ds] : 'text-gray-500'
+                    )}
+                  >
                     {formatDelta(delta)}
                   </span>{' '}
                   <span className="text-gray-500">{deltaLabel ?? 'vs. período anterior'}</span>
@@ -165,7 +168,13 @@ export function StatTile({
           {hint && <p className="mt-0.5 truncate text-xs text-gray-500">{hint}</p>}
         </div>
         {series && series.length > 1 && (
-          <Sparkline values={series} width={88} height={28} color={seriesColor} className="shrink-0" />
+          <Sparkline
+            values={series}
+            width={88}
+            height={28}
+            color={seriesColor}
+            className="shrink-0"
+          />
         )}
       </div>
     </div>
@@ -282,7 +291,7 @@ export function Th({
       className={cn(
         'whitespace-nowrap border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500',
         numeric ? 'text-right' : 'text-left',
-        className,
+        className
       )}
       {...rest}
     >
@@ -302,7 +311,7 @@ export function Td({
       className={cn(
         'border-b border-gray-100 px-3 py-2 align-middle',
         numeric ? 'text-right tabular-nums' : 'text-left',
-        className,
+        className
       )}
       {...rest}
     >

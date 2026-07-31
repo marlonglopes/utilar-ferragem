@@ -58,8 +58,7 @@ const MOCK_DIRECTORY: Record<string, BalcaoCustomer> = {
 
 /** Resultado da busca: achou, ou não achou. Erro de verdade é exceção. */
 export type CustomerLookupResult =
-  | { found: true; customer: BalcaoCustomer }
-  | { found: false; document: string }
+  { found: true; customer: BalcaoCustomer } | { found: false; document: string }
 
 export interface UseBalcaoCustomersResult {
   lookup: (document: string) => Promise<CustomerLookupResult>

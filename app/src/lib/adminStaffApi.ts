@@ -112,12 +112,63 @@ const MOCK_STORES: Store[] = [
 ]
 
 const MOCK_OPERATORS: Operator[] = [
-  { userId: 'u-14', name: 'Nicolas Dias', email: 'test14@utilar.com.br', storeId: 's-1', storeCode: 'MATRIZ', storeName: 'Matriz', level: 'operator', discountCeilingPct: 5, canApproveDiscount: false, active: true, createdAt: '2026-07-20T10:00:00Z' },
-  { userId: 'u-15', name: 'Olívia Fernandes', email: 'test15@utilar.com.br', storeId: 's-1', storeCode: 'MATRIZ', storeName: 'Matriz', level: 'manager', discountCeilingPct: 20, canApproveDiscount: true, active: true, createdAt: '2026-07-20T10:00:00Z' },
+  {
+    userId: 'u-14',
+    name: 'Nicolas Dias',
+    email: 'test14@utilar.com.br',
+    storeId: 's-1',
+    storeCode: 'MATRIZ',
+    storeName: 'Matriz',
+    level: 'operator',
+    discountCeilingPct: 5,
+    canApproveDiscount: false,
+    active: true,
+    createdAt: '2026-07-20T10:00:00Z',
+  },
+  {
+    userId: 'u-15',
+    name: 'Olívia Fernandes',
+    email: 'test15@utilar.com.br',
+    storeId: 's-1',
+    storeCode: 'MATRIZ',
+    storeName: 'Matriz',
+    level: 'manager',
+    discountCeilingPct: 20,
+    canApproveDiscount: true,
+    active: true,
+    createdAt: '2026-07-20T10:00:00Z',
+  },
 ]
 
 const MOCK_USERS: AdminUser[] = [
-  { id: 'u-1', name: 'Ana Silva', email: 'test1@utilar.com.br', role: 'customer', cpf: null, phone: null, emailVerified: true, createdAt: '2026-07-01T10:00:00Z' },
-  { id: 'u-2', name: 'Bruno Ferreira', email: 'test2@utilar.com.br', role: 'customer', cpf: null, phone: null, emailVerified: true, createdAt: '2026-07-02T10:00:00Z' },
-  { id: 'u-c', name: 'Contador Utilar', email: 'contador@utilar.com.br', role: 'customer', cpf: null, phone: null, emailVerified: true, createdAt: '2026-07-03T10:00:00Z' },
+  {
+    id: 'u-1',
+    name: 'Ana Silva',
+    email: 'test1@utilar.com.br',
+    role: 'customer',
+    cpf: null,
+    phone: null,
+    emailVerified: true,
+    createdAt: '2026-07-01T10:00:00Z',
+  },
+  {
+    id: 'u-2',
+    name: 'Bruno Ferreira',
+    email: 'test2@utilar.com.br',
+    role: 'customer',
+    cpf: null,
+    phone: null,
+    emailVerified: true,
+    createdAt: '2026-07-02T10:00:00Z',
+  },
+  {
+    id: 'u-c',
+    name: 'Contador Utilar',
+    email: 'contador@utilar.com.br',
+    role: 'customer',
+    cpf: null,
+    phone: null,
+    emailVerified: true,
+    createdAt: '2026-07-03T10:00:00Z',
+  },
 ]

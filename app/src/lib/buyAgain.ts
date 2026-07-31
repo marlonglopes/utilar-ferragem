@@ -156,7 +156,8 @@ export async function resolveBuyAgain(
     // Comparação em centavos: 38.5 vs 38.50 é o mesmo preço, e float
     // desigual por 1e-13 não pode virar aviso de "preço mudou".
     priceChanged: addedLines.filter(
-      (l) => l.newPrice !== undefined && Math.round(l.newPrice * 100) !== Math.round(l.oldPrice * 100)
+      (l) =>
+        l.newPrice !== undefined && Math.round(l.newPrice * 100) !== Math.round(l.oldPrice * 100)
     ),
     nothingAdded: addedLines.length === 0,
     partial: addedLines.length > 0 && addedLines.length < lines.length,

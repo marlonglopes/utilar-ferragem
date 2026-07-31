@@ -43,7 +43,9 @@ describe('RelatedProducts — honestidade do título', () => {
   it('rotula a lista de categoria pelo que ela é', () => {
     renderBlock('category_fallback')
 
-    expect(screen.getByRole('heading', { name: /outros produtos de elétrica/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /outros produtos de elétrica/i })
+    ).toBeInTheDocument()
     expect(screen.queryByText(/quem comprou/i)).not.toBeInTheDocument()
   })
 
@@ -70,7 +72,9 @@ describe('RelatedProducts — honestidade do título', () => {
   it('só promete co-compra quando o backend declara a origem', () => {
     renderBlock('copurchase')
 
-    expect(screen.getByRole('heading', { name: /quem comprou este levou também/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /quem comprou este levou também/i })
+    ).toBeInTheDocument()
     expect(screen.getByText(/pedidos reais de outros clientes/i)).toBeInTheDocument()
     // Aí não faz sentido empurrar a categoria: a lista já é específica.
     expect(screen.queryByRole('link', { name: /ver a categoria inteira/i })).not.toBeInTheDocument()
@@ -139,7 +143,9 @@ describe('taxonomia — rótulo de categoria', () => {
 describe('RelatedProducts — estratégias do backend', () => {
   it('"mixed" também conta como co-compra', () => {
     renderBlock('mixed')
-    expect(screen.getByRole('heading', { name: /quem comprou este levou também/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /quem comprou este levou também/i })
+    ).toBeInTheDocument()
   })
 
   it('"complement" tem título próprio, sem prometer co-compra', () => {
@@ -160,14 +166,18 @@ describe('RelatedProducts — estratégias do backend', () => {
     renderBlock('copurchase', { fallback: true })
 
     expect(screen.queryByText(/quem comprou/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /outros produtos de elétrica/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /outros produtos de elétrica/i })
+    ).toBeInTheDocument()
     expect(screen.getByText(/não é uma recomendação/i)).toBeInTheDocument()
   })
 
   it('estratégia desconhecida cai no rótulo modesto, nunca no otimista', () => {
     // Backend mais novo, front mais velho: errar para o lado humilde.
     renderBlock('coisa_nova_do_futuro' as RelatedStrategy)
-    expect(screen.getByRole('heading', { name: /outros produtos de elétrica/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /outros produtos de elétrica/i })
+    ).toBeInTheDocument()
   })
 
   it('mostra a evidência por item quando o backend manda o motivo', () => {
@@ -177,7 +187,10 @@ describe('RelatedProducts — estratégias do backend', () => {
           <RelatedProducts
             strategy="copurchase"
             products={[
-              { ...PRODUCTS[0], reason: { kind: 'copurchase', label: '12 clientes levaram junto', orders: 12 } },
+              {
+                ...PRODUCTS[0],
+                reason: { kind: 'copurchase', label: '12 clientes levaram junto', orders: 12 },
+              },
             ]}
           />
         </MemoryRouter>

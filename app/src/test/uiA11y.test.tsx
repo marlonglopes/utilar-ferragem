@@ -161,7 +161,13 @@ describe('Modal — foco e rotulagem', () => {
   it('fecha com Escape', async () => {
     let closed = false
     render(
-      <Modal open onClose={() => { closed = true }} title="Teste">
+      <Modal
+        open
+        onClose={() => {
+          closed = true
+        }}
+        title="Teste"
+      >
         <p>corpo</p>
       </Modal>,
       { wrapper }

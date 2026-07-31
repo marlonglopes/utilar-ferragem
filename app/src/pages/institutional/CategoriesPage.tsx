@@ -16,12 +16,10 @@ const DESCRIPTIONS: Record<string, string> = {
     'Cabos, disjuntores, quadros, tomadas, interruptores e material de instalação elétrica.',
   hidraulica:
     'Tubos e conexões de PVC e CPVC, registros, torneiras, caixas d’água e material de esgoto.',
-  pintura:
-    'Tintas acrílicas e esmaltes, massa corrida, texturas, pincéis, rolos, lixas e fitas.',
+  pintura: 'Tintas acrílicas e esmaltes, massa corrida, texturas, pincéis, rolos, lixas e fitas.',
   jardim:
     'Mangueiras, aspersores, podadores, carrinhos de mão, terra adubada e ferramentas de jardinagem.',
-  seguranca:
-    'Capacetes, luvas, óculos, botinas, protetores auriculares e sinalização de obra.',
+  seguranca: 'Capacetes, luvas, óculos, botinas, protetores auriculares e sinalização de obra.',
   fixacao:
     'Parafusos, buchas, pregos, arruelas, abraçadeiras, âncoras químicas e fitas de alta fixação.',
 }
@@ -35,10 +33,7 @@ export default function CategoriesPage() {
         title="Todas as categorias"
         description="Navegue por todas as categorias da UtiLar Ferragem: ferramentas, construção, elétrica, hidráulica, pintura, jardim, segurança e fixação."
         path="/categorias"
-        jsonLd={breadcrumbListSchema([
-          { name: 'Início', path: '/' },
-          { name: 'Categorias' },
-        ])}
+        jsonLd={breadcrumbListSchema([{ name: 'Início', path: '/' }, { name: 'Categorias' }])}
       />
 
       <div className="container py-8">

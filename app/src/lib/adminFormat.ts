@@ -147,7 +147,9 @@ export function pctChange(current: number, previous: number): number | null {
 }
 
 /** Taxa de conversão do funil de pagamento: confirmados / criados. */
-export function conversionRate(funnel: Pick<PaymentFunnel, 'created' | 'confirmed'>): number | null {
+export function conversionRate(
+  funnel: Pick<PaymentFunnel, 'created' | 'confirmed'>
+): number | null {
   if (funnel.created <= 0) return null
   return funnel.confirmed / funnel.created
 }
@@ -186,7 +188,7 @@ export function accountingImbalanceCents(
     AccountingSummary,
     'grossCents' | 'pspFeeCents' | 'refundCents' | 'chargebackCents' | 'netCents'
   > &
-    Partial<Pick<AccountingSummary, 'anticipationFeeCents' | 'sellerSplitCents'>>,
+    Partial<Pick<AccountingSummary, 'anticipationFeeCents' | 'sellerSplitCents'>>
 ): number {
   const anticipation = s.anticipationFeeCents ?? 0
   const split = s.sellerSplitCents ?? 0
@@ -228,7 +230,7 @@ export type SellerSortKey =
 export function sortSellers(
   sellers: SellerPerformance[],
   key: SellerSortKey,
-  dir: 'asc' | 'desc' = 'desc',
+  dir: 'asc' | 'desc' = 'desc'
 ): SellerPerformance[] {
   const mult = dir === 'desc' ? -1 : 1
   return [...sellers].sort((a, b) => {

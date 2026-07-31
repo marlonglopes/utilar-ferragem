@@ -139,7 +139,7 @@ export function adaptSummary(
   period: AdminPeriod,
   s: ApiLedgerSummary,
   methods: ApiMethodBreakdown[],
-  points: ApiDailyPoint[],
+  points: ApiDailyPoint[]
 ): AccountingSummary {
   return {
     period,
@@ -277,15 +277,13 @@ export function adaptDiscrepancy(d: ApiDiscrepancy): ReconciliationItem {
     severity: adaptDiscrepancySeverity(d.kind, d.severity),
     pspTransactionId: d.pspPaymentId ?? null,
     orderNumber: d.paymentId ?? null,
-    note:
-      d.detail ||
-      `Local: ${d.localValue || '—'} · PSP: ${d.pspValue || '—'}`,
+    note: d.detail || `Local: ${d.localValue || '—'} · PSP: ${d.pspValue || '—'}`,
   }
 }
 
 export function adaptReconciliation(
   period: AdminPeriod,
-  discrepancies: ApiDiscrepancy[],
+  discrepancies: ApiDiscrepancy[]
 ): ReconciliationReport {
   const items = discrepancies.map(adaptDiscrepancy)
   return {

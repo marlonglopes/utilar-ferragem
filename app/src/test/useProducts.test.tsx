@@ -43,9 +43,7 @@ describe('useProducts — modo mock', () => {
     expect(items.length).toBeGreaterThan(0)
     // o filtro q casa em nome/vendedor/descrição — todo item bate em algum deles
     expect(
-      items.every((p) =>
-        /furadeira/i.test(`${p.name} ${p.seller} ${p.description ?? ''}`),
-      ),
+      items.every((p) => /furadeira/i.test(`${p.name} ${p.seller} ${p.description ?? ''}`))
     ).toBe(true)
     // e pelo menos um bate pelo nome
     expect(items.some((p) => /furadeira/i.test(p.name))).toBe(true)

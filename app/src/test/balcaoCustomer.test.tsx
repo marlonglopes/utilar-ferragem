@@ -52,7 +52,7 @@ describe('CustomerBlock — busca por documento', () => {
 
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ document: MOCK_DOC, id: expect.any(String) }),
+        expect.objectContaining({ document: MOCK_DOC, id: expect.any(String) })
       )
     })
     // Cliente vindo da base tem `id` — é ele que vai como `customerId` no pedido.
@@ -132,7 +132,7 @@ describe('CustomerBlock — cadastro rápido', () => {
           name: 'Construtora Aurora',
           document: '11144477735',
           phone: '11988887777',
-        }),
+        })
       )
     })
   })

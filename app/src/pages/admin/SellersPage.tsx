@@ -49,7 +49,11 @@ const COLUMNS: Array<{ key: SellerSortKey; label: string; hint?: string }> = [
   { key: 'avgTicketCents', label: 'Ticket médio' },
   { key: 'avgDiscountPct', label: 'Desc. médio', hint: 'Desconto médio concedido sobre o bruto' },
   { key: 'avgMarginPct', label: 'Margem média', hint: 'Margem realizada, já agregada no backend' },
-  { key: 'managerApprovals', label: 'Aprov. gerente', hint: 'Pedidos que estouraram o teto de desconto do cargo' },
+  {
+    key: 'managerApprovals',
+    label: 'Aprov. gerente',
+    hint: 'Pedidos que estouraram o teto de desconto do cargo',
+  },
 ]
 
 export default function AdminSellersPage() {
@@ -70,10 +74,10 @@ export default function AdminSellersPage() {
           else sp.delete(key)
           return sp
         },
-        { replace: true },
+        { replace: true }
       )
     },
-    [setParams],
+    [setParams]
   )
 
   const toggleSort = useCallback(
@@ -88,11 +92,11 @@ export default function AdminSellersPage() {
             sp.set('dir', 'desc')
             return sp
           },
-          { replace: true },
+          { replace: true }
         )
       }
     },
-    [sortKey, sortDir, setParam, setParams],
+    [sortKey, sortDir, setParam, setParams]
   )
 
   const { data, isLoading, isError, error, refetch } = useAdminSellers(period, storeId || undefined)
@@ -114,7 +118,9 @@ export default function AdminSellersPage() {
       description="Quem vende muito e quem vende bem — não são sempre os mesmos."
       toolbar={
         <div className="flex flex-wrap items-center gap-2">
-          <label className="sr-only" htmlFor="seller-store">Loja</label>
+          <label className="sr-only" htmlFor="seller-store">
+            Loja
+          </label>
           <select
             id="seller-store"
             value={storeId}
@@ -123,7 +129,9 @@ export default function AdminSellersPage() {
           >
             <option value="">Todas as lojas</option>
             {(data?.stores ?? []).map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
             ))}
           </select>
           <PeriodPicker {...periodCtl} />
@@ -132,7 +140,10 @@ export default function AdminSellersPage() {
     >
       {isError && (
         <div className="rounded-lg border border-gray-200 bg-white">
-          <ErrorState message={(error as Error)?.message ?? 'Erro desconhecido'} onRetry={() => void refetch()} />
+          <ErrorState
+            message={(error as Error)?.message ?? 'Erro desconhecido'}
+            onRetry={() => void refetch()}
+          />
         </div>
       )}
 
@@ -167,7 +178,10 @@ export default function AdminSellersPage() {
             description="Clique no cabeçalho para reordenar. Margem e desconto carregam severidade própria."
           >
             {sellers.length === 0 ? (
-              <EmptyState title="Nenhum vendedor no recorte" description="Ajuste o período ou a loja." />
+              <EmptyState
+                title="Nenhum vendedor no recorte"
+                description="Ajuste o período ou a loja."
+              />
             ) : (
               <ScrollArea>
                 <Table>
@@ -198,7 +212,7 @@ export default function AdminSellersPage() {
                             title={c.hint}
                             className={cn(
                               'flex w-full items-center justify-end gap-1 px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:text-gray-900',
-                              sortKey === c.key ? 'text-brand-blue' : 'text-gray-500',
+                              sortKey === c.key ? 'text-brand-blue' : 'text-gray-500'
                             )}
                           >
                             {c.label}
@@ -234,18 +248,24 @@ export default function AdminSellersPage() {
                             <Meter value={s.totalCents / maxTotal} className="mt-1" />
                           </Td>
                           <Td numeric>{formatCount(s.orderCount)}</Td>
-                          <Td numeric><Money cents={s.avgTicketCents} /></Td>
+                          <Td numeric>
+                            <Money cents={s.avgTicketCents} />
+                          </Td>
                           <Td numeric>
                             <span className={cn('font-semibold tabular-nums', SEVERITY_TEXT[dSev])}>
                               {formatPercent(s.avgDiscountPct)}
                             </span>
                           </Td>
                           <Td numeric>
-                            <SeverityPill severity={mSev}>{formatPercent(s.avgMarginPct)}</SeverityPill>
+                            <SeverityPill severity={mSev}>
+                              {formatPercent(s.avgMarginPct)}
+                            </SeverityPill>
                           </Td>
                           <Td numeric>
                             {s.managerApprovals > 0 ? (
-                              <span className="tabular-nums text-gray-700">{s.managerApprovals}</span>
+                              <span className="tabular-nums text-gray-700">
+                                {s.managerApprovals}
+                              </span>
                             ) : (
                               <span className="text-gray-300">—</span>
                             )}
@@ -270,9 +290,13 @@ export default function AdminSellersPage() {
                         {sellers.length} vendedores
                       </Td>
                       <Td>&nbsp;</Td>
-                      <Td numeric><Money cents={totals.totalCents} emphasis /></Td>
+                      <Td numeric>
+                        <Money cents={totals.totalCents} emphasis />
+                      </Td>
                       <Td numeric>{formatCount(totals.orderCount)}</Td>
-                      <Td numeric><Money cents={totals.avgTicketCents} emphasis /></Td>
+                      <Td numeric>
+                        <Money cents={totals.avgTicketCents} emphasis />
+                      </Td>
                       <Td numeric>{formatPercent(totals.avgDiscountPct)}</Td>
                       <Td numeric>{formatPercent(totals.avgMarginPct)}</Td>
                       <Td numeric>{formatCount(totals.managerApprovals)}</Td>

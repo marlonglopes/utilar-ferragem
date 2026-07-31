@@ -18,7 +18,9 @@ function detectInitialLocale(): Locale {
     if (!raw) return 'pt-BR'
     const stored = (JSON.parse(raw) as { state?: { locale?: string } }).state?.locale
     return stored === 'en' ? 'en' : 'pt-BR'
-  } catch { return 'pt-BR' }
+  } catch {
+    return 'pt-BR'
+  }
 }
 
 export const useLocaleStore = create<LocaleState>()(

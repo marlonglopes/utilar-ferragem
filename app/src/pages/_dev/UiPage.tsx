@@ -55,7 +55,9 @@ export default function UiPage() {
           <h1 className="text-2xl font-display font-black text-gray-900">
             Design System — Referência
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Sprint 02 — todos os primitivos em todas as variantes</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Sprint 02 — todos os primitivos em todas as variantes
+          </p>
         </div>
         <LocaleSwitcher />
       </div>
@@ -82,11 +84,19 @@ export default function UiPage() {
       <Section title="Input">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
           <Input label="Label padrão" placeholder="Placeholder..." />
-          <Input label="Com ícone esquerdo" leftIcon={<Search className="h-4 w-4" />} placeholder={t('searchPlaceholder')} />
+          <Input
+            label="Com ícone esquerdo"
+            leftIcon={<Search className="h-4 w-4" />}
+            placeholder={t('searchPlaceholder')}
+          />
           <Input label="Com erro" error="Campo obrigatório" defaultValue="valor inválido" />
           <Input label="Com dica" hint="Texto de ajuda abaixo" placeholder="Opcional..." />
           <Input label="Desabilitado" disabled value="Não editável" readOnly />
-          <Input label="Com ícone direito" rightIcon={<Star className="h-4 w-4" />} placeholder="Avaliação..." />
+          <Input
+            label="Com ícone direito"
+            rightIcon={<Star className="h-4 w-4" />}
+            placeholder="Avaliação..."
+          />
         </div>
       </Section>
 
@@ -121,8 +131,20 @@ export default function UiPage() {
           <Checkbox label="Com erro" error="Aceite obrigatório" />
         </Row>
         <Row>
-          <Radio label="Opção A" name="demo" value="a" checked={radio === 'a'} onChange={() => setRadio('a')} />
-          <Radio label="Opção B" name="demo" value="b" checked={radio === 'b'} onChange={() => setRadio('b')} />
+          <Radio
+            label="Opção A"
+            name="demo"
+            value="a"
+            checked={radio === 'a'}
+            onChange={() => setRadio('a')}
+          />
+          <Radio
+            label="Opção B"
+            name="demo"
+            value="b"
+            checked={radio === 'b'}
+            onChange={() => setRadio('b')}
+          />
           <Radio label="Desabilitado" disabled />
         </Row>
       </Section>
@@ -142,7 +164,9 @@ export default function UiPage() {
       <Section title="Tag">
         <Row>
           <Tag>Ferramentas</Tag>
-          <Tag removable onRemove={() => {}}>Removível</Tag>
+          <Tag removable onRemove={() => {}}>
+            Removível
+          </Tag>
           <Tag onRemove={() => {}}>Com handler</Tag>
         </Row>
       </Section>
@@ -150,18 +174,28 @@ export default function UiPage() {
       <Section title="Card">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">
           <Card>
-            <CardHeader><CardTitle>Título do card</CardTitle></CardHeader>
-            <CardBody><p className="text-sm text-gray-600">Conteúdo do card com texto de exemplo.</p></CardBody>
+            <CardHeader>
+              <CardTitle>Título do card</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <p className="text-sm text-gray-600">Conteúdo do card com texto de exemplo.</p>
+            </CardBody>
             <CardFooter>
               <Button size="sm">Ação</Button>
-              <Button size="sm" variant="ghost">Cancelar</Button>
+              <Button size="sm" variant="ghost">
+                Cancelar
+              </Button>
             </CardFooter>
           </Card>
           <Card shadow="md">
-            <CardBody><p className="text-sm text-gray-600">Shadow md, padding padrão.</p></CardBody>
+            <CardBody>
+              <p className="text-sm text-gray-600">Shadow md, padding padrão.</p>
+            </CardBody>
           </Card>
           <Card border={false} shadow="none" className="bg-brand-blue-light">
-            <CardBody><p className="text-sm text-brand-blue font-medium">Sem borda, sem sombra.</p></CardBody>
+            <CardBody>
+              <p className="text-sm text-brand-blue font-medium">Sem borda, sem sombra.</p>
+            </CardBody>
           </Card>
         </div>
       </Section>
@@ -198,10 +232,14 @@ export default function UiPage() {
         <Button onClick={() => setModalOpen(true)}>Abrir Modal</Button>
         <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Título do modal">
           <p className="text-sm text-gray-700 mb-4">
-            Conteúdo do modal. Pressione <kbd className="rounded bg-gray-100 px-1 py-0.5 text-xs">Esc</kbd> ou clique fora para fechar.
+            Conteúdo do modal. Pressione{' '}
+            <kbd className="rounded bg-gray-100 px-1 py-0.5 text-xs">Esc</kbd> ou clique fora para
+            fechar.
           </p>
           <div className="flex gap-2 justify-end">
-            <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setModalOpen(false)}>
+              Cancelar
+            </Button>
             <Button onClick={() => setModalOpen(false)}>Confirmar</Button>
           </div>
         </Modal>
@@ -213,7 +251,10 @@ export default function UiPage() {
             <Button
               key={side}
               variant="secondary"
-              onClick={() => { setDrawerSide(side); setDrawerOpen(true) }}
+              onClick={() => {
+                setDrawerSide(side)
+                setDrawerOpen(true)
+              }}
             >
               Drawer {side}
             </Button>
@@ -225,18 +266,16 @@ export default function UiPage() {
           side={drawerSide}
           title={`Drawer — ${drawerSide}`}
         >
-          <p className="text-sm text-gray-700">Conteúdo do drawer abre pelo lado <strong>{drawerSide}</strong>.</p>
+          <p className="text-sm text-gray-700">
+            Conteúdo do drawer abre pelo lado <strong>{drawerSide}</strong>.
+          </p>
         </Drawer>
       </Section>
 
       <Section title="Toast">
         <Row>
           {(['success', 'error', 'info', 'warning'] as const).map((v) => (
-            <Button
-              key={v}
-              variant="ghost"
-              onClick={() => toast(`Toast de ${v}`, v)}
-            >
+            <Button key={v} variant="ghost" onClick={() => toast(`Toast de ${v}`, v)}>
               {v}
             </Button>
           ))}
@@ -253,9 +292,13 @@ export default function UiPage() {
           <p className="font-display font-black text-3xl text-gray-900">Archivo Black — display</p>
           <p className="font-sans text-base text-gray-700">Inter Regular — corpo de texto</p>
           <p className="font-sans font-semibold text-base text-gray-900">Inter SemiBold — labels</p>
-          <code className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">JetBrains Mono — código</code>
+          <code className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
+            JetBrains Mono — código
+          </code>
           <div className="flex items-center gap-2">
-            <Badge variant="orange" className="text-xs">R$ 149,90</Badge>
+            <Badge variant="orange" className="text-xs">
+              R$ 149,90
+            </Badge>
             <span className="text-brand-orange font-bold text-xl">R$ 149,90</span>
           </div>
         </div>

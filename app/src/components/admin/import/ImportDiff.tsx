@@ -56,7 +56,7 @@ function PriceDiff({ row }: { row: ImportRow }) {
           'rounded px-1.5 py-0.5 text-xs font-semibold tabular-nums',
           severity === 'critical' && 'bg-red-100 text-red-800',
           severity === 'warn' && 'bg-amber-100 text-amber-900',
-          !severity && 'bg-gray-100 text-gray-800',
+          !severity && 'bg-gray-100 text-gray-800'
         )}
       >
         {formatReais(row.newPrice)}
@@ -64,7 +64,10 @@ function PriceDiff({ row }: { row: ImportRow }) {
       {severity && (
         <span
           data-testid="price-alert"
-          className={cn('inline-flex items-center gap-0.5 text-xs font-bold', SEVERITY_TEXT[severity])}
+          className={cn(
+            'inline-flex items-center gap-0.5 text-xs font-bold',
+            SEVERITY_TEXT[severity]
+          )}
         >
           <AlertTriangle className="h-3 w-3" aria-hidden="true" />
           {formatPriceDelta(row.oldPrice, row.newPrice)}
@@ -97,14 +100,18 @@ export function ImportDiff({ plan }: { plan: ImportPlan }) {
               'rounded-lg border border-gray-200 bg-white p-3',
               c.severity === 'critical' && 'border-l-4 border-l-red-600',
               c.severity === 'warn' && 'border-l-4 border-l-amber-500',
-              c.severity === 'ok' && 'border-l-4 border-l-emerald-500',
+              c.severity === 'ok' && 'border-l-4 border-l-emerald-500'
             )}
           >
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{c.label}</p>
             <p
               className={cn(
                 'mt-0.5 font-display text-2xl font-bold tabular-nums leading-tight',
-                c.value === 0 ? 'text-gray-300' : c.severity ? SEVERITY_TEXT[c.severity] : 'text-gray-900',
+                c.value === 0
+                  ? 'text-gray-300'
+                  : c.severity
+                    ? SEVERITY_TEXT[c.severity]
+                    : 'text-gray-900'
               )}
             >
               {formatCount(c.value)}
@@ -131,7 +138,10 @@ export function ImportDiff({ plan }: { plan: ImportPlan }) {
               key={i}
               className="flex items-start gap-2 rounded-md border border-gray-200 border-l-4 border-l-amber-500 bg-amber-50/60 p-2.5 text-xs leading-relaxed text-gray-700"
             >
-              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" aria-hidden="true" />
+              <AlertTriangle
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700"
+                aria-hidden="true"
+              />
               {w}
             </li>
           ))}
@@ -150,7 +160,7 @@ export function ImportDiff({ plan }: { plan: ImportPlan }) {
                 'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
                 filter === f.id
                   ? 'bg-brand-blue text-white'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               )}
             >
               {f.label}
@@ -170,7 +180,9 @@ export function ImportDiff({ plan }: { plan: ImportPlan }) {
             <Table>
               <thead>
                 <tr>
-                  <Th numeric className="w-20">Linha</Th>
+                  <Th numeric className="w-20">
+                    Linha
+                  </Th>
                   <Th className="w-28">Ação</Th>
                   <Th>SKU</Th>
                   <Th>Produto</Th>
@@ -187,7 +199,7 @@ export function ImportDiff({ plan }: { plan: ImportPlan }) {
                       data-testid={`diff-row-${r.rowNumber}`}
                       className={cn(
                         r.action === 'reject' && 'bg-red-50/60',
-                        r.action === 'review' && 'bg-amber-50/50',
+                        r.action === 'review' && 'bg-amber-50/50'
                       )}
                     >
                       {/* O número DA PLANILHA — é assim que se acha o erro no Excel. */}
@@ -198,7 +210,7 @@ export function ImportDiff({ plan }: { plan: ImportPlan }) {
                         <span
                           className={cn(
                             'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                            ACTION_CHIP[r.action],
+                            ACTION_CHIP[r.action]
                           )}
                         >
                           {ACTION_LABEL[r.action]}
@@ -212,7 +224,9 @@ export function ImportDiff({ plan }: { plan: ImportPlan }) {
                           {String(r.mapped?.name ?? r.raw?.name ?? '—')}
                         </span>
                       </Td>
-                      <Td><PriceDiff row={r} /></Td>
+                      <Td>
+                        <PriceDiff row={r} />
+                      </Td>
                       <Td className="max-w-[22rem]">
                         {issues.length === 0 ? (
                           <span className="text-gray-300">—</span>
@@ -223,7 +237,7 @@ export function ImportDiff({ plan }: { plan: ImportPlan }) {
                                 key={i}
                                 className={cn(
                                   'text-xs leading-snug',
-                                  r.action === 'reject' ? 'text-red-800' : 'text-amber-900',
+                                  r.action === 'reject' ? 'text-red-800' : 'text-amber-900'
                                 )}
                               >
                                 {e.field && (

@@ -2,8 +2,14 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft, Package, MapPin, CreditCard,
-  X, ExternalLink, Loader2, AlertTriangle,
+  ArrowLeft,
+  Package,
+  MapPin,
+  CreditCard,
+  X,
+  ExternalLink,
+  Loader2,
+  AlertTriangle,
 } from 'lucide-react'
 import { useOrder, useOrders } from '@/hooks/useOrders'
 import { OrderTimeline } from '@/components/orders/OrderTimeline'
@@ -16,12 +22,17 @@ import type { OrderStatus } from '@/lib/mockOrders'
 
 function statusColor(status: OrderStatus) {
   switch (status) {
-    case 'delivered': return 'bg-green-100 text-green-700'
-    case 'shipped': return 'bg-blue-100 text-blue-700'
+    case 'delivered':
+      return 'bg-green-100 text-green-700'
+    case 'shipped':
+      return 'bg-blue-100 text-blue-700'
     case 'picking':
-    case 'paid': return 'bg-amber-100 text-amber-700'
-    case 'pending_payment': return 'bg-orange-100 text-orange-700'
-    case 'cancelled': return 'bg-gray-100 text-gray-500'
+    case 'paid':
+      return 'bg-amber-100 text-amber-700'
+    case 'pending_payment':
+      return 'bg-orange-100 text-orange-700'
+    case 'cancelled':
+      return 'bg-gray-100 text-gray-500'
   }
 }
 
@@ -108,10 +119,15 @@ export default function OrderDetailPage() {
   }
 
   const createdDate = new Date(order.createdAt).toLocaleDateString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
   })
   const updatedDate = new Date(order.updatedAt).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
   })
   const itemCount = order.items.reduce((s, i) => s + i.quantity, 0)
 
@@ -137,7 +153,12 @@ export default function OrderDetailPage() {
             {t('orders.items', { count: itemCount })}
           </p>
         </div>
-        <span className={cn('text-xs font-semibold px-3 py-1 rounded-full self-start sm:self-auto', statusColor(order.status))}>
+        <span
+          className={cn(
+            'text-xs font-semibold px-3 py-1 rounded-full self-start sm:self-auto',
+            statusColor(order.status)
+          )}
+        >
           {cancelDone ? t('orderStatus.cancelled') : t(`orderStatus.${order.status}`)}
         </span>
       </div>
@@ -146,7 +167,9 @@ export default function OrderDetailPage() {
         {/* Timeline */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <OrderTimeline order={cancelDone ? { ...order, status: 'cancelled' } : order} />
-          <p className="text-xs text-gray-400 mt-3">{t('orders.lastUpdate', { date: updatedDate })}</p>
+          <p className="text-xs text-gray-400 mt-3">
+            {t('orders.lastUpdate', { date: updatedDate })}
+          </p>
         </div>
 
         {/* Items */}
@@ -186,7 +209,13 @@ export default function OrderDetailPage() {
             </div>
             <div className="flex justify-between text-gray-500">
               <span>Frete</span>
-              <span>{order.shippingCost === 0 ? <span className="text-green-600">Grátis</span> : formatCurrency(order.shippingCost)}</span>
+              <span>
+                {order.shippingCost === 0 ? (
+                  <span className="text-green-600">Grátis</span>
+                ) : (
+                  formatCurrency(order.shippingCost)
+                )}
+              </span>
             </div>
             <div className="flex justify-between font-bold text-gray-900 text-base pt-1 border-t border-gray-100">
               <span>Total</span>
@@ -239,7 +268,7 @@ export default function OrderDetailPage() {
         <div className="flex flex-col sm:flex-row gap-3">
           <BuyAgainButton order={order} variant="full" />
 
-          {(order.status === 'pending_payment' && !cancelDone) && (
+          {order.status === 'pending_payment' && !cancelDone && (
             <button
               onClick={() => setShowCancelModal(true)}
               className="flex-1 h-11 rounded-xl border border-red-200 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors flex items-center justify-center gap-2"

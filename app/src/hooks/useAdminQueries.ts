@@ -106,7 +106,7 @@ export function useAdminReconciliation(period: AdminPeriod): UseQueryResult<Reco
 
 export function useAdminSellers(
   period: AdminPeriod,
-  storeId?: string,
+  storeId?: string
 ): UseQueryResult<SellerPerformanceReport> {
   return useQuery({
     queryKey: adminKeys.sellers(period, storeId),

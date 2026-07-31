@@ -110,7 +110,11 @@ describe('FavoriteButton — comportamento', () => {
     render(
       <I18nextProvider i18n={i18n}>
         <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <div onClick={() => { navegou = true }}>
+          <div
+            onClick={() => {
+              navegou = true
+            }}
+          >
             <FavoriteButton product={product()} />
           </div>
         </MemoryRouter>
@@ -148,7 +152,10 @@ describe('FavoritesPage', () => {
     renderPage()
 
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
-    expect(screen.getByRole('link', { name: 'Cabo 2,5mm' })).toHaveAttribute('href', '/produto/cabo')
+    expect(screen.getByRole('link', { name: 'Cabo 2,5mm' })).toHaveAttribute(
+      'href',
+      '/produto/cabo'
+    )
     expect(screen.getByText('2 produtos salvos')).toBeInTheDocument()
   })
 

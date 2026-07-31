@@ -30,7 +30,8 @@ export interface PaymentResult {
 }
 
 const MOCK_PIX_QR = 'iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAAACXBIWXMAAAsTAAALEwEAmpwYAAAF'
-const MOCK_PIX_CODE = '00020126360014BR.GOV.BCB.PIX0114+5511999990000520400005303986540510.005802BR5913UtiLar Ferragem6009SAO PAULO62070503***6304B14A'
+const MOCK_PIX_CODE =
+  '00020126360014BR.GOV.BCB.PIX0114+5511999990000520400005303986540510.005802BR5913UtiLar Ferragem6009SAO PAULO62070503***6304B14A'
 const MOCK_BOLETO = '34191.09008 09133.610947 91020.150008 1 00010000012345'
 
 function mockPixResult(orderId: string): PaymentResult {
@@ -119,7 +120,8 @@ function parseStripeResult(raw: ApiPaymentResponse, method: PaymentMethod): Paym
 
 function parseMercadoPagoResult(raw: ApiPaymentResponse, method: PaymentMethod): PaymentResult {
   const psp = (raw.psp_payload ?? {}) as Record<string, unknown>
-  const txData = ((psp.point_of_interaction as Record<string, unknown> | undefined)?.transaction_data ?? {}) as Record<string, unknown>
+  const txData = ((psp.point_of_interaction as Record<string, unknown> | undefined)
+    ?.transaction_data ?? {}) as Record<string, unknown>
 
   const result: PaymentResult = {
     paymentId: raw.id,
@@ -161,7 +163,7 @@ function parseMercadoPagoResult(raw: ApiPaymentResponse, method: PaymentMethod):
 function parseAppmaxResult(
   raw: ApiPaymentResponse,
   method: PaymentMethod,
-  provider: PaymentProvider,
+  provider: PaymentProvider
 ): PaymentResult {
   const cd = (raw.psp_payload ?? {}) as Record<string, unknown>
 
@@ -184,9 +186,7 @@ function parseAppmaxResult(
     const expires = cd.pix_expires_at as string | undefined
     const parsed = expires ? new Date(expires) : null
     result.expiresAt =
-      parsed && !Number.isNaN(parsed.getTime())
-        ? parsed
-        : new Date(Date.now() + 30 * 60 * 1000) // Appmax: Pix expira em 30min
+      parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date(Date.now() + 30 * 60 * 1000) // Appmax: Pix expira em 30min
   }
 
   if (method === 'boleto') {
@@ -210,7 +210,10 @@ function parseApiResult(raw: ApiPaymentResponse, method: PaymentMethod): Payment
 // Exposto pra OrderConfirmationPage reusar: re-construir o PaymentResult a
 // partir do GET /payments/:id quando user volta na página depois de fechar
 // a aba sem ter copiado o boleto/QR.
-export function paymentResultFromApi(raw: ApiPaymentResponse, method: PaymentMethod): PaymentResult {
+export function paymentResultFromApi(
+  raw: ApiPaymentResponse,
+  method: PaymentMethod
+): PaymentResult {
   return parseApiResult(raw, method)
 }
 
@@ -233,106 +236,120 @@ export function usePayment() {
 
   useEffect(() => () => stopPolling(), [stopPolling])
 
-  const startPolling = useCallback((paymentId: string) => {
-    stopPolling()
-    pollCountRef.current = 0
+  const startPolling = useCallback(
+    (paymentId: string) => {
+      stopPolling()
+      pollCountRef.current = 0
 
-    if (!isApiEnabled) {
-      pollingRef.current = setInterval(() => {
-        pollCountRef.current++
-        if (pollCountRef.current >= 2) {
-          stopPolling()
-          setResult((prev) => prev ? { ...prev, status: 'confirmed' } : prev)
-        }
-      }, 3000)
-      return
-    }
-
-    pollingRef.current = setInterval(async () => {
-      pollCountRef.current++
-      if (pollCountRef.current > MAX_POLLS) {
-        stopPolling()
-        setResult((prev) => prev ? { ...prev, status: 'expired' } : prev)
+      if (!isApiEnabled) {
+        pollingRef.current = setInterval(() => {
+          pollCountRef.current++
+          if (pollCountRef.current >= 2) {
+            stopPolling()
+            setResult((prev) => (prev ? { ...prev, status: 'confirmed' } : prev))
+          }
+        }, 3000)
         return
       }
-      try {
-        const data = await apiGet<{ status: string }>(`/api/v1/payments/${paymentId}`, token ?? undefined)
-        if (data.status === 'confirmed') {
+
+      pollingRef.current = setInterval(async () => {
+        pollCountRef.current++
+        if (pollCountRef.current > MAX_POLLS) {
           stopPolling()
-          setResult((prev) => prev ? { ...prev, status: 'confirmed' } : prev)
-        } else if (data.status === 'failed') {
-          stopPolling()
-          setResult((prev) => prev ? { ...prev, status: 'failed' } : prev)
+          setResult((prev) => (prev ? { ...prev, status: 'expired' } : prev))
+          return
         }
-      } catch {
-        // transient — keep polling
-      }
-    }, 3000)
-  }, [token, stopPolling])
+        try {
+          const data = await apiGet<{ status: string }>(
+            `/api/v1/payments/${paymentId}`,
+            token ?? undefined
+          )
+          if (data.status === 'confirmed') {
+            stopPolling()
+            setResult((prev) => (prev ? { ...prev, status: 'confirmed' } : prev))
+          } else if (data.status === 'failed') {
+            stopPolling()
+            setResult((prev) => (prev ? { ...prev, status: 'failed' } : prev))
+          }
+        } catch {
+          // transient — keep polling
+        }
+      }, 3000)
+    },
+    [token, stopPolling]
+  )
 
-  const createPayment = useCallback(async (
-    orderId: string,
-    method: PaymentMethod,
-    amount: number,
-    // payer_phone é OBRIGATÓRIO na Appmax (403 "O campo Celular é obrigatório",
-    // confirmado no sandbox). Stripe/MP ignoram.
-    extras?: { payer_cpf?: string; payer_name?: string; payer_phone?: string },
-  ) => {
-    setError('')
-    setResult((prev) => prev
-      ? { ...prev, status: 'creating' }
-      : { paymentId: '', provider: 'mock', method, status: 'creating' })
-
-    try {
-      if (!isApiEnabled) {
-        await new Promise((r) => setTimeout(r, 600))
-        let mock: PaymentResult
-        if (method === 'pix') mock = mockPixResult(orderId)
-        else if (method === 'boleto') mock = mockBoletoResult(orderId)
-        else mock = mockCardResult(orderId)
-        setResult(mock)
-        if (method === 'pix') startPolling(mock.paymentId)
-        return mock
-      }
-
-      const data = await apiPost<ApiPaymentResponse>(
-        '/api/v1/payments',
-        { order_id: orderId, method, amount, ...(extras ?? {}) },
-        token ?? undefined,
+  const createPayment = useCallback(
+    async (
+      orderId: string,
+      method: PaymentMethod,
+      amount: number,
+      // payer_phone é OBRIGATÓRIO na Appmax (403 "O campo Celular é obrigatório",
+      // confirmado no sandbox). Stripe/MP ignoram.
+      extras?: { payer_cpf?: string; payer_name?: string; payer_phone?: string }
+    ) => {
+      setError('')
+      setResult((prev) =>
+        prev
+          ? { ...prev, status: 'creating' }
+          : { paymentId: '', provider: 'mock', method, status: 'creating' }
       )
-      const parsed = parseApiResult(data, method)
-      setResult(parsed)
-      // Pix/Boleto: poll. Card-Stripe: confirma via Elements (frontend marca confirmed manualmente).
-      if (method === 'pix' || method === 'boleto') startPolling(parsed.paymentId)
-      return parsed
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao criar pagamento'
-      setError(msg)
-      setResult(null)
-    }
-  }, [token, startPolling])
+
+      try {
+        if (!isApiEnabled) {
+          await new Promise((r) => setTimeout(r, 600))
+          let mock: PaymentResult
+          if (method === 'pix') mock = mockPixResult(orderId)
+          else if (method === 'boleto') mock = mockBoletoResult(orderId)
+          else mock = mockCardResult(orderId)
+          setResult(mock)
+          if (method === 'pix') startPolling(mock.paymentId)
+          return mock
+        }
+
+        const data = await apiPost<ApiPaymentResponse>(
+          '/api/v1/payments',
+          { order_id: orderId, method, amount, ...(extras ?? {}) },
+          token ?? undefined
+        )
+        const parsed = parseApiResult(data, method)
+        setResult(parsed)
+        // Pix/Boleto: poll. Card-Stripe: confirma via Elements (frontend marca confirmed manualmente).
+        if (method === 'pix' || method === 'boleto') startPolling(parsed.paymentId)
+        return parsed
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Erro ao criar pagamento'
+        setError(msg)
+        setResult(null)
+      }
+    },
+    [token, startPolling]
+  )
 
   const simulateConfirm = useCallback(() => {
     stopPolling()
-    setResult((prev) => prev ? { ...prev, status: 'confirmed' } : prev)
+    setResult((prev) => (prev ? { ...prev, status: 'confirmed' } : prev))
   }, [stopPolling])
 
   // Marca como pendente — usado depois de stripe.confirmPayment retornar succeeded.
   // O webhook vai promover pra confirmed real, mas o frontend pode mostrar feedback otimista.
   const markPending = useCallback(() => {
-    setResult((prev) => prev ? { ...prev, status: 'pending' } : prev)
+    setResult((prev) => (prev ? { ...prev, status: 'pending' } : prev))
   }, [])
 
   const markConfirmed = useCallback(() => {
     stopPolling()
-    setResult((prev) => prev ? { ...prev, status: 'confirmed' } : prev)
+    setResult((prev) => (prev ? { ...prev, status: 'confirmed' } : prev))
   }, [stopPolling])
 
-  const markFailed = useCallback((msg?: string) => {
-    stopPolling()
-    if (msg) setError(msg)
-    setResult((prev) => prev ? { ...prev, status: 'failed' } : prev)
-  }, [stopPolling])
+  const markFailed = useCallback(
+    (msg?: string) => {
+      stopPolling()
+      if (msg) setError(msg)
+      setResult((prev) => (prev ? { ...prev, status: 'failed' } : prev))
+    },
+    [stopPolling]
+  )
 
   return {
     result,

@@ -196,12 +196,18 @@ export default function BalcaoApprovalsPage() {
           aria-label="Atualizar fila"
           className="flex h-12 w-12 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
         >
-          <RefreshCw className={cn('h-5 w-5', approvals.isLoading && 'animate-spin')} aria-hidden="true" />
+          <RefreshCw
+            className={cn('h-5 w-5', approvals.isLoading && 'animate-spin')}
+            aria-hidden="true"
+          />
         </button>
       </div>
 
       {approvals.actionError && (
-        <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700">
+        <p
+          role="alert"
+          className="mb-3 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700"
+        >
           {approvals.actionError}
         </p>
       )}

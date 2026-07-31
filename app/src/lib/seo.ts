@@ -111,10 +111,7 @@ export function productSchema(p: ProductSchemaInput) {
       url,
       price: p.price.toFixed(2),
       priceCurrency: p.currency ?? 'BRL',
-      availability:
-        p.stock > 0
-          ? 'https://schema.org/InStock'
-          : 'https://schema.org/OutOfStock',
+      availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
       itemCondition: 'https://schema.org/NewCondition',
       ...(p.seller ? { seller: { '@type': 'Organization', name: p.seller } } : {}),
     },

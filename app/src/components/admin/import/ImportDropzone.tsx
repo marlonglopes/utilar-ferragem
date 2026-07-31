@@ -1,11 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { AlertTriangle, FileSpreadsheet, Loader2, UploadCloud } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import {
-  ACCEPTED_EXTENSIONS,
-  MAX_UPLOAD_BYTES,
-  formatBytes,
-} from '@/lib/adminImportFormat'
+import { ACCEPTED_EXTENSIONS, MAX_UPLOAD_BYTES, formatBytes } from '@/lib/adminImportFormat'
 import { formatCount } from '@/lib/adminFormat'
 
 /**
@@ -44,7 +40,7 @@ export function ImportDropzone({
       const dropped = e.dataTransfer.files?.[0]
       if (dropped) onSelect(dropped)
     },
-    [onSelect],
+    [onSelect]
   )
 
   return (
@@ -60,7 +56,7 @@ export function ImportDropzone({
         className={cn(
           'rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors',
           dragging ? 'border-brand-blue bg-brand-blue-light' : 'border-gray-300 bg-gray-50',
-          error && 'border-red-300 bg-red-50',
+          error && 'border-red-300 bg-red-50'
         )}
       >
         {loading ? (
@@ -78,7 +74,7 @@ export function ImportDropzone({
         <label
           className={cn(
             'mt-4 inline-flex cursor-pointer items-center gap-2 rounded-md bg-brand-blue px-3 py-2 text-xs font-semibold text-white hover:bg-brand-blue/90',
-            loading && 'pointer-events-none opacity-60',
+            loading && 'pointer-events-none opacity-60'
           )}
         >
           Escolher arquivo
@@ -120,7 +116,9 @@ export function ImportDropzone({
       {file && !error && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-gray-200 bg-white p-3">
           <FileSpreadsheet className="h-5 w-5 shrink-0 text-brand-blue" aria-hidden="true" />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{file.name}</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
+            {file.name}
+          </span>
           <span className="text-xs tabular-nums text-gray-500">{formatBytes(file.size)}</span>
           {detectedRows !== undefined && (
             <span className="text-xs tabular-nums text-gray-500">

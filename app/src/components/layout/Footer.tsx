@@ -33,9 +33,7 @@ export function Footer() {
                 </span>
               </div>
             </div>
-            <p className="text-sm text-blue-200 leading-relaxed">
-              {t('footer.lgpd')}
-            </p>
+            <p className="text-sm text-blue-200 leading-relaxed">{t('footer.lgpd')}</p>
           </div>
 
           <div>

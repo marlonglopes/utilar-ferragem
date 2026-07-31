@@ -75,7 +75,10 @@ export default function AdminObservabilityPage() {
     >
       {isError && (
         <div className="rounded-lg border border-gray-200 bg-white">
-          <ErrorState message={(error as Error)?.message ?? 'Erro desconhecido'} onRetry={() => void refetch()} />
+          <ErrorState
+            message={(error as Error)?.message ?? 'Erro desconhecido'}
+            onRetry={() => void refetch()}
+          />
         </div>
       )}
 
@@ -151,17 +154,27 @@ export default function AdminObservabilityPage() {
                             {s.up ? (s.status === 'ok' ? 'Saudável' : 'Degradado') : 'Fora do ar'}
                           </SeverityPill>
                         </Td>
-                        <Td numeric className="text-gray-600">{formatLatency(s.p50Ms)}</Td>
+                        <Td numeric className="text-gray-600">
+                          {formatLatency(s.p50Ms)}
+                        </Td>
                         <Td numeric className={cn('font-semibold', SEVERITY_TEXT[lat])}>
                           {formatLatency(s.p95Ms)}
                         </Td>
-                        <Td numeric className="text-gray-600">{formatLatency(s.p99Ms)}</Td>
+                        <Td numeric className="text-gray-600">
+                          {formatLatency(s.p99Ms)}
+                        </Td>
                         <Td numeric className={cn('font-semibold', SEVERITY_TEXT[err])}>
                           {formatPercent(s.errorRate, 2)}
                         </Td>
-                        <Td numeric className="text-gray-600">{formatCount(s.rpm)}</Td>
-                        <Td numeric className="text-gray-600">{formatPercent(s.uptimePct, 2)}</Td>
-                        <Td className="whitespace-nowrap font-mono text-[11px] text-gray-500">{s.version}</Td>
+                        <Td numeric className="text-gray-600">
+                          {formatCount(s.rpm)}
+                        </Td>
+                        <Td numeric className="text-gray-600">
+                          {formatPercent(s.uptimePct, 2)}
+                        </Td>
+                        <Td className="whitespace-nowrap font-mono text-[11px] text-gray-500">
+                          {s.version}
+                        </Td>
                         <Td>
                           <Sparkline
                             values={s.latencySeries}

@@ -32,7 +32,7 @@ function renderGuard() {
         />
         <Route path="/entrar" element={<div>tela de login</div>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   )
 }
 
@@ -110,7 +110,7 @@ describe('AdminRoute — auth real em produção', () => {
           />
           <Route path="/entrar" element={<div>tela de login</div>} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
     )
   }
 
