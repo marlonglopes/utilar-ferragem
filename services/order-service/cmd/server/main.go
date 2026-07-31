@@ -202,6 +202,9 @@ func main() {
 	// quem embala não precisa de poder de admin sobre o resto do sistema.
 	ops := r.Group("/api/v1/admin", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, "admin", "operator"))
 	{
+		// Lista de pedidos do painel de operação — o que faltava para ter onde
+		// agir os PATCH de fulfillment abaixo.
+		ops.GET("/orders", orderH.AdminList)
 		ops.PATCH("/orders/:id/picking", orderH.MarkPicking)
 		ops.PATCH("/orders/:id/shipped", orderH.MarkShipped)
 		ops.PATCH("/orders/:id/delivered", orderH.MarkDelivered)

@@ -507,6 +507,109 @@ func (h *OrderHandler) List(c *gin.Context) {
 	})
 }
 
+// AdminList GET /api/v1/admin/orders?status=&channel=&q=&page=&per_page=
+//
+// Lista TODOS os pedidos (sem escopo de cliente) para o painel de OPERAÇÃO —
+// é o que faltava para separar/despachar/entregar/cancelar pelo admin (os PATCH
+// de fulfillment já existiam, mas nada listava os pedidos para agir neles).
+//
+// Filtros: status (específico | active | done | all), canal (web|balcao), e
+// busca `q` por nome/documento do cliente ou id do pedido. Só admin/operador
+// chega aqui (grupo de rota), então NÃO há escopo de user — de propósito.
+func (h *OrderHandler) AdminList(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	if perPage < 1 || perPage > 100 {
+		perPage = 20
+	}
+
+	where := "1=1"
+	var args []any
+
+	switch st := c.Query("status"); st {
+	case "", "all":
+		// sem filtro de status
+	case "active":
+		where += " AND status IN ('pending_payment','paid','picking','shipped')"
+	case "done":
+		where += " AND status IN ('delivered','cancelled')"
+	default:
+		if isKnownOrderStatus(st) {
+			args = append(args, st)
+			where += fmt.Sprintf(" AND status = $%d", len(args))
+		}
+	}
+
+	if ch := c.Query("channel"); ch == "web" || ch == "balcao" {
+		args = append(args, ch)
+		where += fmt.Sprintf(" AND channel = $%d", len(args))
+	}
+
+	if q := strings.TrimSpace(c.Query("q")); q != "" {
+		args = append(args, "%"+q+"%")
+		p := len(args)
+		where += fmt.Sprintf(
+			" AND (customer_name ILIKE $%d OR customer_document ILIKE $%d OR id::text ILIKE $%d)", p, p, p)
+	}
+
+	countArgs := append([]any{}, args...)
+	offset := (page - 1) * perPage
+	limitPH, offsetPH := len(args)+1, len(args)+2
+	args = append(args, perPage, offset)
+
+	rows, err := h.db.Query(fmt.Sprintf(
+		`SELECT id FROM orders WHERE %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d`,
+		where, limitPH, offsetPH), args...)
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	defer rows.Close()
+	ids := make([]string, 0, perPage)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			DBError(c, err)
+			return
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		DBError(c, err)
+		return
+	}
+
+	orders, err := h.loadOrders(ids)
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	var total int
+	if err := h.db.QueryRow("SELECT count(*) FROM orders WHERE "+where, countArgs...).Scan(&total); err != nil {
+		DBError(c, err)
+		return
+	}
+	totalPages := (total + perPage - 1) / perPage
+	c.JSON(http.StatusOK, gin.H{
+		"data": orders,
+		"meta": gin.H{"page": page, "per_page": perPage, "total": total, "total_pages": totalPages},
+	})
+}
+
+// isKnownOrderStatus valida o filtro de status contra os estados reais — evita
+// injeção de valor arbitrário no WHERE (mesmo parametrizado, filtra ruído).
+func isKnownOrderStatus(s string) bool {
+	switch model.OrderStatus(s) {
+	case model.StatusPendingPayment, model.StatusPaid, model.StatusPicking,
+		model.StatusShipped, model.StatusDelivered, model.StatusCancelled:
+		return true
+	}
+	return false
+}
+
 // Get GET /api/v1/orders/:id
 //
 // SEGURANÇA — a proteção contra IDOR mudou de FORMA aqui, e essa é a parte
