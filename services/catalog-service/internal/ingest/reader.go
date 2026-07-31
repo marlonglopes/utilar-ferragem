@@ -32,8 +32,8 @@ const (
 // de caracteres invisíveis — o valor cru fica no staging (import_rows.raw) pra
 // auditoria.
 type Table struct {
-	Header  []string
-	Rows    [][]string
+	Header []string
+	Rows   [][]string
 	// RowNumbers guarda a linha ORIGINAL no arquivo de cada entrada de Rows.
 	// Sem isto, pular preâmbulo faz o relatório de erro apontar "linha 5"
 	// quando o operador precisa procurar na linha 12 da planilha dele.

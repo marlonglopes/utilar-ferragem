@@ -39,13 +39,13 @@ type Committer struct {
 
 // CommitResult é o relatório final.
 type CommitResult struct {
-	Created  int      `json:"created"`
-	Updated  int      `json:"updated"`
-	Skipped  int      `json:"skipped"`
-	Archived int      `json:"archived"`
-	Rejected int      `json:"rejected"`
-	Held     int      `json:"held"` // retidos para revisão humana
-	Failed   int      `json:"failed"`
+	Created  int        `json:"created"`
+	Updated  int        `json:"updated"`
+	Skipped  int        `json:"skipped"`
+	Archived int        `json:"archived"`
+	Rejected int        `json:"rejected"`
+	Held     int        `json:"held"` // retidos para revisão humana
+	Failed   int        `json:"failed"`
 	Errors   []RowError `json:"errors,omitempty"`
 }
 

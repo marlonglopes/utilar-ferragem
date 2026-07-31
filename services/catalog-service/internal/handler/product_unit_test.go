@@ -73,10 +73,10 @@ func TestParseProductsQuery_fullParams(t *testing.T) {
 
 func TestParseProductsQuery_sanitizesBounds(t *testing.T) {
 	tests := []struct {
-		name       string
-		url        string
-		wantPage   int
-		wantPer    int
+		name        string
+		url         string
+		wantPage    int
+		wantPer     int
 		wantInStock bool
 	}{
 		{"negative page → 1", "/products?page=-5", 1, 24, false},

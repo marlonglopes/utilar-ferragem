@@ -24,7 +24,7 @@ const HeaderName = "X-Request-Id"
 // gerados na mesma ms sejam ordenados — útil pra log replay determinístico.
 // Mutex pq monotonic.Read não é thread-safe.
 var (
-	mu              sync.Mutex
+	mu               sync.Mutex
 	monotonicEntropy = ulid.Monotonic(rand.Reader, 0)
 )
 

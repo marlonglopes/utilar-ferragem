@@ -66,7 +66,7 @@ type CachedResponse struct {
 
 // Errors públicos.
 var (
-	ErrInFlight  = errors.New("idempotency: request in flight")
+	ErrInFlight   = errors.New("idempotency: request in flight")
 	ErrInvalidKey = errors.New("idempotency: invalid key")
 )
 

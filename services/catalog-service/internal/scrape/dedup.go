@@ -3,8 +3,9 @@ package scrape
 import "strings"
 
 // Dedup remove duplicatas de um lote. Chave, em ordem de confiança:
-//   1. codigo_fabricante (quando existe) — o identificador mais estável.
-//   2. nome-normalizado + categoria — quando não há código.
+//  1. codigo_fabricante (quando existe) — o identificador mais estável.
+//  2. nome-normalizado + categoria — quando não há código.
+//
 // Mantém o PRIMEIRO item visto (a ordem de descoberta costuma ser a canônica).
 func Dedup(items []ScrapedProduct) (unique []ScrapedProduct, removed int) {
 	seen := make(map[string]bool, len(items))

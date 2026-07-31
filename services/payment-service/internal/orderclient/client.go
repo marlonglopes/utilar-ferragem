@@ -3,12 +3,12 @@
 // SEGURANÇA (audit C1, C2):
 //
 // O payment-service precisa garantir que:
-//   1. (C1) o `amount` cobrado é o que foi gravado no order-service quando o
-//      pedido foi criado — não o que o cliente envia no body. O cliente pode
-//      tentar tampering enviando `amount: 0.01` num pedido de R$ 5000.
-//   2. (C2) o `order_id` referenciado pertence ao usuário autenticado no JWT.
-//      Sem isso, atacante cria pagamento referenciando pedido alheio e dispara
-//      confirmação cruzada.
+//  1. (C1) o `amount` cobrado é o que foi gravado no order-service quando o
+//     pedido foi criado — não o que o cliente envia no body. O cliente pode
+//     tentar tampering enviando `amount: 0.01` num pedido de R$ 5000.
+//  2. (C2) o `order_id` referenciado pertence ao usuário autenticado no JWT.
+//     Sem isso, atacante cria pagamento referenciando pedido alheio e dispara
+//     confirmação cruzada.
 //
 // O fix dos dois é o mesmo: payment-service faz `GET /api/v1/orders/:id` no
 // order-service propagando o JWT do cliente. Como o order-service filtra por

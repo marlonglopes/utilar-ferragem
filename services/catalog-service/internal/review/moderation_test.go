@@ -5,8 +5,8 @@ import "testing"
 // A política de moderação é "publica, mas segura o suspeito". Os dois lados
 // erram caro e por motivos opostos:
 //
-//   • deixar passar spam → texto de venda de concorrente na página do produto;
-//   • segurar demais → avaliação técnica honesta some, e como a fila é revisada
+//   - deixar passar spam → texto de venda de concorrente na página do produto;
+//   - segurar demais → avaliação técnica honesta some, e como a fila é revisada
 //     devagar numa loja sem equipe, "some" na prática quer dizer "some".
 //
 // Por isso os falsos positivos têm tantos casos quanto os verdadeiros.

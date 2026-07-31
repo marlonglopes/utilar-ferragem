@@ -82,7 +82,6 @@ var (
 	// Convite explícito a contato fora da plataforma. Cobre o spam que escreve
 	// o telefone por extenso justamente para escapar do regex de número.
 	reContato = regexp.MustCompile(`(?i)\b(whats?app|whatzap|zap|telegram|chama\s+no|me\s+chama|fora\s+do\s+site|direto\s+comigo)\b`)
-
 )
 
 // maxRunLength — a partir de quantas repetições do MESMO caractere o texto é

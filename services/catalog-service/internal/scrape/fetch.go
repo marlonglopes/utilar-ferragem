@@ -32,9 +32,9 @@ type Fetcher struct {
 	ua       string
 	minDelay time.Duration // intervalo mínimo entre requisições ao MESMO host
 
-	mu       sync.Mutex
-	lastHit  map[string]time.Time
-	robots   map[string]*Robots
+	mu      sync.Mutex
+	lastHit map[string]time.Time
+	robots  map[string]*Robots
 }
 
 // NewFetcher — minDelay padrão 2.5s (a spec pede 2–3s). O Crawl-delay do

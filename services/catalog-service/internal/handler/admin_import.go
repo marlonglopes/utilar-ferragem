@@ -413,11 +413,11 @@ func (h *ImportHandler) CreateBatch(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusCreated, gin.H{
-		"batchId": batchID,
-		"status":  "validated",
-		"dryRun":  true,
-		"summary": planSummary(plan),
-		"rows":    truncateRows(plan.Rows),
+		"batchId":  batchID,
+		"status":   "validated",
+		"dryRun":   true,
+		"summary":  planSummary(plan),
+		"rows":     truncateRows(plan.Rows),
 		"warnings": plan.Warnings,
 		"nextStep": fmt.Sprintf("revise o diff e aplique com POST /api/v1/admin/import/batches/%s/commit", batchID),
 	})

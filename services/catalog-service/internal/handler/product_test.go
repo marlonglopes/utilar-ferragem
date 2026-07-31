@@ -259,13 +259,13 @@ func TestProduct_GetBySlug(t *testing.T) {
 		t.Fatalf("status = %d, body=%s", w.Code, w.Body.String())
 	}
 	var p struct {
-		Slug              string  `json:"slug"`
-		Name              string  `json:"name"`
-		SellerID          string  `json:"sellerId"`
-		SellerRating      float64 `json:"sellerRating"`
-		ReviewCount       int     `json:"reviewCount"`
-		OriginalPrice     float64 `json:"originalPrice"`
-		Images            []struct {
+		Slug          string  `json:"slug"`
+		Name          string  `json:"name"`
+		SellerID      string  `json:"sellerId"`
+		SellerRating  float64 `json:"sellerRating"`
+		ReviewCount   int     `json:"reviewCount"`
+		OriginalPrice float64 `json:"originalPrice"`
+		Images        []struct {
 			URL string `json:"url"`
 			Alt string `json:"alt"`
 		} `json:"images"`

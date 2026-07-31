@@ -19,17 +19,17 @@ import "time"
 // schema da spec (chaves em pt-BR/snake_case no JSON). Campos opcionais são
 // ponteiros: distinguir "ausente" de "vazio" importa para a validação.
 type ScrapedProduct struct {
-	Fonte                string   `json:"fonte"`
-	URLOrigem            string   `json:"url_origem"`
-	CodigoFabricante     *string  `json:"codigo_fabricante"`
-	Nome                 string   `json:"nome"`
-	CategoriaBruta       string   `json:"categoria_bruta"`
-	CategoriaNormalizada string   `json:"categoria_normalizada"`
-	Descricao            *string  `json:"descricao"`
-	Preco                *float64 `json:"preco"`
-	Moeda                string   `json:"moeda"` // sempre "BRL"
-	ImagemURLOriginal    *string  `json:"imagem_url_original"`
-	UnidadeVenda         *string  `json:"unidade_venda"` // UN, CX, KG…
+	Fonte                string    `json:"fonte"`
+	URLOrigem            string    `json:"url_origem"`
+	CodigoFabricante     *string   `json:"codigo_fabricante"`
+	Nome                 string    `json:"nome"`
+	CategoriaBruta       string    `json:"categoria_bruta"`
+	CategoriaNormalizada string    `json:"categoria_normalizada"`
+	Descricao            *string   `json:"descricao"`
+	Preco                *float64  `json:"preco"`
+	Moeda                string    `json:"moeda"` // sempre "BRL"
+	ImagemURLOriginal    *string   `json:"imagem_url_original"`
+	UnidadeVenda         *string   `json:"unidade_venda"` // UN, CX, KG…
 	ColetadoEm           time.Time `json:"coletado_em"`
 }
 

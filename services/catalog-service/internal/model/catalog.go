@@ -78,7 +78,7 @@ type Product struct {
 	// Stock é float64 desde a migration 005 (`stock NUMERIC`): a loja vende
 	// 2,5 m de cabo e 1,5 m³ de areia. Quantidades inteiras serializam
 	// idênticas ("10"), então o contrato JSON com o frontend não muda.
-	Stock          float64         `json:"stock"`
+	Stock       float64 `json:"stock"`
 	Rating      float64 `json:"rating"`
 	ReviewCount int     `json:"reviewCount"`
 	// RatingScore é a média BAYESIANA (products.rating_bayes, migration 015) —

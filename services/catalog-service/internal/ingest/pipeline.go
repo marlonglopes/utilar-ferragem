@@ -49,9 +49,9 @@ type RowResult struct {
 	ProductID string            `json:"productId,omitempty"`
 
 	// Diff de preço — o que a tela de revisão mostra em âmbar.
-	OldPrice  *float64 `json:"oldPrice,omitempty"`
-	NewPrice  *float64 `json:"newPrice,omitempty"`
-	DropPct   float64  `json:"dropPct,omitempty"`
+	OldPrice *float64 `json:"oldPrice,omitempty"`
+	NewPrice *float64 `json:"newPrice,omitempty"`
+	DropPct  float64  `json:"dropPct,omitempty"`
 }
 
 func (r *RowResult) addError(field, msg string) {

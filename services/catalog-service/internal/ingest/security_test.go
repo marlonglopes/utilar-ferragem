@@ -120,8 +120,8 @@ func TestProfile_RejeitaCampoDuplicado(t *testing.T) {
 	// Duas colunas no mesmo campo tornariam o resultado dependente da ordem de
 	// iteração do mapa — não-determinístico entre execuções.
 	p := &Profile{Name: "x", Columns: map[string]ColumnMapping{
-		"NOME":     {Field: FieldName},
-		"PRECO":    {Field: FieldPrice},
+		"NOME":      {Field: FieldName},
+		"PRECO":     {Field: FieldPrice},
 		"VLR VENDA": {Field: FieldPrice},
 	}}
 	if err := p.Validate(); err == nil {

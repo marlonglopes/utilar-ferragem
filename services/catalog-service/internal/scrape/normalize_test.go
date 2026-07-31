@@ -7,11 +7,11 @@ import "testing"
 func TestNormalizeCategoria(t *testing.T) {
 	cases := []struct{ bruta, nome, want string }{
 		{"Dobradiças", "Dobradiça 3 pol Zincada", "fixacao"},
-		{"", "Charneira de aço inox", "fixacao"},               // sinônimo
+		{"", "Charneira de aço inox", "fixacao"}, // sinônimo
 		{"Ferramentas Elétricas", "Furadeira de Impacto", "ferramentas"},
 		{"", "Óculos de Proteção Incolor CA 34082", "seguranca"}, // EPI
 		{"Fixação", "Parafuso Chipboard 4x40", "fixacao"},
-		{"", "Cadeado de Latão 40mm", "fixacao"},                // fechadura/cadeado = fixação, não "seguranca"(EPI)
+		{"", "Cadeado de Latão 40mm", "fixacao"}, // fechadura/cadeado = fixação, não "seguranca"(EPI)
 		{"Hidráulica", "Tubo PVC Soldável 25mm", "hidraulica"},
 		{"Diversos", "Item Misterioso XYZ", CategoriaDesconhecida}, // não reconhece => vazio
 	}

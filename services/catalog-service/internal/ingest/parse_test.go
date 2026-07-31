@@ -14,10 +14,10 @@ import (
 
 func TestParseNumber_FormatoBrasileiro(t *testing.T) {
 	tests := []struct {
-		name    string
-		in      string
-		want    float64
-		wantOK  bool
+		name     string
+		in       string
+		want     float64
+		wantOK   bool
 		wantWarn bool
 	}{
 		// --- o caso central: BR vs US -------------------------------------

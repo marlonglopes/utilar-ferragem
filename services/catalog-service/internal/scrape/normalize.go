@@ -6,7 +6,8 @@ import "strings"
 // fornecedores ("dobradiça" vs "charneira"), então mapeamos o texto bruto (a
 // categoria do site + o nome do produto) para o vocabulário CONTROLADO do
 // catálogo antes de gravar. As categorias válidas são as 8 do catalog:
-//   construcao, eletrica, ferramentas, fixacao, hidraulica, jardim, pintura, seguranca
+//
+//	construcao, eletrica, ferramentas, fixacao, hidraulica, jardim, pintura, seguranca
 //
 // O escopo do scraper é FERRAGEM (fixação/marcenaria/serralheria), então a
 // esmagadora maioria cai em `fixacao` ou `ferramentas`. Locks/dobradiças/

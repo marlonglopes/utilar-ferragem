@@ -109,4 +109,3 @@ func CacheControl(maxAgeSeconds int) gin.HandlerFunc {
 		c.Header("Cache-Control", "public, max-age="+strconv.Itoa(maxAgeSeconds))
 	}
 }
-

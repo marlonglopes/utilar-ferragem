@@ -197,12 +197,12 @@ func TestParseMPSignatureHeader(t *testing.T) {
 		wantErr bool
 	}{
 		{"ts=123,v1=abc", "123", "abc", false},
-		{"v1=abc,ts=123", "123", "abc", false},                  // ordem invertida
-		{"ts=123, v1=abc", "123", "abc", false},                 // espaço extra
-		{"ts=123,v1=abc,extra=ignored", "123", "abc", false},    // campo extra
-		{"ts=123", "", "", true},                                // só ts
-		{"", "", "", true},                                      // vazio
-		{"v1=abc", "", "", true},                                // só v1
+		{"v1=abc,ts=123", "123", "abc", false},               // ordem invertida
+		{"ts=123, v1=abc", "123", "abc", false},              // espaço extra
+		{"ts=123,v1=abc,extra=ignored", "123", "abc", false}, // campo extra
+		{"ts=123", "", "", true},                             // só ts
+		{"", "", "", true},                                   // vazio
+		{"v1=abc", "", "", true},                             // só v1
 	}
 	for _, c := range cases {
 		t.Run(c.in, func(t *testing.T) {

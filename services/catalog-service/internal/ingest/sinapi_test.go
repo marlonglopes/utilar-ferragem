@@ -134,7 +134,7 @@ func TestSINAPI_NuncaPublicaAutomaticamente(t *testing.T) {
 				"O valor do SINAPI é CUSTO DE OBRA PÚBLICA, nunca preço de venda.", col)
 		}
 		if m.Field == FieldStatus {
-			t.Fatalf("REGRESSÃO CRÍTICA: o perfil SINAPI mapeia `status` — o arquivo "+
+			t.Fatalf("REGRESSÃO CRÍTICA: o perfil SINAPI mapeia `status` — o arquivo " +
 				"não pode decidir o que vai pra vitrine")
 		}
 	}

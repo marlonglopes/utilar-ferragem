@@ -21,20 +21,20 @@ const (
 )
 
 type Payment struct {
-	ID           string          `json:"id" db:"id"`
-	OrderID      string          `json:"order_id" db:"order_id"`
-	UserID       string          `json:"user_id" db:"user_id"`
-	Method       PaymentMethod   `json:"method" db:"method"`
-	Status       PaymentStatus   `json:"status" db:"status"`
-	Amount       float64         `json:"amount" db:"amount"`
-	Currency     string          `json:"currency" db:"currency"`
+	ID           string           `json:"id" db:"id"`
+	OrderID      string           `json:"order_id" db:"order_id"`
+	UserID       string           `json:"user_id" db:"user_id"`
+	Method       PaymentMethod    `json:"method" db:"method"`
+	Status       PaymentStatus    `json:"status" db:"status"`
+	Amount       float64          `json:"amount" db:"amount"`
+	Currency     string           `json:"currency" db:"currency"`
 	PSPPaymentID *string          `json:"psp_payment_id,omitempty" db:"psp_payment_id"`
 	PSPMetadata  *json.RawMessage `json:"psp_metadata,omitempty" db:"psp_metadata"`
 	PSPPayload   *json.RawMessage `json:"psp_payload,omitempty" db:"psp_payload"`
-	ConfirmedAt  *time.Time      `json:"confirmed_at,omitempty" db:"confirmed_at"`
-	ExpiresAt    *time.Time      `json:"expires_at,omitempty" db:"expires_at"`
-	CreatedAt    time.Time       `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time       `json:"updated_at" db:"updated_at"`
+	ConfirmedAt  *time.Time       `json:"confirmed_at,omitempty" db:"confirmed_at"`
+	ExpiresAt    *time.Time       `json:"expires_at,omitempty" db:"expires_at"`
+	CreatedAt    time.Time        `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time        `json:"updated_at" db:"updated_at"`
 }
 
 type CreatePaymentRequest struct {
@@ -54,16 +54,16 @@ type CreatePaymentRequest struct {
 
 // PSPPayload is the response sent back to the SPA per payment method
 type PixPayload struct {
-	QRCode     string    `json:"qr_code"`
-	QRCodeBase64 string  `json:"qr_code_base64"`
-	CopyPaste  string    `json:"copy_paste"`
-	ExpiresAt  time.Time `json:"expires_at"`
+	QRCode       string    `json:"qr_code"`
+	QRCodeBase64 string    `json:"qr_code_base64"`
+	CopyPaste    string    `json:"copy_paste"`
+	ExpiresAt    time.Time `json:"expires_at"`
 }
 
 type BoletoPayload struct {
-	BarCode    string    `json:"bar_code"`
-	PDF        string    `json:"pdf_url"`
-	ExpiresAt  time.Time `json:"expires_at"`
+	BarCode   string    `json:"bar_code"`
+	PDF       string    `json:"pdf_url"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type CardPayload struct {

@@ -36,11 +36,11 @@ import (
 // e derrubar o serviço por OOM — o ataque clássico contra qualquer parser de
 // formato comprimido.
 const (
-	maxXLSXEntries    = 512               // arquivos dentro do zip
-	maxXLSXEntrySize  = 128 << 20         // 128 MB descomprimidos por entrada
-	maxXLSXTotalSize  = 256 << 20         // 256 MB descomprimidos no total
-	maxCompressRatio  = 200               // razão de compressão suspeita
-	maxXLSXSheetCells = 4 << 20           // 4M células por aba
+	maxXLSXEntries    = 512       // arquivos dentro do zip
+	maxXLSXEntrySize  = 128 << 20 // 128 MB descomprimidos por entrada
+	maxXLSXTotalSize  = 256 << 20 // 256 MB descomprimidos no total
+	maxCompressRatio  = 200       // razão de compressão suspeita
+	maxXLSXSheetCells = 4 << 20   // 4M células por aba
 )
 
 type xlsxCell struct {

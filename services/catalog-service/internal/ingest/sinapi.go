@@ -95,12 +95,12 @@ type SINAPICompositionItem struct {
 
 // SINAPIResult é o retorno do parse do arquivo.
 type SINAPIResult struct {
-	Insumos      []SINAPIInsumo
-	Compositions []SINAPIComposition
-	UF           string
+	Insumos        []SINAPIInsumo
+	Compositions   []SINAPIComposition
+	UF             string
 	ReferenceMonth string
-	Desonerado   bool
-	Warnings     []string
+	Desonerado     bool
+	Warnings       []string
 	// SkippedLabor conta os insumos descartados por serem mão de obra,
 	// locação ou energia. Reportado porque é um número grande e esperado — se
 	// aparecer zero, o filtro quebrou e pedreiro está entrando como produto.

@@ -102,9 +102,9 @@ func (c *Client) CreatePreference(orderID string, amount float64, title string) 
 	body := map[string]any{
 		"items": []map[string]any{
 			{
-				"title":      title,
-				"quantity":   1,
-				"unit_price": amount,
+				"title":       title,
+				"quantity":    1,
+				"unit_price":  amount,
 				"currency_id": "BRL",
 			},
 		},
