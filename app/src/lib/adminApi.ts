@@ -119,7 +119,7 @@ async function adminFetch(base: string, path: string, init?: RequestInit): Promi
   return fetch(`${base}${path}`, comToken(novo))
 }
 
-async function adminGet<T>(base: string, path: string): Promise<T> {
+export async function adminGet<T>(base: string, path: string): Promise<T> {
   const res = await adminFetch(base, path)
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
@@ -129,6 +129,30 @@ async function adminGet<T>(base: string, path: string): Promise<T> {
     throw new AdminApiError(body.error ?? `HTTP ${res.status}`, res.status, body.code)
   }
   return (await res.json()) as T
+}
+
+// adminSend faz um POST/PATCH admin com o mesmo tratamento de token/erro do
+// adminGet. Usado por ações (ex.: despachar pedido). `body` opcional em JSON.
+export async function adminSend<T>(
+  base: string,
+  path: string,
+  method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+  body?: unknown,
+): Promise<T> {
+  const res = await adminFetch(base, path, {
+    method,
+    ...(body !== undefined
+      ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      : {}),
+  })
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
+    if (res.status === 403) {
+      throw new AdminApiError('Sua conta não tem permissão para esta ação.', 403, 'forbidden')
+    }
+    throw new AdminApiError(err.error ?? `HTTP ${res.status}`, res.status, err.code)
+  }
+  return (await res.json().catch(() => ({}))) as T
 }
 
 // ---------------------------------------------------------------------------

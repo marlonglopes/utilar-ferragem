@@ -4,6 +4,7 @@ import { NavLink, useLocation , useNavigate } from 'react-router-dom'
 import {
   Activity,
   BookOpenCheck,
+  ClipboardList,
   LayoutDashboard,
   Menu,
   Package,
@@ -32,6 +33,7 @@ import { isAdminApiEnabled } from '@/lib/adminApi'
 const NAV = [
   { to: '/admin', label: 'Visão geral', short: 'Geral', icon: LayoutDashboard, end: true },
   { to: '/admin/contabil', label: 'Auditoria contábil', short: 'Contábil', icon: BookOpenCheck },
+  { to: '/admin/pedidos', label: 'Pedidos', short: 'Pedidos', icon: ClipboardList },
   { to: '/admin/vendedores', label: 'Vendedores', short: 'Vendedores', icon: Users },
   { to: '/admin/produtos', label: 'Produtos', short: 'Produtos', icon: Package },
   { to: '/admin/importar', label: 'Importar produtos', short: 'Importar', icon: Upload },
