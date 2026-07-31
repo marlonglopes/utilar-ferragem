@@ -129,6 +129,7 @@ export default defineConfig({
       '/api/v1/admin/sellers':   { target: 'http://localhost:8092', changeOrigin: true }, // order
       '/api/v1/admin/orders':    { target: 'http://localhost:8092', changeOrigin: true }, // order
       '/api/v1/admin/returns':   { target: 'http://localhost:8092', changeOrigin: true }, // order
+      '/api/v1/admin/users':     { target: 'http://localhost:8093', changeOrigin: true }, // auth
       '/api/v1/admin/customers': { target: 'http://localhost:8093', changeOrigin: true }, // auth
       '/api/v1/admin/operators': { target: 'http://localhost:8093', changeOrigin: true }, // auth
       '/api/v1/admin/stores':    { target: 'http://localhost:8093', changeOrigin: true }, // auth

@@ -44,6 +44,7 @@ func main() {
 	authH := handler.NewAuthHandler(database, cfg)
 	addrH := handler.NewAddressHandler(database)
 	storeH := handler.NewStoreHandler(database)
+	userAdminH := handler.NewUserAdminHandler(database)
 
 	// A14-M5: cleanup periódico de tokens expirados (refresh, reset, verify).
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
@@ -118,6 +119,7 @@ func main() {
 		handler.JWTAuth(cfg.JWTSecret, authH.AccessTokenDenyList()),
 		handler.RequireRole("admin"))
 	{
+		admin.GET("/users", userAdminH.ListUsers)
 		admin.POST("/stores", storeH.CreateStore)
 		admin.GET("/stores", storeH.ListStores)
 		admin.POST("/operators", storeH.CreateOperator)
