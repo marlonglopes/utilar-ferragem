@@ -42,6 +42,7 @@ const ProductEditPage = lazy(() => import('@/pages/admin/ProductEditPage'))
 const OrdersPage = lazy(() => import('@/pages/admin/OrdersPage'))
 const ActivityPage = lazy(() => import('@/pages/admin/ActivityPage'))
 const StaffPage = lazy(() => import('@/pages/admin/StaffPage'))
+const CategoriesPage = lazy(() => import('@/pages/admin/CategoriesPage'))
 
 /** Envolve a página no guard de papel + Suspense + fronteira de erro. */
 function adminPage(element: ReactNode): ReactNode {
@@ -84,6 +85,12 @@ export const adminRoutes: RouteObject[] = [
     // Gestão de staff: promover usuário a operador, cargo e teto de desconto.
     path: '/admin/operadores',
     element: adminPage(<StaffPage />),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // Gestão de categorias: criar/renomear/excluir (antes só por seed).
+    path: '/admin/categorias',
+    element: adminPage(<CategoriesPage />),
     errorElement: <RouteErrorBoundary />,
   },
   {

@@ -180,6 +180,10 @@ func main() {
 	{
 		// Trilha de auditoria do catálogo — "quem fez o quê" (leitura).
 		admin.GET("/audit", auditH.AuditList)
+		// Gestão de categorias (criar/renomear/excluir) — hoje só existia listagem.
+		admin.POST("/categories", categoryH.Create)
+		admin.PATCH("/categories/:id", categoryH.Update)
+		admin.DELETE("/categories/:id", categoryH.Delete)
 		admin.POST("/products", adminProductH.Create)
 		admin.PATCH("/products/by-id/:id", adminProductH.Patch)
 		admin.DELETE("/products/by-id/:id", adminProductH.Delete)
