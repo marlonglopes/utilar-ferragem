@@ -16,7 +16,21 @@ func TestAdminList_DevolveProdutosComCustoEMargem(t *testing.T) {
 	defer db.Close()
 	r := adminRouterDB(db)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/products?pageSize=5", nil)
+	// Ordena por `cost` DESC (NULLS LAST) DE PROPÓSITO: depois de importar o
+	// estoque real da loja (milhares de produtos em rascunho, sem custo ainda,
+	// pois o relatório do ERP não traz coluna de custo), a ordenação padrão
+	// (created_at DESC) traz só os importados na primeira página, e nenhum tem
+	// custo — o que fazia este teste falhar por DADO, não por regressão. O que
+	// ele PRECISA provar é que a rota de admin NÃO esconde `cost` quando ele
+	// existe; então subimos quem tem custo pro topo. Se o catálogo inteiro
+	// estiver sem custo, não há o que verificar aqui.
+	var comCusto int
+	_ = db.QueryRow(`SELECT count(*) FROM products WHERE cost IS NOT NULL`).Scan(&comCusto)
+	if comCusto == 0 {
+		t.Skip("nenhum produto com custo cadastrado — nada a verificar")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/products?pageSize=5&sort=cost&dir=desc", nil)
 	req.Header.Set("X-User-Role", "admin")
 	req.Header.Set("X-User-Id", "teste")
 	w := httptest.NewRecorder()

@@ -28,6 +28,30 @@ export const creds = {
   admin: { email: 'admin@utilar.com.br', password: 'utilar123' },
 }
 
+/**
+ * Semeia a sessão direto no storage (zustand persist, chave `utilar-auth`),
+ * SEM passar pelo formulário. É como o e2e alcança rotas por PAPEL (/admin,
+ * /balcao) no modo mock — o papel fica garantido, não dependendo de o mock de
+ * login derivar admin/operador do e-mail. addInitScript roda antes dos scripts
+ * da página, então o store já nasce logado.
+ */
+export async function authAs(
+  page: Page,
+  role: 'admin' | 'store_operator' | 'customer',
+  email?: string,
+) {
+  const user = {
+    id: '00000000-0000-4000-8000-000000000099',
+    name: role === 'admin' ? 'Admin E2E' : role === 'store_operator' ? 'Operador E2E' : 'Cliente E2E',
+    email: email ?? `${role}@utilar.com.br`,
+    role,
+    token: 'e2e-mock-token',
+  }
+  await page.addInitScript((u) => {
+    window.localStorage.setItem('utilar-auth', JSON.stringify({ state: { user: u }, version: 0 }))
+  }, user)
+}
+
 /** Faz login pela página /entrar e espera o redirect pra fora do /entrar. */
 export async function login(page: Page, email = creds.customer.email, password = creds.customer.password) {
   await page.goto(routes.login)
