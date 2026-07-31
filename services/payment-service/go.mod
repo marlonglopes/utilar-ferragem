@@ -1,6 +1,6 @@
 module github.com/utilar/payment-service
 
-go 1.26.2
+go 1.26.5
 
 require (
 	github.com/gin-gonic/gin v1.12.0
@@ -32,7 +32,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
-	github.com/quic-go/quic-go v0.59.0 // indirect
+	github.com/quic-go/quic-go v0.59.1 // indirect
 	github.com/stripe/stripe-go/v79 v79.12.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.8.0 // indirect
