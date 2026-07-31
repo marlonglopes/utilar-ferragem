@@ -40,6 +40,7 @@ const ProductsPage = lazy(() => import('@/pages/admin/ProductsPage'))
 const ProductNewPage = lazy(() => import('@/pages/admin/ProductNewPage'))
 const ProductEditPage = lazy(() => import('@/pages/admin/ProductEditPage'))
 const OrdersPage = lazy(() => import('@/pages/admin/OrdersPage'))
+const ActivityPage = lazy(() => import('@/pages/admin/ActivityPage'))
 
 /** Envolve a página no guard de papel + Suspense + fronteira de erro. */
 function adminPage(element: ReactNode): ReactNode {
@@ -70,6 +71,12 @@ export const adminRoutes: RouteObject[] = [
     // Fila de operação: listar pedidos e agir (separar/despachar/entregar/cancelar).
     path: '/admin/pedidos',
     element: adminPage(<OrdersPage />),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // Atividade / CloudTrail: "quem fez o quê, quando" (trilha de auditoria).
+    path: '/admin/atividade',
+    element: adminPage(<ActivityPage />),
     errorElement: <RouteErrorBoundary />,
   },
   {

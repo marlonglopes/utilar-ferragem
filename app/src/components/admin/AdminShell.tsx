@@ -5,6 +5,7 @@ import {
   Activity,
   BookOpenCheck,
   ClipboardList,
+  Fingerprint,
   LayoutDashboard,
   Menu,
   Package,
@@ -37,6 +38,7 @@ const NAV = [
   { to: '/admin/vendedores', label: 'Vendedores', short: 'Vendedores', icon: Users },
   { to: '/admin/produtos', label: 'Produtos', short: 'Produtos', icon: Package },
   { to: '/admin/importar', label: 'Importar produtos', short: 'Importar', icon: Upload },
+  { to: '/admin/atividade', label: 'Atividade', short: 'Atividade', icon: Fingerprint },
   { to: '/admin/trilha', label: 'Trilha de auditoria', short: 'Trilha', icon: ScrollText },
   { to: '/admin/observabilidade', label: 'Observabilidade', short: 'Saúde', icon: Activity },
 ]
