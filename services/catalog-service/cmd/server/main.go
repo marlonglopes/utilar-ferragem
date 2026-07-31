@@ -59,6 +59,7 @@ func main() {
 	categoryH := handler.NewCategoryHandler(database)
 	sellerH := handler.NewSellerHandler(database)
 	adminProductH := handler.NewAdminProductHandler(database)
+	auditH := handler.NewAuditHandler(database)
 	catalogAdminH := handler.NewCatalogAdminHandler(database)
 	reservationH := handler.NewReservationHandler(database)
 	importH := handler.NewImportHandler(database)
@@ -177,6 +178,8 @@ func main() {
 	// Rotas de escrita (ingestão) — protegidas por role=admin.
 	admin := r.Group("/api/v1/admin", handler.RequireAdmin(cfg.JWTSecret, cfg.DevMode))
 	{
+		// Trilha de auditoria do catálogo — "quem fez o quê" (leitura).
+		admin.GET("/audit", auditH.AuditList)
 		admin.POST("/products", adminProductH.Create)
 		admin.PATCH("/products/by-id/:id", adminProductH.Patch)
 		admin.DELETE("/products/by-id/:id", adminProductH.Delete)
