@@ -260,6 +260,14 @@ func main() {
 		// estorno) para a atividade unificada. Admin-only: traz valor de
 		// desconto e de estorno.
 		adminDash.GET("/audit", auditH.AuditList)
+
+		// CRUD da tabela de frete — é o que o cliente PAGA, então só admin.
+		// (O seed veio com CEP de SP; a loja é no RS. Isto permite corrigir.)
+		shipAdminH := handler.NewShippingAdminHandler(database, rates)
+		adminDash.GET("/shipping-rates", shipAdminH.List)
+		adminDash.POST("/shipping-rates", shipAdminH.Create)
+		adminDash.PATCH("/shipping-rates/:id", shipAdminH.Update)
+		adminDash.DELETE("/shipping-rates/:id", shipAdminH.Delete)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

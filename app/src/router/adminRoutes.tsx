@@ -46,6 +46,7 @@ const CategoriesPage = lazy(() => import('@/pages/admin/CategoriesPage'))
 const StockPage = lazy(() => import('@/pages/admin/StockPage'))
 const ReturnsPage = lazy(() => import('@/pages/admin/ReturnsPage'))
 const ReviewsPage = lazy(() => import('@/pages/admin/ReviewsPage'))
+const ShippingPage = lazy(() => import('@/pages/admin/ShippingPage'))
 
 /** Envolve a página no guard de papel + Suspense + fronteira de erro. */
 function adminPage(element: ReactNode): ReactNode {
@@ -112,6 +113,12 @@ export const adminRoutes: RouteObject[] = [
     // Moderação de avaliações: aprovar/recusar o que a triagem segurou.
     path: '/admin/avaliacoes',
     element: adminPage(<ReviewsPage />),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // Frete: CRUD das faixas por CEP — o que o cliente paga (só admin).
+    path: '/admin/frete',
+    element: adminPage(<ShippingPage />),
     errorElement: <RouteErrorBoundary />,
   },
   {
