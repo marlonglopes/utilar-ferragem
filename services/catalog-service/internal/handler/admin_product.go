@@ -432,6 +432,13 @@ func (h *AdminProductHandler) Patch(c *gin.Context) {
 
 	audit(h.db, c, "product.update", "product", id, changes)
 
+	// Estoque editado pelo formulário também vira MOVIMENTO — unifica a série
+	// com o ajuste do almoxarife (antes, editar aqui sumia do histórico). Só
+	// quando o número mudou de fato.
+	if in.Stock != nil && *in.Stock != before.Stock {
+		recordStockMovement(h.db, c, id, *in.Stock-before.Stock, *in.Stock, "Edição do produto")
+	}
+
 	// Histórico só quando preço OU custo mudou de verdade. Um PATCH que só
 	// ajusta a descrição não pode poluir a série que alimenta o alerta de
 	// queda percentual (o detector do erro de vírgula na importação).

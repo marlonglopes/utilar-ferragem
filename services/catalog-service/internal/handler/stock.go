@@ -3,6 +3,7 @@ package handler
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,6 +11,28 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// recordStockMovement grava um movimento de estoque. Fail-open (igual a audit e
+// price history): perder o movimento não pode derrubar a operação de negócio.
+//
+// É o que UNIFICA a série do histórico: toda mudança de estoque — o ajuste com
+// motivo do almoxarife (Adjust) E a edição do produto pela tela de Produtos —
+// vira uma linha aqui. Sem isto, editar o estoque pelo formulário do produto
+// sumia do histórico do almoxarife.
+func recordStockMovement(db execer, c *gin.Context, productID string, delta, resulting float64, reason string) {
+	actorID, actorRole := auditActor(c)
+	_, err := db.Exec(`
+		INSERT INTO stock_movements
+			(product_id, delta, reason, resulting_stock, actor_id, actor_role, request_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		productID, delta, reason, resulting,
+		nullIfEmpty(actorID), nullIfEmpty(actorRole), nullIfEmpty(c.GetString("request_id")))
+	if err != nil {
+		slog.Error("stock_movement.write_failed",
+			"product_id", productID, "reason", reason,
+			"request_id", c.GetString("request_id"), "error", err.Error())
+	}
+}
 
 // StockHandler é a tela do ALMOXARIFE: ver estoque, ajustar com MOTIVO, e o
 // histórico de movimento. NÃO devolve custo em lugar nenhum — o almoxarife não

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -105,5 +106,58 @@ func TestStock_AjusteRelativoComMotivoEHistorico_SemCusto(t *testing.T) {
 	}
 	if strings.Contains(strings.ToLower(w.Body.String()), "\"cost\"") {
 		t.Errorf("REGRESSÃO: /admin/stock vazou custo: %s", w.Body.String()[:200])
+	}
+}
+
+// Unificação da série (follow-up): editar o estoque pelo FORMULÁRIO do produto
+// (PATCH) também tem que gerar um movimento — senão a edição some do histórico
+// do almoxarife. Regressão nomeada pelo buraco que fecha.
+func TestStock_EdicaoDeProdutoGeraMovimento(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(handler.RequestID())
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", "admin-edit")
+		c.Set("user_role", "admin")
+	})
+	adminH := handler.NewAdminProductHandler(db)
+	r.PATCH("/api/v1/admin/products/by-id/:id", adminH.Patch)
+
+	var pid string
+	var orig float64
+	if err := db.QueryRow(`SELECT id, stock FROM products ORDER BY created_at LIMIT 1`).Scan(&pid, &orig); err != nil {
+		t.Skipf("sem produtos: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.Exec(`DELETE FROM stock_movements WHERE product_id=$1`, pid)
+		_, _ = db.Exec(`UPDATE products SET stock=$2 WHERE id=$1`, pid, orig)
+	})
+
+	novo := orig + 13
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/products/by-id/"+pid,
+		strings.NewReader(`{"stock":`+strconv.FormatFloat(novo, 'f', -1, 64)+`}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("patch: %d %s", w.Code, w.Body.String())
+	}
+
+	var delta, resulting float64
+	var reason string
+	err := db.QueryRow(`
+		SELECT delta, resulting_stock, reason FROM stock_movements
+		WHERE product_id=$1 ORDER BY created_at DESC LIMIT 1`, pid).Scan(&delta, &resulting, &reason)
+	if err != nil {
+		t.Fatalf("nenhum movimento gravado pela edição do produto: %v", err)
+	}
+	if delta != 13 || resulting != novo {
+		t.Errorf("movimento errado: delta=%v resulting=%v (queria 13 / %v)", delta, resulting, novo)
+	}
+	if reason != "Edição do produto" {
+		t.Errorf("motivo = %q, queria 'Edição do produto'", reason)
 	}
 }
