@@ -42,8 +42,12 @@ test.describe('Admin — painel de operação', () => {
   // Menu filtrado por PERSONA — a metade visível do requisito. Cada papel vê só
   // as suas seções (a fronteira real é o 403 do backend; isto é o conforto).
   // Assertivas por href (robustas a viewport: mobile mostra rótulo curto).
+  // Locator CSS (não getByRole): no mobile a barra fica display:none atrás do
+  // hambúrguer e sai da árvore de acessibilidade — getByRole não a acharia. O
+  // que queremos medir é quais links são RENDERIZADOS (filtrados por papel),
+  // presentes no DOM mesmo colapsados.
   const nav = (page: import('@playwright/test').Page) =>
-    page.getByRole('navigation', { name: 'Seções do painel' })
+    page.locator('nav[aria-label="Seções do painel"]')
 
   test('contador vê contábil/pedidos, NÃO vê produtos/operadores', async ({ page }) => {
     await authAs(page, 'contador')
