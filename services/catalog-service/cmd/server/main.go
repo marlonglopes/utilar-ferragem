@@ -213,6 +213,8 @@ func main() {
 		// a pública esconde os dois de propósito. Sem ela a tela de gestão
 		// de produtos abria com "Produto não encontrado".
 		admin.GET("/products", catalogAdminH.ListProducts)
+		// Casa SKUs a produtos — usado pelo uploader de imagens em lote.
+		admin.GET("/products/by-sku", catalogAdminH.ResolveBySKU)
 		admin.GET("/products/by-id/:id", catalogAdminH.GetProduct)
 		admin.GET("/products/by-id/:id/price-history", catalogAdminH.GetPriceHistory)
 		admin.PUT("/products/by-id/:id/price-tiers", catalogAdminH.SetPriceTiers)
