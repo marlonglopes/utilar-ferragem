@@ -27,6 +27,18 @@ func setupTestDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Skipf("test DB not available: %v", err)
 	}
+	// Limita e FECHA o pool por teste. Sem isto, cada setupTestDB abria um pool
+	// sem teto e sem Close: ao longo do pacote (~25s, dezenas de testes) as
+	// conexões ociosas se acumulavam, e as 49 reservas concorrentes de
+	// TestReserve_ConcurrentRaceForLastUnit passavam do max_connections=100 do
+	// Postgres — uma delas tomava "too many clients" e virava 500 em vez do 409
+	// esperado (o flake documentado no CLAUDE.md). Com teto, as goroutines
+	// enfileiram na conexão em vez de estourar; a corrida pela última unidade
+	// continua idêntica (elas ainda disputam a linha). t.Cleanup fecha o pool
+	// quando o teste acaba, então nada vaza para o próximo.
+	db.SetMaxOpenConns(15)
+	db.SetMaxIdleConns(4)
+	t.Cleanup(func() { _ = db.Close() })
 	if err := db.Ping(); err != nil {
 		t.Skipf("test DB not reachable: %v", err)
 	}
