@@ -175,8 +175,10 @@ func main() {
 	}
 	obsH := handler.NewObservabilityHandler(obsTargets, cfg.MetricsToken)
 
-	// Rotas de escrita (ingestão) — protegidas por role=admin.
-	admin := r.Group("/api/v1/admin", handler.RequireAdmin(cfg.JWTSecret, cfg.DevMode))
+	// Gestão de catálogo — admin + `vendas` (vendedor interno mantém o catálogo
+	// e VÊ custo). É o único grupo que devolve `cost`; contador e almoxarife
+	// não entram aqui de propósito (não veem custo). Ver docs/backoffice-personas.md.
+	admin := r.Group("/api/v1/admin", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, handler.CatalogAdminRoles...))
 	{
 		// Trilha de auditoria do catálogo — "quem fez o quê" (leitura).
 		admin.GET("/audit", auditH.AuditList)
@@ -237,12 +239,6 @@ func main() {
 		// como rascunho sem preço de venda. Ver docs/base-de-produtos.md.
 		admin.POST("/import/sinapi", importH.ImportSINAPI)
 
-		// Observabilidade agregada dos 4 serviços. Está sob o mesmo
-		// RequireAdmin do grupo — anônimo toma 401, customer/seller/
-		// store_operator tomam 403. Ver internal/handler/observability.go
-		// para o PORQUÊ de a rota morar aqui e não no payment-service.
-		admin.GET("/observability", obsH.Snapshot)
-
 		// Fila de moderação de avaliações. Só entra aqui o que a triagem
 		// automática segurou (link, contato, caixa alta) — ver a justificativa
 		// da política em internal/review/moderation.go.
@@ -261,6 +257,15 @@ func main() {
 			}
 			c.JSON(http.StatusOK, gin.H{"data": gin.H{"pairs": n}})
 		})
+	}
+
+	// Observabilidade agregada dos serviços (saúde/métricas, SEM custo). Grupo
+	// à parte do catálogo: o contador acompanha a saúde da operação, mas não
+	// entra no CatalogAdminRoles (não vê custo nem mexe no catálogo). Anônimo
+	// toma 401; customer/seller/store_operator/vendas/almoxarife tomam 403.
+	catObs := r.Group("/api/v1/admin", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, handler.CatalogObsRoles...))
+	{
+		catObs.GET("/observability", obsH.Snapshot)
 	}
 
 	// Rotas internas de reserva de estoque — chamadas pelo order-service, não
