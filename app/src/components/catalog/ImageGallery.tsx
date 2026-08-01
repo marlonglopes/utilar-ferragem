@@ -3,24 +3,14 @@ import { ChevronLeft, ChevronRight, X, ZoomIn } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { resolveImageUrl } from '@/lib/api'
 import type { ProductImage } from '@/types/product'
+import { NoPhoto } from './NoPhoto'
 
 interface ImageGalleryProps {
   images?: ProductImage[]
-  icon: string
+  // `icon` (emoji da categoria) ainda é aceito por compat com os callers, mas
+  // não é mais usado: produto sem foto mostra o placeholder "sem foto ainda".
+  icon?: string
   productName: string
-}
-
-function IconSlide({ icon, size = 'lg' }: { icon: string; size?: 'lg' | 'sm' }) {
-  return (
-    <div
-      className={cn(
-        'flex items-center justify-center bg-gray-50 select-none',
-        size === 'lg' ? 'text-[7rem]' : 'text-3xl'
-      )}
-    >
-      {icon}
-    </div>
-  )
 }
 
 function ImageSlide({ src, alt, size = 'lg' }: { src: string; alt: string; size?: 'lg' | 'sm' }) {
@@ -34,7 +24,7 @@ function ImageSlide({ src, alt, size = 'lg' }: { src: string; alt: string; size?
   )
 }
 
-export function ImageGallery({ images: rawImages, icon, productName }: ImageGalleryProps) {
+export function ImageGallery({ images: rawImages, productName }: ImageGalleryProps) {
   // Resolve as URLs relativas (/media/...) contra a base do catalog uma vez só;
   // todo o resto do componente usa `images` já resolvido. Ver resolveImageUrl.
   const images = rawImages?.map((img) => ({ ...img, url: resolveImageUrl(img.url) ?? img.url }))
@@ -93,7 +83,8 @@ export function ImageGallery({ images: rawImages, icon, productName }: ImageGall
           {hasImages ? (
             <ImageSlide src={images[active].url} alt={images[active].alt} size="lg" />
           ) : (
-            <IconSlide icon={icon} size="lg" />
+            // Produto real sem foto ainda — marca "sem foto" em vez de foto errada.
+            <NoPhoto />
           )}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-end justify-end p-3">
             <ZoomIn className="h-5 w-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -199,7 +190,9 @@ export function ImageGallery({ images: rawImages, icon, productName }: ImageGall
                 className="max-h-[85vh] max-w-full object-contain rounded-xl"
               />
             ) : (
-              <span className="text-[12rem] select-none">{icon}</span>
+              <div className="flex h-80 w-80 items-center justify-center rounded-xl bg-white">
+                <NoPhoto />
+              </div>
             )}
           </div>
 

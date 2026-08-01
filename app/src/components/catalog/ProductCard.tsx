@@ -4,6 +4,7 @@ import { resolveImageUrl } from '@/lib/api'
 import { formatCurrency } from '@/lib/format'
 import { Skeleton } from '@/components/ui'
 import { FavoriteButton } from './FavoriteButton'
+import { NoPhoto } from './NoPhoto'
 import type { Product } from '@/types/product'
 
 export interface ProductCardProps {
@@ -35,7 +36,6 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const {
     slug,
     name,
-    icon,
     seller,
     price,
     originalPrice,
@@ -75,20 +75,22 @@ export function ProductCard({ product, className }: ProductCardProps) {
           imprevisível, e cover cortaria a ponta da ferramenta. lazy + async
           para a vitrine não bloquear o scroll no celular.
         */}
-        {capa ? (
+        {/* Placeholder "sem foto ainda" SEMPRE atrás: produto real sem foto cai
+            nele, e URL quebrada também (a <img> some no onError e ele aparece).
+            A <img> tem bg-gray-50 próprio, então cobre o placeholder quando a
+            foto carrega. */}
+        <NoPhoto compact className="absolute inset-0" />
+        {capa && (
           <img
             src={resolveImageUrl(capa.url)}
             alt={capa.alt || name}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-105"
+            className="relative h-full w-full bg-gray-50 object-contain transition-transform duration-200 group-hover:scale-105"
             onError={(e) => {
-              // URL quebrada volta pro emoji em vez de deixar o card vazio.
               e.currentTarget.style.display = 'none'
             }}
           />
-        ) : (
-          icon
         )}
         {badge && badgeLabel && (
           <span

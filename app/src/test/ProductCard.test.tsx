@@ -53,4 +53,19 @@ describe('ProductCard', () => {
     renderCard(makeProduct({ badge: 'discount', badgeLabel: '-20%' }))
     expect(screen.getByText('-20%')).toBeInTheDocument()
   })
+
+  // Reputação: produto real importado ainda SEM foto não pode mostrar imagem
+  // errada nem um card quebrado — mostra o placeholder "sem foto ainda".
+  it('produto sem foto mostra "Sem foto ainda", nunca uma <img> quebrada', () => {
+    renderCard(makeProduct({ images: [] }))
+    expect(screen.getByText(/sem foto ainda/i)).toBeInTheDocument()
+    expect(document.querySelector('img')).toBeNull()
+  })
+
+  it('produto COM foto mostra a imagem (e não o placeholder)', () => {
+    renderCard(makeProduct({ images: [{ url: '/media/x.jpg', alt: 'Furadeira' }] as never }))
+    const img = document.querySelector('img')
+    expect(img).not.toBeNull()
+    expect(img).toHaveAttribute('alt', 'Furadeira')
+  })
 })
