@@ -251,10 +251,15 @@ func main() {
 	// `store_operator` no `RequireRole` do painel seria exatamente isso.
 	// Só role=admin. Ver docs/admin-dashboard-api.md § Autorização.
 	dash := handler.NewAdminDashboardHandler(database, catalog, authc)
+	auditH := handler.NewAuditHandler(database)
 	adminDash := r.Group("/api/v1/admin", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, "admin"))
 	{
 		adminDash.GET("/overview", dash.Overview)
 		adminDash.GET("/sellers/performance", dash.SellersPerformance)
+		// Trilha de operação do pedido (PDV/desconto/aprovação + devolução/
+		// estorno) para a atividade unificada. Admin-only: traz valor de
+		// desconto e de estorno.
+		adminDash.GET("/audit", auditH.AuditList)
 	}
 
 	r.GET("/health", func(c *gin.Context) {
