@@ -8,6 +8,7 @@ import {
   ClipboardList,
   CreditCard,
   Fingerprint,
+  HelpCircle,
   ImagePlus,
   LayoutDashboard,
   Menu,
@@ -156,6 +157,16 @@ export function AdminShell({
                 {user.email}
               </span>
             )}
+            {/* Guias de operação — abre em nova aba pra não perder a tela atual. */}
+            <a
+              href="/ajuda/operacao"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-[36px] items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+            >
+              <HelpCircle className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Ajuda</span>
+            </a>
             <button
               type="button"
               onClick={() => {

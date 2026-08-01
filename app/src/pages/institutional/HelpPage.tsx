@@ -185,6 +185,13 @@ export default function HelpPage() {
             </Link>
             .
           </p>
+          <p className="mt-2 text-sm text-gray-500">
+            É da equipe da loja?{' '}
+            <Link to="/ajuda/operacao" className="text-brand-orange underline">
+              Guias de operação (balcão e painel)
+            </Link>
+            .
+          </p>
         </header>
 
         <div className="max-w-3xl flex flex-col gap-6">

@@ -29,6 +29,8 @@ const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 const AboutPage = lazy(() => import('@/pages/institutional/AboutPage'))
 const ContactPage = lazy(() => import('@/pages/institutional/ContactPage'))
 const HelpPage = lazy(() => import('@/pages/institutional/HelpPage'))
+const GuidesPage = lazy(() => import('@/pages/help/GuidesPage'))
+const GuidePage = lazy(() => import('@/pages/help/GuidePage'))
 const CategoriesPage = lazy(() => import('@/pages/institutional/CategoriesPage'))
 const SellPage = lazy(() => import('@/pages/institutional/SellPage'))
 const PrivacyPage = lazy(() => import('@/pages/institutional/PrivacyPage'))
@@ -74,6 +76,8 @@ const router = createBrowserRouter([
       { path: 'sobre', element: page(<AboutPage />) },
       { path: 'contato', element: page(<ContactPage />) },
       { path: 'ajuda', element: page(<HelpPage />) },
+      { path: 'ajuda/operacao', element: page(<GuidesPage />) },
+      { path: 'ajuda/operacao/:slug', element: page(<GuidePage />) },
       { path: 'categorias', element: page(<CategoriesPage />) },
       { path: 'vender', element: page(<SellPage />) },
       { path: 'privacidade', element: page(<PrivacyPage />) },
