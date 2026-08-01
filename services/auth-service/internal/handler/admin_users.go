@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/utilar/auth-service/internal/model"
 )
 
 // UserAdminHandler expõe a LEITURA de usuários para o admin — o que faltava para
@@ -30,12 +31,81 @@ type adminUserRow struct {
 	CreatedAt     string  `json:"createdAt"`
 }
 
-func isKnownRole(r string) bool {
-	switch r {
-	case "customer", "seller", "admin", "store_operator":
-		return true
+func isKnownRole(r string) bool { return model.IsKnownRole(r) }
+
+type updateRoleReq struct {
+	Role string `json:"role"`
+}
+
+// UpdateUserRole PATCH /api/v1/admin/users/:id/role  {role}
+//
+// É como o dono ATRIBUI uma persona (contador/vendas/almoxarife) a alguém —
+// sem isto, os papéis novos existiriam no enum mas ninguém os receberia. Só
+// admin (grupo de rota). Audita quem mudou o papel de quem (de→para), porque
+// promover alguém a `vendas` passa a deixá-la ver custo, e a `admin` entrega a
+// loja inteira: é exatamente o tipo de ação que precisa de trilha.
+//
+// Fail-closed: papel desconhecido → 400 (nunca chega no enum do Postgres, que
+// vazaria schema). `service` não é papel de usuário (A1) e não passa em
+// isKnownRole.
+func (h *UserAdminHandler) UpdateUserRole(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		BadRequest(c, "id do usuário é obrigatório")
+		return
 	}
-	return false
+	var req updateRoleReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, "corpo inválido")
+		return
+	}
+	novo := strings.TrimSpace(req.Role)
+	if !isKnownRole(novo) {
+		BadRequest(c, "papel desconhecido")
+		return
+	}
+
+	// Captura o papel antigo na MESMA transação do UPDATE: o old→new da trilha
+	// tem que refletir a troca real, não uma leitura que corre com outro PATCH.
+	tx, err := h.db.BeginTx(c.Request.Context(), nil)
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var antigo string
+	err = tx.QueryRowContext(c.Request.Context(),
+		`SELECT role::text FROM users WHERE id = $1 FOR UPDATE`, id).Scan(&antigo)
+	if err == sql.ErrNoRows {
+		NotFound(c, "usuário não encontrado")
+		return
+	}
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	if antigo == novo {
+		c.JSON(http.StatusOK, gin.H{"id": id, "role": novo, "changed": false})
+		return
+	}
+	if _, err := tx.ExecContext(c.Request.Context(),
+		`UPDATE users SET role = $2::user_role WHERE id = $1`, id, novo); err != nil {
+		DBError(c, err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		DBError(c, err)
+		return
+	}
+
+	logStoreEvent(c, h.db, storeEvent{
+		Action:   "user.role.update",
+		TargetID: &id,
+		OldValue: map[string]any{"role": antigo},
+		NewValue: map[string]any{"role": novo},
+	})
+	c.JSON(http.StatusOK, gin.H{"id": id, "role": novo, "changed": true})
 }
 
 // ListUsers GET /api/v1/admin/users?role=&q=&page=&per_page=

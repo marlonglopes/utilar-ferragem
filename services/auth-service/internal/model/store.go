@@ -16,7 +16,32 @@ const (
 	RoleSeller        = "seller"
 	RoleAdmin         = "admin"
 	RoleStoreOperator = "store_operator"
+
+	// Personas de operação do backoffice (2026-07). Cada uma enxerga só o seu
+	// no painel, e o servidor recusa (403) o que está fora do seu escopo — a
+	// filtragem do menu é conforto, a fronteira de verdade é aqui e nos grupos
+	// de rota de cada serviço. Ver docs/backoffice-personas.md.
+	//
+	// ⚠️ `vendas` é o vendedor INTERNO da loja (PDV + pedidos + catálogo, vê
+	// custo pra negociar margem). NÃO confundir com `seller` (lojista anunciante
+	// do marketplace) nem com `store_operator` (que é o papel do balcão).
+	RoleContador   = "contador"   // contábil/faturamento; leitura no resto; NÃO vê custo
+	RoleVendas     = "vendas"     // vendedor interno; catálogo/pedidos/PDV; vê custo
+	RoleAlmoxarife = "almoxarife" // estoque/separação/despacho/devolução; NÃO vê custo
 )
+
+// IsKnownRole valida o papel vindo de fora (query, PATCH de papel) antes de
+// tocar o banco — um papel inventado viraria erro de enum do Postgres, que
+// vaza schema na mensagem. `service` NUNCA é um papel de usuário (A1): é
+// identidade de máquina, emitida só com o SERVICE_JWT_SECRET.
+func IsKnownRole(r string) bool {
+	switch r {
+	case RoleCustomer, RoleSeller, RoleAdmin, RoleStoreOperator,
+		RoleContador, RoleVendas, RoleAlmoxarife:
+		return true
+	}
+	return false
+}
 
 // StoreLevel — cargo do operador dentro da loja.
 type StoreLevel string

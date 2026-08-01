@@ -120,6 +120,10 @@ func main() {
 		handler.RequireRole("admin"))
 	{
 		admin.GET("/users", userAdminH.ListUsers)
+		// Atribuir persona (contador/vendas/almoxarife) a um usuário. Audita
+		// de→para: promover a `vendas` passa a expor custo; a `admin`, a loja
+		// inteira.
+		admin.PATCH("/users/:id/role", userAdminH.UpdateUserRole)
 		admin.POST("/stores", storeH.CreateStore)
 		admin.GET("/stores", storeH.ListStores)
 		admin.POST("/operators", storeH.CreateOperator)
