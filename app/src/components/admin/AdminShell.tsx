@@ -4,6 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   Activity,
   BookOpenCheck,
+  Boxes,
   ClipboardList,
   Fingerprint,
   LayoutDashboard,
@@ -38,6 +39,7 @@ const NAV = [
   { to: '/admin', label: 'Visão geral', short: 'Geral', icon: LayoutDashboard, end: true },
   { to: '/admin/contabil', label: 'Auditoria contábil', short: 'Contábil', icon: BookOpenCheck },
   { to: '/admin/pedidos', label: 'Pedidos', short: 'Pedidos', icon: ClipboardList },
+  { to: '/admin/estoque', label: 'Estoque', short: 'Estoque', icon: Boxes },
   { to: '/admin/operadores', label: 'Operadores', short: 'Operadores', icon: UserCog },
   { to: '/admin/vendedores', label: 'Vendedores', short: 'Vendedores', icon: Users },
   { to: '/admin/produtos', label: 'Produtos', short: 'Produtos', icon: Package },

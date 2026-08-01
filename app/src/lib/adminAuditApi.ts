@@ -124,6 +124,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   'product.images.reorder': 'Imagens reordenadas',
   'product.import': 'Produto importado',
   'product.price_tiers': 'Preço por quantidade',
+  'stock.adjust': 'Estoque ajustado',
   'import.batch.commit': 'Lote importado',
   'import.batch.dryrun': 'Lote (simulação)',
   'import.profile.create': 'Perfil de importação',

@@ -62,12 +62,19 @@ describe('adminAccess — matriz de persona', () => {
     expect(canAccessAdmin('/admin', 'vendas')).toBe(false)
   })
 
-  it('almoxarife: só pedidos (separação/despacho); nada de custo/contábil/staff', () => {
+  it('almoxarife: pedidos + estoque; nada de custo/contábil/staff', () => {
     expect(canAccessAdmin('/admin/pedidos', 'almoxarife')).toBe(true)
+    expect(canAccessAdmin('/admin/estoque', 'almoxarife')).toBe(true) // sem custo
     expect(canAccessAdmin('/admin/produtos', 'almoxarife')).toBe(false)
     expect(canAccessAdmin('/admin/contabil', 'almoxarife')).toBe(false)
     expect(canAccessAdmin('/admin/operadores', 'almoxarife')).toBe(false)
     expect(canAccessAdmin('/admin', 'almoxarife')).toBe(false)
+  })
+
+  it('estoque: admin/almoxarife/vendas SIM; contador NÃO', () => {
+    expect(canAccessAdmin('/admin/estoque', 'admin')).toBe(true)
+    expect(canAccessAdmin('/admin/estoque', 'vendas')).toBe(true)
+    expect(canAccessAdmin('/admin/estoque', 'contador')).toBe(false)
   })
 
   it('papel não-staff nunca acessa (fail-closed)', () => {

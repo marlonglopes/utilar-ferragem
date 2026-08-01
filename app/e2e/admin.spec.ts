@@ -23,6 +23,7 @@ import { authAs } from './helpers'
 const ADMIN_PAGES = [
   '/admin',
   '/admin/pedidos',
+  '/admin/estoque',
   '/admin/atividade',
   '/admin/operadores',
   '/admin/categorias',
@@ -70,11 +71,12 @@ test.describe('Admin — painel de operação', () => {
     await expect(n.locator('a[href^="/admin/operadores"]')).toHaveCount(0)
   })
 
-  test('almoxarife vê pedidos, NÃO vê produtos/contábil', async ({ page }) => {
+  test('almoxarife vê pedidos + estoque, NÃO vê produtos/contábil', async ({ page }) => {
     await authAs(page, 'almoxarife')
-    await page.goto('/admin/pedidos')
+    await page.goto('/admin/estoque')
     const n = nav(page)
     await expect(n.locator('a[href^="/admin/pedidos"]')).toHaveCount(1)
+    await expect(n.locator('a[href^="/admin/estoque"]')).toHaveCount(1)
     await expect(n.locator('a[href^="/admin/produtos"]')).toHaveCount(0)
     await expect(n.locator('a[href^="/admin/contabil"]')).toHaveCount(0)
   })

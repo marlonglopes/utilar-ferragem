@@ -28,6 +28,7 @@ export const ADMIN_SECTIONS: ReadonlyArray<{ path: string; roles: readonly Staff
   { path: '/admin', roles: ['admin'] }, // Visão geral: faturamento/margem
   { path: '/admin/contabil', roles: ['admin', 'contador'] },
   { path: '/admin/pedidos', roles: ['admin', 'contador', 'vendas', 'almoxarife'] },
+  { path: '/admin/estoque', roles: ['admin', 'almoxarife', 'vendas'] }, // sem custo
   { path: '/admin/operadores', roles: ['admin'] },
   { path: '/admin/vendedores', roles: ['admin'] },
   { path: '/admin/produtos', roles: ['admin', 'vendas'] }, // tem custo
