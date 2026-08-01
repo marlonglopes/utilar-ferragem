@@ -29,6 +29,7 @@ export const ADMIN_SECTIONS: ReadonlyArray<{ path: string; roles: readonly Staff
   { path: '/admin/contabil', roles: ['admin', 'contador'] },
   { path: '/admin/pedidos', roles: ['admin', 'contador', 'vendas', 'almoxarife'] },
   { path: '/admin/estoque', roles: ['admin', 'almoxarife', 'vendas'] }, // sem custo
+  { path: '/admin/devolucoes', roles: ['admin', 'almoxarife', 'vendas', 'contador'] }, // contador só vê
   { path: '/admin/operadores', roles: ['admin'] },
   { path: '/admin/vendedores', roles: ['admin'] },
   { path: '/admin/produtos', roles: ['admin', 'vendas'] }, // tem custo

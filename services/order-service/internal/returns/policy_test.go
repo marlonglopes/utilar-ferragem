@@ -503,3 +503,43 @@ func TestSplitAceitaDevolucaoTotal(t *testing.T) {
 		t.Fatalf("devolução total com split: err = %v", err)
 	}
 }
+
+// Personas de backoffice na devolução (2026-07): quem confere a mercadoria
+// física (almoxarife/vendas) decide/recebe; o contador só VÊ a fila; e o
+// ESTORNO (dinheiro saindo) é só do admin — defesa em profundidade além da rota.
+func TestPersonas_DevolucaoAuthz(t *testing.T) {
+	decide := map[string]bool{
+		returns.RoleAdmin: true, returns.RoleOperator: true, returns.RoleStoreOperator: true,
+		returns.RoleAlmoxarife: true, returns.RoleVendas: true,
+		returns.RoleContador: false, returns.RoleCustomer: false, "seller": false,
+	}
+	for role, want := range decide {
+		if got := returns.CanDecide(role); got != want {
+			t.Errorf("CanDecide(%q) = %v, queria %v", role, got, want)
+		}
+	}
+
+	// Contador vê a fila mas não decide.
+	if !returns.CanViewQueue(returns.RoleContador) {
+		t.Error("contador deveria VER a fila de devoluções")
+	}
+	if returns.CanDecide(returns.RoleContador) {
+		t.Error("contador NÃO deveria decidir devolução (read-only)")
+	}
+	if returns.CanViewQueue(returns.RoleCustomer) {
+		t.Error("cliente não vê a fila")
+	}
+
+	// Estorno é só do admin — nem almoxarife, nem vendas, nem contador.
+	for _, role := range []string{
+		returns.RoleAlmoxarife, returns.RoleVendas, returns.RoleContador,
+		returns.RoleOperator, returns.RoleStoreOperator,
+	} {
+		if returns.CanRefund(role) {
+			t.Errorf("CanRefund(%q) = true — só admin estorna", role)
+		}
+	}
+	if !returns.CanRefund(returns.RoleAdmin) {
+		t.Error("admin tem que poder estornar")
+	}
+}

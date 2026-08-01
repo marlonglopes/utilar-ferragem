@@ -492,8 +492,8 @@ func (h *ReturnHandler) Refund(c *gin.Context) {
 	requestID := c.GetString("request_id")
 	actorID := c.GetString("user_id")
 
-	if !returns.CanDecide(c.GetString("user_role")) {
-		Forbidden(c, "papel não pode estornar devoluções")
+	if !returns.CanRefund(c.GetString("user_role")) {
+		Forbidden(c, "só o admin pode estornar (dinheiro saindo)")
 		return
 	}
 
@@ -665,7 +665,7 @@ func (h *ReturnHandler) ListForOrder(c *gin.Context) {
 
 // ListQueue GET /api/v1/admin/returns — a fila do atendimento.
 func (h *ReturnHandler) ListQueue(c *gin.Context) {
-	if !returns.CanDecide(c.GetString("user_role")) {
+	if !returns.CanViewQueue(c.GetString("user_role")) {
 		Forbidden(c, "papel não pode ver a fila de devoluções")
 		return
 	}

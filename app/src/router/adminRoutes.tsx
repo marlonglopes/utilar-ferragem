@@ -44,6 +44,7 @@ const ActivityPage = lazy(() => import('@/pages/admin/ActivityPage'))
 const StaffPage = lazy(() => import('@/pages/admin/StaffPage'))
 const CategoriesPage = lazy(() => import('@/pages/admin/CategoriesPage'))
 const StockPage = lazy(() => import('@/pages/admin/StockPage'))
+const ReturnsPage = lazy(() => import('@/pages/admin/ReturnsPage'))
 
 /** Envolve a página no guard de papel + Suspense + fronteira de erro. */
 function adminPage(element: ReactNode): ReactNode {
@@ -98,6 +99,12 @@ export const adminRoutes: RouteObject[] = [
     // Estoque: a tela do almoxarife — ajuste com motivo + histórico + alerta.
     path: '/admin/estoque',
     element: adminPage(<StockPage />),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // Devoluções (CDC): aprovar/receber/estornar — a fila da loja.
+    path: '/admin/devolucoes',
+    element: adminPage(<ReturnsPage />),
     errorElement: <RouteErrorBoundary />,
   },
   {

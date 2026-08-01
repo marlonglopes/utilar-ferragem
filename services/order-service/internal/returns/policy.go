@@ -69,6 +69,13 @@ const (
 	RoleOperator      = "operator"
 	RoleStoreOperator = "store_operator"
 	RoleService       = "service"
+
+	// Personas de backoffice (2026-07): quem confere a mercadoria que voltou é o
+	// almoxarife (devolução física); o vendedor interno também atende devolução.
+	// O contador só VÊ a fila (faturamento), não decide. Ver docs/devolucao-e-troca.md.
+	RoleAlmoxarife = "almoxarife"
+	RoleVendas     = "vendas"
+	RoleContador   = "contador"
 )
 
 // Erros sentinela. O handler os traduz em HTTP sem reinterpretar mensagem.
@@ -370,23 +377,39 @@ func isFullReturn(items map[string]OrderItemRef, wanted map[string]int) bool {
 // sobre `seller` no CLAUDE.md).
 func canActOnBehalf(role string) bool {
 	switch role {
-	case RoleAdmin, RoleOperator, RoleStoreOperator, RoleService:
+	case RoleAdmin, RoleOperator, RoleStoreOperator, RoleService, RoleAlmoxarife, RoleVendas:
 		return true
 	}
 	return false
 }
 
-// CanDecide diz se o papel pode deferir/indeferir uma devolução.
+// CanDecide diz se o papel pode deferir/indeferir/receber uma devolução.
 //
 // O CLIENTE não pode — nem a própria. Aprovar a própria devolução é o
 // equivalente exato de aprovar o próprio desconto no balcão, e essa regra já
 // custou uma constraint de banco lá (orders_no_self_approval).
+//
+// Almoxarife e vendas entram (conferem a mercadoria física). O CONTADOR NÃO —
+// ele só vê a fila (CanViewQueue), é read-only fora do contábil.
 func CanDecide(role string) bool {
 	switch role {
-	case RoleAdmin, RoleOperator, RoleStoreOperator:
+	case RoleAdmin, RoleOperator, RoleStoreOperator, RoleAlmoxarife, RoleVendas:
 		return true
 	}
 	return false
+}
+
+// CanViewQueue diz quem pode LER a fila de devoluções. Além de quem decide, o
+// CONTADOR também vê (faturamento/leitura), sem poder agir.
+func CanViewQueue(role string) bool {
+	return CanDecide(role) || role == RoleContador
+}
+
+// CanRefund isola o REEMBOLSO — dinheiro SAINDO — em só admin, defesa em
+// profundidade além da rota (opsRefund). Nem almoxarife nem vendas (que podem
+// decidir/receber) cruzam esta linha; devolver dinheiro é decisão do dono.
+func CanRefund(role string) bool {
+	return role == RoleAdmin
 }
 
 // returnableStatus — de quais estados de pedido se pode pedir devolução.

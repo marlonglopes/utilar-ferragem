@@ -77,6 +77,14 @@ describe('adminAccess — matriz de persona', () => {
     expect(canAccessAdmin('/admin/estoque', 'contador')).toBe(false)
   })
 
+  it('devoluções: admin/almoxarife/vendas + contador(vê); customer NÃO', () => {
+    expect(canAccessAdmin('/admin/devolucoes', 'admin')).toBe(true)
+    expect(canAccessAdmin('/admin/devolucoes', 'almoxarife')).toBe(true)
+    expect(canAccessAdmin('/admin/devolucoes', 'vendas')).toBe(true)
+    expect(canAccessAdmin('/admin/devolucoes', 'contador')).toBe(true) // só leitura
+    expect(canAccessAdmin('/admin/devolucoes', 'customer')).toBe(false)
+  })
+
   it('papel não-staff nunca acessa (fail-closed)', () => {
     for (const role of ['customer', 'seller', 'store_operator', '', undefined]) {
       expect(canAccessAdmin('/admin/pedidos', role as string)).toBe(false)

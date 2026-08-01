@@ -24,6 +24,7 @@ const ADMIN_PAGES = [
   '/admin',
   '/admin/pedidos',
   '/admin/estoque',
+  '/admin/devolucoes',
   '/admin/atividade',
   '/admin/operadores',
   '/admin/categorias',
