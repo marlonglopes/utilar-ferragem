@@ -90,28 +90,28 @@ cada persona (vendas/almoxarifado/contador) vira uma linha imutável.
 
 ---
 
-## Roadmap priorizado (cruzando as 3 camadas)
+## Roadmap priorizado — STATUS (atualizado 2026-08-01)
 
 Ordem por impacto pra "loja operável + auditável + por papel":
 
-| # | Entrega | Camadas | Por quê primeiro |
-|---|---|---|---|
-| **1** | **Pedidos no admin**: `GET /admin/orders` (lista/filtro) + página + ações de fulfillment (separar/despachar/entregar/cancelar) | Func + Papel(vendas/almox) + Audit | Sem isso a loja **não processa pedido online**. Desbloqueia vendas E almoxarifado. |
-| **2** | **Auditoria unificada**: ligar `pkg/audit` em catalog/order/auth + **tela CloudTrail** filtrável | Audit (todas) | Seu requisito central; cada ação das telas novas já nasce auditada. |
-| **3** | **Papéis + visões**: criar `contador/vendas/almoxarife`, permissão por recurso, menu filtrado, 403 fail-closed | Papel (todas) | Amarra quem acessa o quê antes de abrir mais telas. |
-| **4** | **Devoluções/estorno** (tela) + **operadores/staff** (tela) — backends prontos | Func + Papel + Audit | Endpoints órfãos virando tela; almoxarifado e onboarding de staff. |
-| **5** | **Estoque**: ajuste com motivo + **movimento (histórico)** + **relatório de estoque baixo** | Func + Papel(almox) + Audit | Núcleo do almoxarifado; hoje só sobrescreve número. |
-| **6** | **Categorias (CRUD)** + **frete (CRUD)** + **configurações da loja** | Func + Papel(admin) + Audit | Configuração da loja que hoje é só seed. |
-| **7** | **Preço por quantidade + histórico de preço** (tela) — backend pronto | Func + Papel(vendas) + Audit | Preço por volume é core de ferragem. |
-| **8** | **Meios de pagamento** (tela de config PSP) + **moderação de avaliações** (tela) | Func | Tirar do env; endpoint de review pronto. |
-| **9** | **NF-e / fiscal** (contador) — ver `docs/fiscal-para-o-dono.md` | Func + Papel(contador) | Depende de decisões do dono (emissor, contador, A1). |
-| **10** | **Bulk atômico** + **promoções/cupons** (se o negócio quiser) | Func | Melhoria de escala / greenfield. |
+| # | Entrega | Status |
+|---|---|---|
+| **1** | **Pedidos no admin** (lista/filtro + fulfillment) | ✅ feito |
+| **2** | **Auditoria unificada** (catálogo + staff + operação + tela CloudTrail filtrável) | ✅ feito |
+| **3** | **Papéis + visões** (contador/vendas/almoxarife, menu filtrado, 403 fail-closed) | ✅ feito — `backoffice-personas.md` |
+| **4** | **Devoluções** (tela) + **operadores/staff** (tela) | ✅ tela feita · ⚠️ estorno REAL no PSP ainda falta (só posta no ledger) |
+| **5** | **Estoque** (ajuste com motivo + histórico + alerta de baixo) | ✅ feito — `estoque.md` |
+| **6** | **Categorias (CRUD)** + **frete (CRUD)** + **configurações da loja** | ✅ categorias · ✅ frete (avisa CEP de SP; falta valor real RS) · 🔴 settings |
+| **7** | **Preço por quantidade + histórico de preço** (tela) | 🔴 pendente (backend pronto) |
+| **8** | **Meios de pagamento** (config, leitura) + **moderação de avaliações** (tela) | ✅ feito |
+| **9** | **NF-e / fiscal** (contador) | 🔴 depende do dono (emissor, contador) — `fiscal-nfe-emissor` |
+| **10** | **Bulk atômico** + **promoções/cupons** | 🔴 pendente |
+| **+** | **Uploader de imagens EM LOTE por SKU** (compressão no cliente, paralelo, retry) + placeholder "sem foto" | ✅ feito (fora do plano original) |
 
-**Resumo de uma linha:** o **motor** (produto, imagem, import, contábil, auditoria, PSP)
-está forte; o que falta é **as telas de operação** (principalmente **pedidos/fulfillment**),
-a **camada de papéis com visão por persona**, e **estender a auditoria** do payment pra todo
-o resto — mais os cadastros de configuração da loja (categoria/frete/settings) que hoje só
-existem por seed.
+**Resumo:** o backoffice de operação está **essencialmente completo** (1-6, 8 +
+imagens em lote). O que sobra em código é opcional/escala (7, 10, settings,
+recorte de imagem) + o **estorno real no PSP** (dependente da Appmax). O que
+trava o lançamento não é código — ver `ESTADO-DO-PROJETO.md` §Bloqueios.
 
 ---
 

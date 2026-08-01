@@ -25,6 +25,7 @@ E a **Alice**, assistente embutida que consulta o catálogo real e calcula mater
 1. **Tudo coberto por testes, sempre. Não pode falhar.** Nenhuma feature é "pronta" sem teste. Prefira teste de regressão nomeado pelo bug que previne, com comentário explicando o modo de falha.
 2. **Commit + push assim que algo for corrigido.** Não acumule. Nunca commite com build ou teste quebrado.
 3. **Segredo nunca é versionado.** `.gitignore` cobre `.env*`, chaves, `.creds`, `.aws/`, `.claude/settings.local.json`.
+4. **É uma LOJA FÍSICA REAL, com reputação.** Nada entra pro cliente com problema. "Verde nos testes / funciona na demo" ≠ "seguro pra cliente real" — separe sempre os dois e seja honesto sobre o que ainda é grau-de-demo (foto genérica, frete de SP, sem NF-e). Ver `docs/ESTADO-DO-PROJETO.md`.
 
 ## Armadilhas que já custaram tempo — leia antes de confiar num comando
 
@@ -37,7 +38,9 @@ E a **Alice**, assistente embutida que consulta o catálogo real e calcula mater
 | `ON CONFLICT (sku)` | O índice é **parcial**. Precisa de `ON CONFLICT (sku) WHERE sku IS NOT NULL`. |
 | `NOT NULL DEFAULT` no Postgres | O DEFAULT só vale quando a coluna é **omitida** do INSERT. NULL explícito viola a constraint. |
 | Relatório de subagente | **Verifique você mesmo.** Build, rode a suíte, teste a lógica de risco. Vários bugs sérios saíram daí. |
-| Teste de concorrência falhando do nada | O **catalog-service rodando** tem um sweeper de reservas a cada 60s no mesmo banco. Pare o serviço antes de rodar a suíte, ou trate como flake. |
+| Teste de concorrência falhando do nada | Duas causas: (a) o **catalog-service rodando** tem um sweeper de reservas a cada 60s no mesmo banco — pare o serviço; (b) já foi CORRIGIDO na raiz o flake do `TestReserve_ConcurrentRaceForLastUnit`: `setupTestDB` limita o pool + `t.Cleanup(db.Close)` (pools sem teto estouravam o `max_connections=100`). |
+| `go mod tidy` num serviço | Tenta buscar `github.com/utilar/pkg` na rede (o `go.work` já provê) e "falha" com "access rights". Não rode; use `go get <pkg>@versão` pontual. |
+| ngrok do sistema (3.5.0) | A conta free agora exige **≥3.20.0** (ERR_NGROK_121). Use o binário **3.39** em `scratchpad/ngrok` ou `sudo ngrok update`. E cuidado: `kill` na porta 5175 derruba o ngrok junto (ele mantém conexões com o vite). |
 
 ## Comandos
 
@@ -125,7 +128,7 @@ React 18, TS strict, Vite 5, Tailwind 3, Router 6, Zustand 4, TanStack Query 5, 
 - **Mock mode**: `VITE_*_URL` vazio → dados de `src/lib/mock*.ts`. Testes sempre em mock.
 - **API** (`src/lib/api.ts`): 4 base URLs por serviço, JWT com refresh em 401, e **`Idempotency-Key` derivada de conteúdo** — UUID por chamada não protegeria contra duplo clique, que é o caso real.
 - **Rotas protegidas**: `ProtectedRoute` (cliente), `BalcaoRoute` (operador), `AdminRoute` (admin). ⚠️ `ProtectedRoute` **expulsa quem não é `customer`** — não use pra área interna.
-- **Papéis**: `customer | seller | admin | store_operator`. ⚠️ **`seller` é lojista do marketplace, NÃO vendedor de balcão.** Confundir dá acesso ao PDV pra todo anunciante.
+- **Papéis**: `customer | seller | admin | store_operator` + **personas de backoffice** `contador | vendas | almoxarife`. ⚠️ **`seller` é lojista do marketplace, NÃO vendedor de balcão** (confundir dá PDV a todo anunciante); **`vendas` é vendedor INTERNO** (painel: catálogo+pedidos), ainda ≠ `seller` e ≠ `store_operator`. Vocabulário único em `pkg/roles`. Matriz de acesso (menu + 403) em `app/src/lib/adminAccess.ts` e `docs/backoffice-personas.md`. **Custo só admin+vendas** veem; contador/almoxarife nunca.
 - Rotas em pt-BR: `/categoria/:slug`, `/produto/:slug`, `/carrinho`, `/entrar`, `/checkout`, `/conta`, `/balcao`, `/admin`.
 - Marca: `brand.orange` #F47920, `brand.blue` #1B3E8A, `brand.gold` #F5A623. Inter / Archivo / JetBrains Mono.
 
@@ -199,4 +202,4 @@ Sprints e fases: `SPRINT.md`, `docs/phases/`, `docs/sprints/`.
 - Transação onde houver mais de uma escrita. `rows.Err()` sempre checado.
 - Migrations reversíveis (`.up.sql` + `.down.sql`).
 - Pre-commit: Husky + lint-staged (ESLint + Prettier no que está staged).
-- Node em `.nvmrc` (v20), Go em `go.work` (1.26.2).
+- Node em `.nvmrc` (v20), Go em `go.work` (**1.26.5** — subiu de 1.26.2 pra zerar CVEs de stdlib; `GOTOOLCHAIN=auto` baixa). Go real em `/home/marlon/go/bin`.
