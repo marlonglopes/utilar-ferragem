@@ -15,10 +15,14 @@ const ORDER_URL = import.meta.env.VITE_ORDER_URL ?? ''
 
 export type AuditSource = 'catalog' | 'staff' | 'operacao'
 
-const SOURCES: ReadonlyArray<{ key: AuditSource; label: string; base: string }> = [
-  { key: 'catalog', label: 'Catálogo', base: CATALOG_URL },
-  { key: 'staff', label: 'Staff', base: AUTH_URL },
-  { key: 'operacao', label: 'Operação', base: ORDER_URL },
+// Cada serviço tem um PATH distinto de propósito: no modo túnel (single-origin)
+// todas as VITE_*_URL são a mesma origem e o proxy do vite roteia por PATH — se
+// os três usassem /admin/audit, o proxy não saberia para qual serviço mandar.
+// Por isso order = /admin/order-audit e auth = /admin/staff-audit. Ver vite.config.ts.
+const SOURCES: ReadonlyArray<{ key: AuditSource; label: string; base: string; path: string }> = [
+  { key: 'catalog', label: 'Catálogo', base: CATALOG_URL, path: '/api/v1/admin/audit' },
+  { key: 'staff', label: 'Staff', base: AUTH_URL, path: '/api/v1/admin/staff-audit' },
+  { key: 'operacao', label: 'Operação', base: ORDER_URL, path: '/api/v1/admin/order-audit' },
 ]
 
 export const SOURCE_LABEL: Record<AuditSource, string> = {
@@ -88,7 +92,7 @@ export async function fetchAuditActivity(q: AuditQuery): Promise<AuditPage> {
   const perSource = await Promise.all(
     wanted.map(async (s) => {
       try {
-        const pg = await adminGet<RawPage>(s.base, `/api/v1/admin/audit${serverQuery(q)}`)
+        const pg = await adminGet<RawPage>(s.base, `${s.path}${serverQuery(q)}`)
         return pg.data.map((r) => ({ ...r, source: s.key }))
       } catch {
         // 403 (persona sem acesso a esta fonte) ou rede: pula a fonte, não trava.

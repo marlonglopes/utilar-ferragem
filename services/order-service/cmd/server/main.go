@@ -259,7 +259,11 @@ func main() {
 		// Trilha de operação do pedido (PDV/desconto/aprovação + devolução/
 		// estorno) para a atividade unificada. Admin-only: traz valor de
 		// desconto e de estorno.
-		adminDash.GET("/audit", auditH.AuditList)
+		//
+		// Path DISTINTO de propósito (order-audit, não audit): no modo túnel
+		// single-origin o proxy roteia por path, e catalog/auth também expõem
+		// /admin/audit — mesma rota mandaria os três pro mesmo serviço.
+		adminDash.GET("/order-audit", auditH.AuditList)
 
 		// CRUD da tabela de frete — é o que o cliente PAGA, então só admin.
 		// (O seed veio com CEP de SP; a loja é no RS. Isto permite corrigir.)

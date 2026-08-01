@@ -129,12 +129,16 @@ export default defineConfig({
       '/api/v1/admin/sellers': { target: 'http://localhost:8092', changeOrigin: true }, // order
       '/api/v1/admin/orders': { target: 'http://localhost:8092', changeOrigin: true }, // order
       '/api/v1/admin/returns': { target: 'http://localhost:8092', changeOrigin: true }, // order
+      '/api/v1/admin/shipping-rates': { target: 'http://localhost:8092', changeOrigin: true }, // order (frete CRUD)
+      '/api/v1/admin/order-audit': { target: 'http://localhost:8092', changeOrigin: true }, // order (atividade)
+      '/api/v1/admin/payment': { target: 'http://localhost:8090', changeOrigin: true }, // payment (config)
       '/api/v1/admin/users': { target: 'http://localhost:8093', changeOrigin: true }, // auth
       '/api/v1/admin/customers': { target: 'http://localhost:8093', changeOrigin: true }, // auth
       '/api/v1/admin/operators': { target: 'http://localhost:8093', changeOrigin: true }, // auth
       '/api/v1/admin/stores': { target: 'http://localhost:8093', changeOrigin: true }, // auth
+      '/api/v1/admin/staff-audit': { target: 'http://localhost:8093', changeOrigin: true }, // auth (atividade)
       '/api/v1/admin/me': { target: 'http://localhost:8093', changeOrigin: true }, // auth
-      '/api/v1/admin': { target: 'http://localhost:8091', changeOrigin: true }, // catalog (products, observability, import, reviews, recommendations)
+      '/api/v1/admin': { target: 'http://localhost:8091', changeOrigin: true }, // catalog catch-all (products, stock, reviews, audit, observability, import)
 
       // /api/v1/store — auth (customers, me) antes do catch-all catalog (products/costs)
       '/api/v1/store/customers': { target: 'http://localhost:8093', changeOrigin: true }, // auth

@@ -127,7 +127,10 @@ func main() {
 		admin.PATCH("/users/:id/role", userAdminH.UpdateUserRole)
 		// Trilha de administração de staff (operador, teto, MUDANÇA DE PAPEL) —
 		// a leitura que faltava para a atividade unificada do painel.
-		admin.GET("/audit", auditH.AuditList)
+		//
+		// Path DISTINTO (staff-audit, não audit): no modo túnel single-origin o
+		// proxy roteia por path, e catalog/order também têm /admin/audit.
+		admin.GET("/staff-audit", auditH.AuditList)
 		admin.POST("/stores", storeH.CreateStore)
 		admin.GET("/stores", storeH.ListStores)
 		admin.POST("/operators", storeH.CreateOperator)
