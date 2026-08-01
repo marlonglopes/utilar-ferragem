@@ -53,7 +53,7 @@ export default function BoletoPayment({ result }: Props) {
             />
             <button
               onClick={handleCopy}
-              className="h-10 px-4 rounded-xl bg-brand-orange text-white font-semibold text-sm hover:bg-brand-orange-dark transition-colors flex items-center gap-2 flex-shrink-0"
+              className="h-10 px-4 rounded-xl bg-brand-orange text-gray-900 font-semibold text-sm hover:bg-brand-orange-dark transition-colors flex items-center gap-2 flex-shrink-0"
             >
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               {copied ? t('boleto.copied') : t('boleto.copy')}
@@ -73,7 +73,7 @@ export default function BoletoPayment({ result }: Props) {
           href={result.hostedVoucherUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm transition-colors"
+          className="flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold text-sm transition-colors"
         >
           <ExternalLink className="h-4 w-4" />
           {t('boletoStripe.downloadHosted')}

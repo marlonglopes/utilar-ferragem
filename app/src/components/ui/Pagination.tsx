@@ -77,7 +77,7 @@ function PageButton({
       className={cn(
         'flex h-8 w-8 items-center justify-center rounded-lg text-sm font-medium transition-colors',
         active
-          ? 'bg-brand-orange text-white'
+          ? 'bg-brand-orange text-gray-900'
           : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
       )}
     >

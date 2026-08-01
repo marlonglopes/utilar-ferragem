@@ -55,7 +55,7 @@ export function AliceMessage({
         <div
           className={
             isUser
-              ? 'ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-brand-orange px-3 py-2 text-sm text-white'
+              ? 'ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-brand-orange px-3 py-2 text-sm text-gray-900'
               : 'mr-auto max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-sm bg-gray-100 px-3 py-2 text-sm text-gray-800'
           }
         >

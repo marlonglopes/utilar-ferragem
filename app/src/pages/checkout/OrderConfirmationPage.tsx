@@ -251,7 +251,7 @@ export default function OrderConfirmationPage() {
         </Link>
         <Link
           to="/"
-          className="flex-1 h-11 rounded-xl bg-brand-orange text-white text-sm font-semibold flex items-center justify-center hover:bg-brand-orange-dark transition-colors"
+          className="flex-1 h-11 rounded-xl bg-brand-orange text-gray-900 text-sm font-semibold flex items-center justify-center hover:bg-brand-orange-dark transition-colors"
         >
           {t('confirmation.continueShopping')}
         </Link>

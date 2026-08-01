@@ -31,7 +31,7 @@ export function AliceBubble() {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? 'Fechar assistente Alice' : 'Abrir assistente Alice'}
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-brand-orange text-white shadow-lg transition-transform hover:scale-105 hover:bg-brand-orange-dark focus:outline-none focus:ring-2 focus:ring-brand-orange focus:ring-offset-2"
+        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-brand-orange text-gray-900 shadow-lg transition-transform hover:scale-105 hover:bg-brand-orange-dark focus:outline-none focus:ring-2 focus:ring-brand-orange focus:ring-offset-2"
       >
         {open ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
       </button>
@@ -76,7 +76,7 @@ export function AliceBubble() {
               type="submit"
               disabled={loading || !input.trim()}
               aria-label="Enviar"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-orange text-white disabled:opacity-50"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-orange text-gray-900 disabled:opacity-50"
             >
               <Send className="h-4 w-4" />
             </button>

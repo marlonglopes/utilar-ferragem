@@ -248,7 +248,7 @@ export default function ProductDetailPage() {
                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     : added
                       ? 'bg-green-600 text-white'
-                      : 'bg-brand-orange hover:bg-brand-orange-dark text-white'
+                      : 'bg-brand-orange hover:bg-brand-orange-dark text-gray-900'
                 )}
               >
                 <ShoppingCart className="h-5 w-5" />
@@ -337,7 +337,7 @@ export default function ProductDetailPage() {
               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
               : added
                 ? 'bg-green-600 text-white'
-                : 'bg-brand-orange hover:bg-brand-orange-dark text-white'
+                : 'bg-brand-orange hover:bg-brand-orange-dark text-gray-900'
           )}
         >
           <ShoppingCart className="h-4 w-4" />

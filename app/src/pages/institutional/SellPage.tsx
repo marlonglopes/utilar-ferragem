@@ -67,7 +67,7 @@ export default function SellPage() {
           </p>
           <a
             href={`mailto:${COMPANY.contact.email}?subject=Quero%20vender%20na%20UtiLar`}
-            className="inline-flex items-center gap-2 rounded-lg bg-brand-orange px-5 py-3 font-semibold text-white transition-colors hover:bg-brand-orange-dark"
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-orange px-5 py-3 font-semibold text-gray-900 transition-colors hover:bg-brand-orange-dark"
           >
             Quero cadastrar minha loja
             <ArrowRight className="h-4 w-4" aria-hidden />
@@ -140,7 +140,7 @@ export default function SellPage() {
             <div className="mt-5 flex flex-wrap gap-3">
               <a
                 href={`mailto:${COMPANY.contact.email}?subject=Quero%20vender%20na%20UtiLar`}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-orange px-5 py-2.5 font-semibold text-white transition-colors hover:bg-brand-orange-dark"
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-orange px-5 py-2.5 font-semibold text-gray-900 transition-colors hover:bg-brand-orange-dark"
               >
                 Falar com o time comercial
               </a>

@@ -25,7 +25,7 @@ export function CategoryRail() {
                 className={cn(
                   'flex-shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap',
                   active
-                    ? 'bg-brand-orange text-white'
+                    ? 'bg-brand-orange text-gray-900'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 )}
                 aria-current={active ? 'page' : undefined}

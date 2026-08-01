@@ -78,7 +78,7 @@ function ProfileTab() {
           'h-10 rounded-xl font-semibold text-sm transition-colors',
           saved
             ? 'bg-green-600 text-white'
-            : 'bg-brand-orange hover:bg-brand-orange-dark text-white'
+            : 'bg-brand-orange hover:bg-brand-orange-dark text-gray-900'
         )}
       >
         {saved ? 'Salvo!' : t('account.saveProfile')}
@@ -185,7 +185,7 @@ function AddressForm({
       <div className="flex gap-2 mt-1">
         <button
           onClick={() => onSave(form)}
-          className="flex-1 h-9 rounded-lg bg-brand-orange hover:bg-brand-orange-dark text-white text-sm font-semibold transition-colors"
+          className="flex-1 h-9 rounded-lg bg-brand-orange hover:bg-brand-orange-dark text-gray-900 text-sm font-semibold transition-colors"
         >
           {t('account.saveAddress')}
         </button>
@@ -240,7 +240,7 @@ function AddressesTab() {
               <span className="font-semibold text-sm text-gray-900">
                 {addr.label || addr.street}
                 {addr.isDefault && (
-                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide bg-brand-orange text-white px-1.5 py-0.5 rounded-full">
+                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide bg-brand-orange text-gray-900 px-1.5 py-0.5 rounded-full">
                     {t('account.defaultAddress')}
                   </span>
                 )}

@@ -208,7 +208,7 @@ export default function StaffPage() {
                     type="button"
                     onClick={promote}
                     disabled={!storeId || createOp.isPending}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-orange/90 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-brand-orange px-3 py-1.5 text-xs font-semibold text-gray-900 hover:bg-brand-orange/90 disabled:opacity-50"
                   >
                     <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
                     Promover

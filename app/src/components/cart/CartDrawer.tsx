@@ -84,7 +84,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
               onClose()
               navigate('/')
             }}
-            className="mt-2 px-4 py-2 rounded-lg bg-brand-orange text-white text-sm font-semibold hover:bg-brand-orange-dark transition-colors"
+            className="mt-2 px-4 py-2 rounded-lg bg-brand-orange text-gray-900 text-sm font-semibold hover:bg-brand-orange-dark transition-colors"
           >
             {t('cartPage.exploreCatalog')}
           </button>
@@ -141,7 +141,7 @@ export function CartDrawer({ open, onClose }: CartDrawerProps) {
             </div>
             <button
               onClick={goToCheckout}
-              className="w-full h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm transition-colors"
+              className="w-full h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold text-sm transition-colors"
             >
               {t('cartPage.goToCheckout')}
             </button>

@@ -190,7 +190,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm transition-colors disabled:opacity-60"
+            className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold text-sm transition-colors disabled:opacity-60"
           >
             {loading ? t('loading') : t('auth.register')}
           </button>

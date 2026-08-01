@@ -12,9 +12,11 @@ export interface ProductCardProps {
 }
 
 const badgeClasses = {
-  discount: 'bg-brand-orange text-white',
-  free_shipping: 'bg-green-600 text-white',
-  last_units: 'bg-yellow-500 text-white',
+  discount: 'bg-brand-orange text-gray-900',
+  // Contraste AA: branco no verde-600 dá 3,3:1 e no amarelo-500 só 1,9:1 (ilegível).
+  // verde-700 + branco = 5,9:1; amarelo pede texto escuro (amarelo-500 + quase-preto ≈ 8:1).
+  free_shipping: 'bg-green-700 text-white',
+  last_units: 'bg-yellow-500 text-gray-900',
 }
 
 function Stars({ rating, count }: { rating: number; count: number }) {
@@ -99,7 +101,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
           </span>
         )}
         {stock <= 5 && stock > 0 && !badge && (
-          <span className="absolute top-2 left-2 text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-500 text-white">
+          <span className="absolute top-2 left-2 text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-500 text-gray-900">
             Últimas {stock}
           </span>
         )}
@@ -107,7 +109,8 @@ export function ProductCard({ product, className }: ProductCardProps) {
       </div>
 
       <div className="flex flex-col gap-1 p-3 flex-1">
-        <p className="text-xs text-gray-400 truncate">{seller}</p>
+        {/* gray-400 sobre branco = 2,5:1 (falha AA). gray-500 = 4,6:1. */}
+        <p className="text-xs text-gray-500 truncate">{seller}</p>
 
         <p className="text-sm text-gray-900 font-medium leading-snug line-clamp-2 group-hover:text-brand-orange transition-colors">
           {name}
@@ -117,7 +120,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
 
         <div className="mt-auto pt-2">
           {originalPrice && (
-            <p className="text-xs text-gray-400 line-through">
+            <p className="text-xs text-gray-500 line-through">
               {formatCurrency(originalPrice)}
               {discount && (
                 <span className="ml-1 text-brand-orange font-semibold">-{discount}%</span>

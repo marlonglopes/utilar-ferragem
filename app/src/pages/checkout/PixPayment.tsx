@@ -68,7 +68,7 @@ export default function PixPayment({ result, onRegenerate, onSimulateConfirm }: 
           <p className="text-gray-500">{t('pix.expired')}</p>
           <button
             onClick={onRegenerate}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-orange text-white font-semibold text-sm hover:bg-brand-orange-dark transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-orange text-gray-900 font-semibold text-sm hover:bg-brand-orange-dark transition-colors"
           >
             <RefreshCw className="h-4 w-4" />
             {t('pix.regenerate')}
@@ -125,7 +125,7 @@ export default function PixPayment({ result, onRegenerate, onSimulateConfirm }: 
                 />
                 <button
                   onClick={handleCopy}
-                  className="h-10 px-4 rounded-xl bg-brand-orange text-white font-semibold text-sm hover:bg-brand-orange-dark transition-colors flex items-center gap-2 flex-shrink-0"
+                  className="h-10 px-4 rounded-xl bg-brand-orange text-gray-900 font-semibold text-sm hover:bg-brand-orange-dark transition-colors flex items-center gap-2 flex-shrink-0"
                 >
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   {copied ? t('pix.copied') : t('pix.copy')}

@@ -27,7 +27,7 @@ function Hero() {
             <div className="flex flex-wrap gap-3">
               <Link
                 to="/categoria/ferramentas"
-                className="inline-flex items-center gap-2 bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold px-5 py-2.5 rounded-lg transition-colors"
+                className="inline-flex items-center gap-2 bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold px-5 py-2.5 rounded-lg transition-colors"
               >
                 {t('hero.cta.catalog')} →
               </Link>

@@ -173,7 +173,7 @@ export default function AdminProductsPage() {
       toolbar={
         <Link
           to="/admin/produtos/novo"
-          className="inline-flex items-center gap-1.5 rounded-md bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-orange/90"
+          className="inline-flex items-center gap-1.5 rounded-md bg-brand-orange px-3 py-1.5 text-xs font-semibold text-gray-900 hover:bg-brand-orange/90"
         >
           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
           Novo produto

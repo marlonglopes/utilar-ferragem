@@ -59,7 +59,7 @@ export default function CartPage() {
         </div>
         <Link
           to="/"
-          className="px-6 py-2.5 rounded-xl bg-brand-orange text-white font-semibold text-sm hover:bg-brand-orange-dark transition-colors"
+          className="px-6 py-2.5 rounded-xl bg-brand-orange text-gray-900 font-semibold text-sm hover:bg-brand-orange-dark transition-colors"
         >
           {t('cartPage.exploreCatalog')}
         </Link>
@@ -166,7 +166,7 @@ export default function CartPage() {
 
           <Link
             to="/checkout"
-            className="w-full h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center transition-colors"
+            className="w-full h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold text-sm flex items-center justify-center transition-colors"
           >
             {t('cartPage.goToCheckout')}
           </Link>

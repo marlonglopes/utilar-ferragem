@@ -22,7 +22,7 @@ export function LocaleSwitcher({ className }: LocaleSwitcherProps) {
           className={cn(
             'px-2 py-1 text-xs font-semibold rounded transition-colors',
             locale === loc
-              ? 'bg-brand-orange text-white'
+              ? 'bg-brand-orange text-gray-900'
               : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
           )}
           aria-pressed={locale === loc}

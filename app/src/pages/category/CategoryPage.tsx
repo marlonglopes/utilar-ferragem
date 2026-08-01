@@ -90,7 +90,7 @@ export default function CategoryPage() {
             <SlidersHorizontal className="h-4 w-4" />
             {t('catalog:filters')}
             {activeCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-brand-orange text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-brand-orange text-gray-900 text-[10px] font-bold flex items-center justify-center">
                 {activeCount}
               </span>
             )}

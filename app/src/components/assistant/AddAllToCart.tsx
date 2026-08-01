@@ -68,7 +68,7 @@ export function AddAllToCart({
       <button
         type="button"
         onClick={handleClick}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-orange px-4 py-2.5 font-display text-sm font-bold text-white transition-colors hover:bg-brand-orange-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange focus-visible:ring-offset-2"
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-orange px-4 py-2.5 font-display text-sm font-bold text-gray-900 transition-colors hover:bg-brand-orange-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange focus-visible:ring-offset-2"
       >
         <ShoppingCart className="h-4 w-4" aria-hidden="true" />
         Adicionar tudo ao carrinho

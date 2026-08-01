@@ -61,7 +61,7 @@ function Stepper({ current }: { current: Step }) {
                 className={cn(
                   'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors',
                   done && 'bg-green-500 text-white',
-                  active && 'bg-brand-orange text-white',
+                  active && 'bg-brand-orange text-gray-900',
                   !done && !active && 'bg-gray-100 text-gray-400'
                 )}
               >
@@ -194,7 +194,7 @@ function AddressStep({ onNext }: { onNext: (addr: Address) => void }) {
                 <p className="text-sm font-semibold text-gray-900">
                   {addr.label || addr.street}
                   {addr.isDefault && (
-                    <span className="ml-2 text-[10px] font-bold uppercase tracking-wide bg-brand-orange text-white px-1.5 py-0.5 rounded-full">
+                    <span className="ml-2 text-[10px] font-bold uppercase tracking-wide bg-brand-orange text-gray-900 px-1.5 py-0.5 rounded-full">
                       {t('account.defaultAddress', { ns: 'common' })}
                     </span>
                   )}
@@ -236,7 +236,7 @@ function AddressStep({ onNext }: { onNext: (addr: Address) => void }) {
         <button
           type="submit"
           disabled={!selectedId}
-          className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors mt-2 disabled:opacity-60"
+          className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold text-sm flex items-center justify-center gap-2 transition-colors mt-2 disabled:opacity-60"
         >
           {t('address.continue')}
           <ChevronRight className="h-4 w-4" />
@@ -342,7 +342,7 @@ function AddressStep({ onNext }: { onNext: (addr: Address) => void }) {
         )}
         <button
           type="submit"
-          className="flex-1 h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors"
+          className="flex-1 h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold text-sm flex items-center justify-center gap-2 transition-colors"
         >
           {t('address.continue')}
           <ChevronRight className="h-4 w-4" />
@@ -466,7 +466,7 @@ function ShippingStep({
       <button
         onClick={() => option && onNext(option)}
         disabled={!option}
-        className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
+        className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold text-sm flex items-center justify-center gap-2 transition-colors mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {t('shipping.continue')}
         <ChevronRight className="h-4 w-4" />
@@ -688,7 +688,7 @@ function PaymentStep({
         <button
           onClick={handleConfirm}
           disabled={isCreating || !boletoReady}
-          className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isCreating ? (
             <>

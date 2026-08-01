@@ -116,7 +116,7 @@ function ResultDialog({ result, onClose }: { result: BuyAgainResult; onClose: ()
             <Link
               to="/carrinho"
               onClick={onClose}
-              className="flex h-11 flex-1 items-center justify-center rounded-xl bg-brand-orange text-sm font-semibold text-white transition-colors hover:bg-brand-orange-dark"
+              className="flex h-11 flex-1 items-center justify-center rounded-xl bg-brand-orange text-sm font-semibold text-gray-900 transition-colors hover:bg-brand-orange-dark"
             >
               {t('orders.buyAgainGoToCart')}
             </Link>

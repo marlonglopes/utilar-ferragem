@@ -123,7 +123,7 @@ export function NegotiationBlock({
             className={cn(
               'h-12 flex-1 rounded-lg border text-sm font-semibold transition-colors disabled:opacity-50',
               discountPct === pct
-                ? 'border-brand-orange bg-brand-orange text-white'
+                ? 'border-brand-orange bg-brand-orange text-gray-900'
                 : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
             )}
           >

@@ -15,7 +15,8 @@ const base =
   'inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50'
 
 const variants: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-orange text-white hover:bg-brand-orange-dark focus-visible:ring-brand-orange',
+  primary:
+    'bg-brand-orange text-gray-900 hover:bg-brand-orange-dark focus-visible:ring-brand-orange',
   secondary:
     'border-2 border-brand-blue text-brand-blue bg-transparent hover:bg-brand-blue-light focus-visible:ring-brand-blue',
   ghost: 'text-gray-700 bg-transparent hover:bg-gray-100 focus-visible:ring-gray-400',

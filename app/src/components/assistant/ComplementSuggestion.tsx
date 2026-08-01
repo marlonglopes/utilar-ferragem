@@ -49,7 +49,7 @@ export function ComplementSuggestion({ complemento }: { complemento: LaraComplem
           onClick={handleAdd}
           disabled={adicionado}
           aria-label={`Adicionar ${produto.name} ao carrinho`}
-          className="flex shrink-0 items-center gap-1 rounded-full bg-brand-orange px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-brand-orange-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange focus-visible:ring-offset-2 disabled:bg-green-600"
+          className="flex shrink-0 items-center gap-1 rounded-full bg-brand-orange px-3 py-1.5 text-[12px] font-bold text-gray-900 transition-colors hover:bg-brand-orange-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange focus-visible:ring-offset-2 disabled:bg-green-600"
         >
           {adicionado ? (
             <>

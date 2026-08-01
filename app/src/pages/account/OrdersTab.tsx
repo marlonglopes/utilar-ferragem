@@ -128,7 +128,7 @@ export default function OrdersTab() {
             className={cn(
               'px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
               filter === f
-                ? 'bg-brand-orange text-white'
+                ? 'bg-brand-orange text-gray-900'
                 : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
             )}
           >

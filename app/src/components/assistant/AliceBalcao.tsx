@@ -89,7 +89,7 @@ export function AliceBalcao({ className = '' }: { className?: string }) {
           type="submit"
           disabled={loading || !input.trim()}
           aria-label="Enviar pergunta"
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-orange text-white disabled:opacity-50"
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-orange text-gray-900 disabled:opacity-50"
         >
           <Send className="h-4 w-4" aria-hidden="true" />
         </button>

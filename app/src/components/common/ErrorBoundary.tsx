@@ -32,7 +32,7 @@ export function ErrorScreen({ title, message, detail }: ErrorScreenProps) {
       <div className="flex flex-wrap items-center justify-center gap-3">
         <button
           onClick={() => window.location.reload()}
-          className="inline-flex items-center gap-2 bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold px-5 py-2.5 rounded-lg transition-colors"
+          className="inline-flex items-center gap-2 bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold px-5 py-2.5 rounded-lg transition-colors"
         >
           <RotateCw className="h-4 w-4" aria-hidden />
           Recarregar a página
