@@ -31,6 +31,7 @@ const ADMIN_PAGES = [
   '/admin/produtos',
   '/admin/contabil',
   '/admin/importar',
+  '/admin/imagens',
   '/admin/avaliacoes',
   '/admin/frete',
   '/admin/pagamento',

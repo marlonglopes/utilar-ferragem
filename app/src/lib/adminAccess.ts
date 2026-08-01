@@ -36,6 +36,7 @@ export const ADMIN_SECTIONS: ReadonlyArray<{ path: string; roles: readonly Staff
   { path: '/admin/produtos', roles: ['admin', 'vendas'] }, // tem custo
   { path: '/admin/categorias', roles: ['admin', 'vendas'] },
   { path: '/admin/importar', roles: ['admin', 'vendas'] },
+  { path: '/admin/imagens', roles: ['admin', 'vendas'] }, // upload de imagens em lote
   { path: '/admin/avaliacoes', roles: ['admin', 'vendas'] }, // moderação (catálogo)
   { path: '/admin/atividade', roles: ['admin', 'vendas'] }, // trilha do catálogo (custo)
   { path: '/admin/trilha', roles: ['admin', 'contador'] }, // trilha contábil (sem custo)

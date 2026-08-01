@@ -48,6 +48,7 @@ const ReturnsPage = lazy(() => import('@/pages/admin/ReturnsPage'))
 const ReviewsPage = lazy(() => import('@/pages/admin/ReviewsPage'))
 const ShippingPage = lazy(() => import('@/pages/admin/ShippingPage'))
 const PaymentConfigPage = lazy(() => import('@/pages/admin/PaymentConfigPage'))
+const BulkImagesPage = lazy(() => import('@/pages/admin/BulkImagesPage'))
 
 /** Envolve a página no guard de papel + Suspense + fronteira de erro. */
 function adminPage(element: ReactNode): ReactNode {
@@ -126,6 +127,12 @@ export const adminRoutes: RouteObject[] = [
     // Config de pagamento (leitura): qual PSP, métodos, saúde — sem segredo.
     path: '/admin/pagamento',
     element: adminPage(<PaymentConfigPage />),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // Upload de imagens em lote por SKU — foto pra centenas de produtos.
+    path: '/admin/imagens',
+    element: adminPage(<BulkImagesPage />),
     errorElement: <RouteErrorBoundary />,
   },
   {

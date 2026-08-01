@@ -49,7 +49,9 @@ describe('adminAccess — matriz de persona', () => {
     expect(canAccessAdmin('/admin', 'contador')).toBe(false)
   })
 
-  it('vendas: catálogo/pedidos/atividade SIM; contábil e staff NÃO', () => {
+  it('vendas: catálogo/pedidos/atividade/imagens SIM; contábil e staff NÃO', () => {
+    expect(canAccessAdmin('/admin/imagens', 'vendas')).toBe(true)
+    expect(canAccessAdmin('/admin/imagens', 'contador')).toBe(false)
     expect(canAccessAdmin('/admin/produtos', 'vendas')).toBe(true)
     expect(canAccessAdmin('/admin/produtos/novo', 'vendas')).toBe(true) // sub-rota
     expect(canAccessAdmin('/admin/produtos/abc-123', 'vendas')).toBe(true)
