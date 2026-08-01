@@ -45,6 +45,7 @@ func main() {
 	addrH := handler.NewAddressHandler(database)
 	storeH := handler.NewStoreHandler(database)
 	userAdminH := handler.NewUserAdminHandler(database)
+	auditH := handler.NewAuditHandler(database)
 
 	// A14-M5: cleanup periódico de tokens expirados (refresh, reset, verify).
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
@@ -124,6 +125,9 @@ func main() {
 		// de→para: promover a `vendas` passa a expor custo; a `admin`, a loja
 		// inteira.
 		admin.PATCH("/users/:id/role", userAdminH.UpdateUserRole)
+		// Trilha de administração de staff (operador, teto, MUDANÇA DE PAPEL) —
+		// a leitura que faltava para a atividade unificada do painel.
+		admin.GET("/audit", auditH.AuditList)
 		admin.POST("/stores", storeH.CreateStore)
 		admin.GET("/stores", storeH.ListStores)
 		admin.POST("/operators", storeH.CreateOperator)
