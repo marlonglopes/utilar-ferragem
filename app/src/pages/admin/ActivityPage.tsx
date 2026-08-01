@@ -17,7 +17,9 @@ import { useAuditActivity } from '@/hooks/useCatalogAudit'
 import {
   AUDIT_ACTION_LABEL,
   isAuditActivityEnabled,
+  SOURCE_LABEL,
   type AuditQuery,
+  type AuditSource,
   type FieldChange,
 } from '@/lib/adminAuditApi'
 
@@ -25,6 +27,31 @@ const PAGE_SIZE = 30
 
 function actionLabel(a: string): string {
   return AUDIT_ACTION_LABEL[a] ?? a
+}
+
+// Cor por serviço, pra bater o olho e saber de onde veio a linha na trilha
+// unificada. Semântico, não é o laranja da marca.
+const SOURCE_CHIP: Record<AuditSource, string> = {
+  catalog: 'bg-blue-50 text-blue-700 ring-blue-600/20',
+  staff: 'bg-purple-50 text-purple-700 ring-purple-600/20',
+  operacao: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+}
+
+function SourceChip({ source }: { source: AuditSource }) {
+  return (
+    <span
+      className={cn(
+        'inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset',
+        SOURCE_CHIP[source]
+      )}
+    >
+      {SOURCE_LABEL[source]}
+    </span>
+  )
+}
+
+function fmtReais(v: number): string {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
 function fmtValue(v: unknown): string {
@@ -74,6 +101,7 @@ export default function ActivityPage() {
   const [params, setParams] = useSearchParams()
   const action = params.get('acao') ?? ''
   const actor = params.get('ator') ?? ''
+  const source = (params.get('fonte') ?? '') as AuditSource | ''
   const page = Math.max(1, Number(params.get('pagina') ?? '1') || 1)
 
   const setParam = useCallback(
@@ -107,8 +135,8 @@ export default function ActivityPage() {
   )
 
   const query: AuditQuery = useMemo(
-    () => ({ action, actor, page, perPage: PAGE_SIZE }),
-    [action, actor, page]
+    () => ({ action, actor, source: source || undefined, page, perPage: PAGE_SIZE }),
+    [action, actor, source, page]
   )
 
   const { data, isLoading, isError, error, refetch } = useAuditActivity(query)
@@ -126,14 +154,32 @@ export default function ActivityPage() {
       <div className="space-y-4">
         {!isAuditActivityEnabled && (
           <p className="rounded-md border border-gray-200 border-l-4 border-l-amber-500 bg-amber-50/60 p-3 text-xs leading-relaxed text-gray-700">
-            <strong>Modo demonstração.</strong> O catálogo não está configurado (
-            <code className="font-mono">VITE_CATALOG_URL</code> vazio): a trilha abaixo é{' '}
+            <strong>Modo demonstração.</strong> Nenhum serviço está configurado (
+            <code className="font-mono">VITE_*_URL</code> vazios): a trilha abaixo é{' '}
             <strong>inventada</strong>. Serve para conhecer a tela.
           </p>
         )}
 
         <Section title="Filtros">
-          <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4">
+          <div className="grid gap-3 p-3 sm:grid-cols-3 sm:p-4">
+            <div>
+              <label htmlFor="af-fonte" className="block text-xs font-semibold text-gray-700">
+                Serviço
+              </label>
+              <select
+                id="af-fonte"
+                value={source}
+                onChange={(e) => setParam('fonte', e.target.value)}
+                className={cn(inputCls, 'mt-1')}
+              >
+                <option value="">Todos</option>
+                {(Object.keys(SOURCE_LABEL) as AuditSource[]).map((s) => (
+                  <option key={s} value={s}>
+                    {SOURCE_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label htmlFor="af-acao" className="block text-xs font-semibold text-gray-700">
                 Ação
@@ -194,6 +240,7 @@ export default function ActivityPage() {
                 <thead>
                   <tr>
                     <Th>Quando</Th>
+                    <Th>Serviço</Th>
                     <Th>Ação</Th>
                     <Th>Ator</Th>
                     <Th>Item</Th>
@@ -202,11 +249,21 @@ export default function ActivityPage() {
                 </thead>
                 <tbody>
                   {rows.map((e) => (
-                    <tr key={e.id} className="hover:bg-gray-50">
+                    <tr key={`${e.source}:${e.id}`} className="hover:bg-gray-50">
                       <Td className="whitespace-nowrap text-xs text-gray-600">
                         {formatWhen(e.createdAt)}
                       </Td>
-                      <Td className="whitespace-nowrap text-gray-800">{actionLabel(e.action)}</Td>
+                      <Td>
+                        <SourceChip source={e.source} />
+                      </Td>
+                      <Td className="whitespace-nowrap text-gray-800">
+                        {actionLabel(e.action)}
+                        {typeof e.amount === 'number' && e.amount > 0 && (
+                          <span className="ml-1.5 text-xs font-semibold text-gray-500">
+                            {fmtReais(e.amount)}
+                          </span>
+                        )}
+                      </Td>
                       <Td className="max-w-[14rem] truncate text-xs text-gray-700">
                         {e.actorId ?? <span className="text-gray-400">sistema</span>}
                         {e.actorRole && <span className="ml-1 text-gray-400">· {e.actorRole}</span>}
