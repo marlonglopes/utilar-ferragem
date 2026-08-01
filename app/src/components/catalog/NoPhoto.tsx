@@ -18,7 +18,10 @@ export function NoPhoto({ className, compact }: { className?: string; compact?: 
       )}
     >
       <ImageOff className={compact ? 'h-7 w-7' : 'h-10 w-10'} aria-hidden="true" />
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+      {/* gray-600 (não 400): "sem foto" ainda é texto que o cliente lê — tem que
+          passar AA sobre o cinza claro (gray-400 dava ~2,5:1). O ícone acima é
+          decorativo (aria-hidden), então pode ficar claro. */}
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">
         Sem foto ainda
       </span>
     </div>
