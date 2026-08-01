@@ -73,3 +73,57 @@ func TestPersonas_CatalogAuthzFailClosed(t *testing.T) {
 		})
 	}
 }
+
+// Estoque (tela do almoxarife): VER é mais amplo que AJUSTAR. Prova que o
+// almoxarife entra (e o custo nunca aparece porque a rota nem devolve), o
+// vendas vê mas não ajusta pelo fluxo com motivo, e o contador fica fora.
+func TestPersonas_StockAuthzFailClosed(t *testing.T) {
+	const secret = "test-secret-at-least-32-chars-long-xx"
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(handler.RequestID())
+	ok := func(c *gin.Context) { c.Status(http.StatusOK) }
+
+	read := r.Group("/api/v1/admin", handler.RequireRole(secret, false, handler.StockReadRoles...))
+	read.GET("/stock", ok)
+	write := r.Group("/api/v1/admin", handler.RequireRole(secret, false, handler.StockWriteRoles...))
+	write.POST("/stock/:id/adjust", ok)
+
+	call := func(method, path, role string) int {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(method, path, nil)
+		if role != "" {
+			req.Header.Set("Authorization", "Bearer "+signToken(t, secret, "u-"+role, role))
+		}
+		r.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	const (
+		list   = "/api/v1/admin/stock"
+		adjust = "/api/v1/admin/stock/p1/adjust"
+	)
+	cases := []struct {
+		nome, method, path, role string
+		want                     int
+	}{
+		{"almoxarife vê estoque", http.MethodGet, list, "almoxarife", http.StatusOK},
+		{"vendas vê estoque", http.MethodGet, list, "vendas", http.StatusOK},
+		{"admin vê estoque", http.MethodGet, list, "admin", http.StatusOK},
+		{"contador NÃO vê estoque", http.MethodGet, list, "contador", http.StatusForbidden},
+		{"customer barrado", http.MethodGet, list, "customer", http.StatusForbidden},
+		{"anônimo 401", http.MethodGet, list, "", http.StatusUnauthorized},
+
+		{"almoxarife ajusta", http.MethodPost, adjust, "almoxarife", http.StatusOK},
+		{"admin ajusta", http.MethodPost, adjust, "admin", http.StatusOK},
+		{"vendas NÃO ajusta (fluxo do almoxarifado)", http.MethodPost, adjust, "vendas", http.StatusForbidden},
+		{"contador NÃO ajusta", http.MethodPost, adjust, "contador", http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		t.Run(tc.nome, func(t *testing.T) {
+			if got := call(tc.method, tc.path, tc.role); got != tc.want {
+				t.Errorf("%s %s como %q → %d, queria %d", tc.method, tc.path, tc.role, got, tc.want)
+			}
+		})
+	}
+}

@@ -268,6 +268,21 @@ func main() {
 		catObs.GET("/observability", obsH.Snapshot)
 	}
 
+	// Estoque — a tela do almoxarife. VER (sem custo) é mais amplo que AJUSTAR.
+	// Grupo separado do catálogo (CatalogAdminRoles) DE PROPÓSITO: aquele
+	// devolve custo e só admin/vendas entram; este nunca devolve custo, então o
+	// almoxarife entra sem ver custo. Ver docs/estoque.md.
+	stockH := handler.NewStockHandler(database)
+	stockRead := r.Group("/api/v1/admin", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, handler.StockReadRoles...))
+	{
+		stockRead.GET("/stock", stockH.List)
+		stockRead.GET("/stock/:id/movements", stockH.Movements)
+	}
+	stockWrite := r.Group("/api/v1/admin", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, handler.StockWriteRoles...))
+	{
+		stockWrite.POST("/stock/:id/adjust", stockH.Adjust)
+	}
+
 	// Rotas internas de reserva de estoque — chamadas pelo order-service, não
 	// pelo browser. Aceitam role=service (token que o order-service assina com o
 	// SERVICE_JWT_SECRET) ou role=admin (operação manual/debug, token de
