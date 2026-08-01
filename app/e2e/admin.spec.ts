@@ -33,6 +33,7 @@ const ADMIN_PAGES = [
   '/admin/importar',
   '/admin/avaliacoes',
   '/admin/frete',
+  '/admin/pagamento',
 ]
 
 test.describe('Admin — painel de operação', () => {

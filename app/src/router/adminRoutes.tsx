@@ -47,6 +47,7 @@ const StockPage = lazy(() => import('@/pages/admin/StockPage'))
 const ReturnsPage = lazy(() => import('@/pages/admin/ReturnsPage'))
 const ReviewsPage = lazy(() => import('@/pages/admin/ReviewsPage'))
 const ShippingPage = lazy(() => import('@/pages/admin/ShippingPage'))
+const PaymentConfigPage = lazy(() => import('@/pages/admin/PaymentConfigPage'))
 
 /** Envolve a página no guard de papel + Suspense + fronteira de erro. */
 function adminPage(element: ReactNode): ReactNode {
@@ -119,6 +120,12 @@ export const adminRoutes: RouteObject[] = [
     // Frete: CRUD das faixas por CEP — o que o cliente paga (só admin).
     path: '/admin/frete',
     element: adminPage(<ShippingPage />),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // Config de pagamento (leitura): qual PSP, métodos, saúde — sem segredo.
+    path: '/admin/pagamento',
+    element: adminPage(<PaymentConfigPage />),
     errorElement: <RouteErrorBoundary />,
   },
   {

@@ -230,6 +230,13 @@ func main() {
 	defer stopPSPCheck()
 	go pspCheck.Run(pspCtx)
 
+	// Configuração de pagamento em LEITURA para o painel (qual PSP, métodos,
+	// saúde). Admin + contador (LedgerRoles): é informação financeira, sem
+	// segredo. NUNCA devolve credencial — trocar PSP/chave segue sendo variável
+	// de ambiente.
+	padm := r.Group("/api/v1/admin", handler.JWTMiddleware(cfg.JWTSecret), handler.RequireAnyRole(handler.LedgerRoles...))
+	padm.GET("/payment/config", handler.NewPaymentConfigHandler(gateway, pspCheck).Get)
+
 	r.GET("/health", func(c *gin.Context) {
 		if err := database.Ping(); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"db": "down"})

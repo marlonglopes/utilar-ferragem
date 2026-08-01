@@ -6,6 +6,7 @@ import {
   BookOpenCheck,
   Boxes,
   ClipboardList,
+  CreditCard,
   Fingerprint,
   LayoutDashboard,
   Menu,
@@ -41,6 +42,7 @@ import { canAccessAdmin, isStaffRole } from '@/lib/adminAccess'
 const NAV = [
   { to: '/admin', label: 'Visão geral', short: 'Geral', icon: LayoutDashboard, end: true },
   { to: '/admin/contabil', label: 'Auditoria contábil', short: 'Contábil', icon: BookOpenCheck },
+  { to: '/admin/pagamento', label: 'Pagamento', short: 'Pagamento', icon: CreditCard },
   { to: '/admin/pedidos', label: 'Pedidos', short: 'Pedidos', icon: ClipboardList },
   { to: '/admin/estoque', label: 'Estoque', short: 'Estoque', icon: Boxes },
   { to: '/admin/devolucoes', label: 'Devoluções', short: 'Devoluções', icon: Undo2 },

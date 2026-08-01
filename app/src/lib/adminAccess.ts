@@ -39,6 +39,7 @@ export const ADMIN_SECTIONS: ReadonlyArray<{ path: string; roles: readonly Staff
   { path: '/admin/avaliacoes', roles: ['admin', 'vendas'] }, // moderação (catálogo)
   { path: '/admin/atividade', roles: ['admin', 'vendas'] }, // trilha do catálogo (custo)
   { path: '/admin/trilha', roles: ['admin', 'contador'] }, // trilha contábil (sem custo)
+  { path: '/admin/pagamento', roles: ['admin', 'contador'] }, // config PSP (leitura, sem segredo)
   { path: '/admin/observabilidade', roles: ['admin', 'contador'] },
 ]
 
