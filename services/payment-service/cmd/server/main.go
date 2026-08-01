@@ -178,7 +178,9 @@ func main() {
 	}
 
 	// API contábil — role=admin obrigatório. Contrato em docs/ledger-api.md.
-	adm := r.Group("/api/v1/ledger", handler.JWTMiddleware(cfg.JWTSecret), handler.AdminOnly())
+	// Livro contábil: admin + contador (LedgerRoles). A contabilidade é o
+	// trabalho do contador; é o único lugar onde essa persona muta algo.
+	adm := r.Group("/api/v1/ledger", handler.JWTMiddleware(cfg.JWTSecret), handler.RequireAnyRole(handler.LedgerRoles...))
 	{
 		adm.GET("/summary", ledgerH.Summary)
 		adm.GET("/by-method", ledgerH.ByMethod)

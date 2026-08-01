@@ -70,6 +70,46 @@ func TestRotasContabeisExigemRoleAdmin(t *testing.T) {
 	}
 }
 
+// O livro contábil é o trabalho do CONTADOR (persona de backoffice): ele lê e
+// concilia. Mas vendas/almoxarife NÃO entram no faturamento, e cliente/vendedor
+// muito menos. Fail-closed com a lista real de main.go (handler.LedgerRoles).
+func TestLedger_AdminEContadorEntram_RestoTomam403(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	casos := []struct {
+		role     string
+		esperado int
+	}{
+		{"admin", http.StatusOK},
+		{"contador", http.StatusOK},
+		{"vendas", http.StatusForbidden},     // vê custo no catálogo, mas não o livro
+		{"almoxarife", http.StatusForbidden}, // estoque, não faturamento
+		{"store_operator", http.StatusForbidden},
+		{"seller", http.StatusForbidden},
+		{"customer", http.StatusForbidden},
+		{"", http.StatusForbidden}, // fail-closed
+	}
+
+	for _, tc := range casos {
+		t.Run(tc.role, func(t *testing.T) {
+			r := gin.New()
+			r.GET("/api/v1/ledger/summary",
+				func(c *gin.Context) { c.Set("user_role", tc.role); c.Next() },
+				handler.RequireAnyRole(handler.LedgerRoles...),
+				func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"grossCents": 1000000}) },
+			)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/ledger/summary", nil))
+			if w.Code != tc.esperado {
+				t.Fatalf("role=%q status=%d, esperado %d", tc.role, w.Code, tc.esperado)
+			}
+			if tc.esperado == http.StatusForbidden && contains(w.Body.String(), "grossCents") {
+				t.Fatalf("DADO FINANCEIRO VAZOU NUM 403 para role=%q: %s", tc.role, w.Body.String())
+			}
+		})
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (func() bool {
 		for i := 0; i+len(sub) <= len(s); i++ {

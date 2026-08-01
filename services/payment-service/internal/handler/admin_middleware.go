@@ -5,29 +5,38 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/utilar/pkg/roles"
 )
 
 // RoleAdmin é o papel exigido pelas rotas contábeis.
-const RoleAdmin = "admin"
+const RoleAdmin = roles.Admin
 
-// AdminOnly exige role=admin no JWT já validado por JWTMiddleware.
+// LedgerRoles — quem entra no livro contábil. Admin e CONTADOR: a contabilidade
+// (faturamento, taxa efetiva, conciliação, fechamento de período) é o trabalho
+// do contador, então ele age aqui — é o único lugar onde a persona `contador`
+// muta algo (fora daqui é só leitura). O livro é financeiro puro: NÃO expõe
+// custo de aquisição por produto (isso mora no catalog), então não há
+// vazamento de custo em conceder a rota ao contador.
+var LedgerRoles = []string{roles.Admin, roles.Contador}
+
+// RequireAnyRole exige que o JWT (já validado por JWTMiddleware) tenha um dos
+// papéis dados. Fail-closed: role ausente/vazia ou fora da lista é NEGADA (403).
 //
-// POR QUE UM MIDDLEWARE SEPARADO: as rotas do livro contábil expõem o
-// faturamento inteiro da empresa, taxa efetiva do gateway e divergências de
-// dinheiro — é o conjunto de dados mais sensível do sistema depois das
-// credenciais. Ownership scoping (user_id) NÃO serve aqui, porque o relatório é
-// agregado e não pertence a um usuário; a única proteção possível é papel.
+// POR QUE role e não ownership: as rotas contábeis expõem o faturamento inteiro,
+// taxa efetiva do gateway e divergências de dinheiro — o dado mais sensível
+// depois das credenciais. O relatório é agregado, não pertence a um usuário,
+// então scoping por user_id não protege; só papel protege.
 //
-// Fail-closed: role ausente ou vazia é NEGADA. Um JWT antigo emitido antes de
-// existir o claim `role` não pode virar passe livre pro faturamento.
-//
-// Responde 403 (e não 404 como o /metrics): aqui o usuário JÁ está autenticado,
-// então não há o que esconder sobre a existência da rota, e um 403 explícito
-// evita horas de debug de "por que a API do dashboard some".
-func AdminOnly() gin.HandlerFunc {
+// Responde 403 (não 404 como o /metrics): o usuário JÁ está autenticado, não há
+// o que esconder sobre a existência da rota.
+func RequireAnyRole(allowed ...string) gin.HandlerFunc {
+	set := make(map[string]struct{}, len(allowed))
+	for _, r := range allowed {
+		set[r] = struct{}{}
+	}
 	return func(c *gin.Context) {
 		role := c.GetString("user_role")
-		if role != RoleAdmin {
+		if _, ok := set[role]; !ok || role == "" {
 			slog.Warn("acesso negado a rota contábil",
 				"request_id", c.GetString("request_id"),
 				"user_id", c.GetString("user_id"),
@@ -35,7 +44,7 @@ func AdminOnly() gin.HandlerFunc {
 				"path", c.FullPath(),
 			)
 			c.AbortWithStatusJSON(http.StatusForbidden, ErrorEnvelope{
-				Error:     "admin role required",
+				Error:     "admin or contador role required",
 				Code:      "forbidden",
 				RequestID: c.GetString("request_id"),
 			})
@@ -44,3 +53,7 @@ func AdminOnly() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// AdminOnly mantém o contrato antigo (só admin) para quem precisar de uma rota
+// exclusiva do dono. As rotas do livro usam LedgerRoles (admin + contador).
+func AdminOnly() gin.HandlerFunc { return RequireAnyRole(RoleAdmin) }
