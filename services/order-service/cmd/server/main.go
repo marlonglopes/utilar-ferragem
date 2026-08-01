@@ -198,31 +198,48 @@ func main() {
 		bal.POST("/orders/:id/settle-external", orderH.SettleExternal)
 	}
 
-	// Rotas de operação (separação, despacho, entrega). role=admin ou operator:
-	// quem embala não precisa de poder de admin sobre o resto do sistema.
-	ops := r.Group("/api/v1/admin", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, "admin", "operator"))
+	// Rotas de operação, separadas por PERSONA (backoffice 2026-07). A fronteira
+	// é aqui, no servidor — o menu filtrado do painel é só conforto. Ver
+	// docs/backoffice-personas.md.
+	//
+	// A separação em três grupos NÃO é estética: reflete quem pode fazer o quê.
+	//   - LER: contador precisa ver pedido/devolução (faturamento), mas é
+	//     read-only fora do contábil — então NÃO entra nos grupos de escrita.
+	//   - AGIR (separar/despachar/receber devolução física): vendedor interno e
+	//     almoxarife, além do operador de balcão e do admin.
+	//   - REEMBOLSAR (dinheiro SAINDO): só admin. É a linha que nem `vendas`,
+	//     nem `almoxarife`, nem `contador` (read-only) cruzam.
+	opsRead := r.Group("/api/v1/admin",
+		handler.RequireRole(cfg.JWTSecret, cfg.DevMode, handler.OpsReadRoles...))
 	{
-		// Lista de pedidos do painel de operação — o que faltava para ter onde
-		// agir os PATCH de fulfillment abaixo.
-		ops.GET("/orders", orderH.AdminList)
-		ops.PATCH("/orders/:id/picking", orderH.MarkPicking)
-		ops.PATCH("/orders/:id/shipped", orderH.MarkShipped)
-		ops.PATCH("/orders/:id/delivered", orderH.MarkDelivered)
-		ops.PATCH("/orders/:id/cancel", orderH.AdminCancel)
+		opsRead.GET("/orders", orderH.AdminList)
+		opsRead.GET("/returns", returnH.ListQueue)
+	}
 
-		// Devolução — o lado da loja.
-		//
-		// Fica em `ops` (admin OU operator) e não no painel do dono: quem
-		// confere a mercadoria que voltou é a mesma pessoa que separa pedido.
-		//
-		// ⚠️ /receive é onde o ESTOQUE volta e /refund é onde o DINHEIRO sai.
-		// A ordem é imposta pela máquina de estados (internal/returns), não
-		// pela ordem das linhas aqui.
-		ops.GET("/returns", returnH.ListQueue)
-		ops.PATCH("/returns/:rid/approve", returnH.Approve)
-		ops.PATCH("/returns/:rid/reject", returnH.Reject)
-		ops.PATCH("/returns/:rid/receive", returnH.Receive)
-		ops.PATCH("/returns/:rid/refund", returnH.Refund)
+	opsWrite := r.Group("/api/v1/admin",
+		handler.RequireRole(cfg.JWTSecret, cfg.DevMode, handler.OpsWriteRoles...))
+	{
+		opsWrite.PATCH("/orders/:id/picking", orderH.MarkPicking)
+		opsWrite.PATCH("/orders/:id/shipped", orderH.MarkShipped)
+		opsWrite.PATCH("/orders/:id/delivered", orderH.MarkDelivered)
+		opsWrite.PATCH("/orders/:id/cancel", orderH.AdminCancel)
+
+		// Devolução — o lado da loja. Quem confere a mercadoria que voltou é a
+		// mesma pessoa que separa pedido (almoxarife/vendas/operador).
+		// ⚠️ /receive é onde o ESTOQUE volta; a ordem é imposta pela máquina de
+		// estados (internal/returns), não pela ordem das linhas aqui.
+		opsWrite.PATCH("/returns/:rid/approve", returnH.Approve)
+		opsWrite.PATCH("/returns/:rid/reject", returnH.Reject)
+		opsWrite.PATCH("/returns/:rid/receive", returnH.Receive)
+	}
+
+	// /refund é onde o DINHEIRO SAI — só admin. Separado de propósito do resto
+	// da devolução: receber a mercadoria de volta (físico) é operação; devolver
+	// o dinheiro é decisão do dono.
+	opsRefund := r.Group("/api/v1/admin",
+		handler.RequireRole(cfg.JWTSecret, cfg.DevMode, handler.OpsRefundRoles...))
+	{
+		opsRefund.PATCH("/returns/:rid/refund", returnH.Refund)
 	}
 
 	// Painel do dono — grupo SEPARADO do `ops` acima, e de propósito.
