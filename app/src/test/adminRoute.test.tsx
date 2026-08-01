@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, cleanup } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AdminRoute } from '@/components/admin/AdminRoute'
@@ -61,10 +61,13 @@ describe('AdminRoute — modo mock (sem auth-service)', () => {
     expect(screen.getByText('conteúdo do painel')).toBeInTheDocument()
   })
 
-  it('libera também para customer, já que não há autorização a aplicar sem backend', () => {
+  it('mas se uma persona logou, aplica a matriz mesmo em mock (demo fiel de papéis)', () => {
+    // customer não é papel de operação → barrado, mesmo sem backend. É o que
+    // torna a demonstração de "cada um vê só o seu" fiel na apresentação.
     setUser('customer')
     renderGuard()
-    expect(screen.getByText('conteúdo do painel')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /acesso restrito ao painel/i })).toBeInTheDocument()
+    expect(screen.queryByText('conteúdo do painel')).not.toBeInTheDocument()
   })
 })
 
@@ -138,5 +141,78 @@ describe('AdminRoute — auth real em produção', () => {
     const Guard = await loadStrictGuard('admin')
     renderWith(Guard)
     expect(screen.getByText('conteúdo do painel')).toBeInTheDocument()
+  })
+})
+
+describe('AdminRoute — roteamento por persona (produção)', () => {
+  async function loadGuard(role: User['role']) {
+    vi.resetModules()
+    vi.stubEnv('DEV', false)
+    vi.doMock('@/lib/api', () => ({
+      isAuthEnabled: true,
+      isApiEnabled: true,
+      isOrderEnabled: true,
+      isCatalogEnabled: true,
+    }))
+    const mod = await import('@/components/admin/AdminRoute')
+    const { useAuthStore: freshStore } = await import('@/store/authStore')
+    freshStore.setState({
+      user: { id: 'u1', email: 'a@b.c', name: 'Teste', role, token: 't' },
+    })
+    return mod.AdminRoute
+  }
+
+  // Monta várias seções do painel para os redirects de "home" resolverem.
+  function renderAt(Guard: typeof AdminRoute, path: string) {
+    const page = (label: string) => (
+      <Guard>
+        <div>{label}</div>
+      </Guard>
+    )
+    return render(
+      <MemoryRouter
+        initialEntries={[path]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <Routes>
+          <Route path="/admin" element={page('visão geral')} />
+          <Route path="/admin/contabil" element={page('contábil')} />
+          <Route path="/admin/pedidos" element={page('pedidos')} />
+          <Route path="/admin/produtos" element={page('produtos')} />
+        </Routes>
+      </MemoryRouter>
+    )
+  }
+
+  it('contador em /admin (visão geral) cai no home dele (contábil)', async () => {
+    const Guard = await loadGuard('contador')
+    renderAt(Guard, '/admin')
+    expect(screen.getByText('contábil')).toBeInTheDocument()
+    expect(screen.queryByText('visão geral')).not.toBeInTheDocument()
+  })
+
+  it('vendas abre produtos (vê custo) mas é desviado do contábil', async () => {
+    let Guard = await loadGuard('vendas')
+    renderAt(Guard, '/admin/produtos')
+    expect(screen.getByText('produtos')).toBeInTheDocument()
+    cleanup()
+
+    Guard = await loadGuard('vendas')
+    renderAt(Guard, '/admin/contabil')
+    // vendas não entra no contábil → vai pro home dele (pedidos)
+    expect(screen.getByText('pedidos')).toBeInTheDocument()
+    expect(screen.queryByText('contábil')).not.toBeInTheDocument()
+  })
+
+  it('almoxarife abre pedidos mas é desviado de produtos (não vê custo)', async () => {
+    let Guard = await loadGuard('almoxarife')
+    renderAt(Guard, '/admin/pedidos')
+    expect(screen.getByText('pedidos')).toBeInTheDocument()
+    cleanup()
+
+    Guard = await loadGuard('almoxarife')
+    renderAt(Guard, '/admin/produtos')
+    expect(screen.getByText('pedidos')).toBeInTheDocument()
+    expect(screen.queryByText('produtos')).not.toBeInTheDocument()
   })
 })

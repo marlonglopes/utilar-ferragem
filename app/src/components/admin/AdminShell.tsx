@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { isAdminApiEnabled } from '@/lib/adminApi'
+import { canAccessAdmin, isStaffRole } from '@/lib/adminAccess'
 
 /**
  * Chrome do painel administrativo.
@@ -64,6 +65,14 @@ export function AdminShell({
   const user = useAuthStore((st) => st.user)
   const logout = useAuthStore((st) => st.logout)
 
+  // Menu por PERSONA: cada papel vê só as seções que pode abrir (espelha o 403
+  // do backend). Se uma persona está logada, filtra; sem persona logada (demo
+  // em mock sem login) mostra tudo, senão o painel abriria vazio. A fronteira
+  // real continua sendo o servidor — isto só evita cliques que dariam 403.
+  const navItems = isStaffRole(user?.role)
+    ? NAV.filter((item) => canAccessAdmin(item.to, user?.role))
+    : NAV
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
@@ -99,7 +108,7 @@ export function AdminShell({
           aria-label="Seções do painel"
         >
           <ul className="flex gap-1 overflow-x-auto py-1 lg:overflow-visible">
-            {NAV.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon
               return (
                 <li key={item.to} className="shrink-0">

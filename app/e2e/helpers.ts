@@ -37,13 +37,12 @@ export const creds = {
  */
 export async function authAs(
   page: Page,
-  role: 'admin' | 'store_operator' | 'customer',
+  role: 'admin' | 'store_operator' | 'customer' | 'contador' | 'vendas' | 'almoxarife',
   email?: string
 ) {
   const user = {
     id: '00000000-0000-4000-8000-000000000099',
-    name:
-      role === 'admin' ? 'Admin E2E' : role === 'store_operator' ? 'Operador E2E' : 'Cliente E2E',
+    name: `${role} E2E`,
     email: email ?? `${role}@utilar.com.br`,
     role,
     token: 'e2e-mock-token',

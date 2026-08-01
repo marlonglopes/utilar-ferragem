@@ -39,6 +39,42 @@ test.describe('Admin — painel de operação', () => {
     await expect(page.getByText('Utilar · Admin')).toBeVisible()
   })
 
+  // Menu filtrado por PERSONA — a metade visível do requisito. Cada papel vê só
+  // as suas seções (a fronteira real é o 403 do backend; isto é o conforto).
+  // Assertivas por href (robustas a viewport: mobile mostra rótulo curto).
+  const nav = (page: import('@playwright/test').Page) =>
+    page.getByRole('navigation', { name: 'Seções do painel' })
+
+  test('contador vê contábil/pedidos, NÃO vê produtos/operadores', async ({ page }) => {
+    await authAs(page, 'contador')
+    await page.goto('/admin/contabil')
+    const n = nav(page)
+    await expect(n.locator('a[href^="/admin/contabil"]')).toHaveCount(1)
+    await expect(n.locator('a[href^="/admin/pedidos"]')).toHaveCount(1)
+    await expect(n.locator('a[href^="/admin/produtos"]')).toHaveCount(0)
+    await expect(n.locator('a[href^="/admin/operadores"]')).toHaveCount(0)
+  })
+
+  test('vendas vê produtos/categorias/pedidos, NÃO vê contábil/operadores', async ({ page }) => {
+    await authAs(page, 'vendas')
+    await page.goto('/admin/produtos')
+    const n = nav(page)
+    await expect(n.locator('a[href^="/admin/produtos"]')).toHaveCount(1)
+    await expect(n.locator('a[href^="/admin/categorias"]')).toHaveCount(1)
+    await expect(n.locator('a[href^="/admin/pedidos"]')).toHaveCount(1)
+    await expect(n.locator('a[href^="/admin/contabil"]')).toHaveCount(0)
+    await expect(n.locator('a[href^="/admin/operadores"]')).toHaveCount(0)
+  })
+
+  test('almoxarife vê pedidos, NÃO vê produtos/contábil', async ({ page }) => {
+    await authAs(page, 'almoxarife')
+    await page.goto('/admin/pedidos')
+    const n = nav(page)
+    await expect(n.locator('a[href^="/admin/pedidos"]')).toHaveCount(1)
+    await expect(n.locator('a[href^="/admin/produtos"]')).toHaveCount(0)
+    await expect(n.locator('a[href^="/admin/contabil"]')).toHaveCount(0)
+  })
+
   for (const path of ADMIN_PAGES) {
     test(`a tela ${path} renderiza sem quebrar`, async ({ page }) => {
       const errors: string[] = []

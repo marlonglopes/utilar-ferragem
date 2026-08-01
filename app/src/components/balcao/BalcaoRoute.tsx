@@ -25,6 +25,13 @@ import { ShieldAlert } from 'lucide-react'
  * Em dev/mock o acesso é liberado, para o PDV ser demonstrável sem backend.
  */
 
+// `vendas` (vendedor interno) AINDA NÃO entra no PDV pelo papel: o balcão é
+// autorizado por VÍNCULO com a loja (store_operators) + claims de loja no JWT,
+// emitidas hoje só para `store_operator` (ver auth jwt.go e balcao/authz.go, que
+// exige role=store_operator no caminho do dinheiro). Dar PDV ao `vendas` de
+// verdade é mudança no caminho do dinheiro (vínculo de loja + claims + authz) —
+// fica como follow-up. Por ora, quem vende no balcão é `store_operator`; o
+// `vendas` opera o painel (catálogo/pedidos). `seller` (marketplace) segue FORA.
 const BALCAO_ROLES_ALLOWED = ['store_operator', 'admin'] as const
 
 /** Sem auth-service configurado (modo mock) ou build de dev → libera. */

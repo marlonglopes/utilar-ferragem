@@ -9,7 +9,11 @@ export interface User {
   // DE BALCÃO — não confundir com `seller`, que é lojista do marketplace.
   // O tipo ficou desatualizado quando o papel foi criado no backend, e o
   // resultado é que o operador caía no ramo genérico do redirecionamento.
-  role: 'customer' | 'seller' | 'admin' | 'store_operator'
+  //
+  // Personas de operação do backoffice (2026-07): contador/vendas/almoxarife.
+  // `vendas` é o vendedor INTERNO (PDV+pedidos+catálogo), ainda diferente de
+  // `seller` (marketplace) e `store_operator` (balcão). Ver lib/adminAccess.ts.
+  role: 'customer' | 'seller' | 'admin' | 'store_operator' | 'contador' | 'vendas' | 'almoxarife'
   token: string // JWT access token (expires em 15min quando vindo do auth-service)
   refreshToken?: string // opaco, revogável (30 dias)
   emailVerified?: boolean
