@@ -1,7 +1,7 @@
 # Estado do projeto — mapa para retomar
 
-**Última atualização:** 2026-08-01. Leia isto primeiro ao reabrir a Utilar.
-Aponta para os docs de detalhe; não os duplica.
+**Última atualização:** 2026-08-02 (checkpoint antes de pausa). Leia isto primeiro
+ao reabrir a Utilar. Aponta para os docs de detalhe; não os duplica.
 
 > ⭐ **Régua permanente:** a Utilar é uma **loja física REAL, já existente e com
 > ótima reputação**. Nada entra pro cliente com problema. Sempre separe
@@ -35,6 +35,7 @@ NF-e, AWS, fotos reais).
 | **Config de pagamento** (leitura) — PSP ativo, métodos, saúde; nunca segredo | ✅ | — |
 | **Imagens** — upload por produto + **uploader EM LOTE por SKU** (compressão no cliente, paralelo, retry) | ✅ | `imagens-produto.md` |
 | **Importação por planilha** — upload, dry-run, mapeamento automático | ✅ | `ingestao-de-produtos.md` |
+| **Central de ajuda** — FAQ do cliente (`/ajuda`) + **guias de operação da equipe** (`/ajuda/operacao`) | ✅ | `src/lib/helpGuides.ts` |
 | **Appmax** v1 (Pix, cartão, boleto, split) | ✅ código | `appmax-v1-appstore.md` |
 | **Livro contábil** — partidas dobradas, período, reconciliação | ✅ | `ledger-api.md` |
 | **Alice** (assistente) — obra, dois modos, tool-use | ✅ | `alice-conhecimento.md` |
@@ -50,10 +51,13 @@ conhecidas zeradas). gofmt/prettier zerados.
 
 ## Estado dos DADOS do catálogo (reputação)
 
-- **Listagem = 480 produtos reais** importados do ERP (nome/preço/estoque
-  verdadeiros). Os ~400 produtos mock/curados (SKU `UTL-`/`CUR-` + os de
-  construção) foram **arquivados** (fora da vitrine; snapshot em
-  `scratchpad/archived-mock-ids.txt`).
+- **Listagem = 4.258 produtos reais** importados do ERP (nome/preço/estoque
+  verdadeiros). Os rascunhos foram **publicados** (só 1 sem nome ficou de fora;
+  snapshot em `scratchpad/published-from-draft-ids.txt`). Os ~400 produtos
+  mock/curados (SKU `UTL-`/`CUR-` + os de construção) foram **arquivados** (fora
+  da vitrine; snapshot em `scratchpad/archived-mock-ids.txt`). ⚠️ Os mocks NÃO
+  foram deletados de propósito: são a **fixture dos testes do catalog** (o
+  `catalog_fixture_ensure` da skill os reimporta+publica se sumirem).
 - **Sem foto (de propósito):** as fotos genéricas casadas por palavra-chave eram
   ERRADAS (cabo de rede com foto de roçadeira) e foram **removidas** (backup em
   `scratchpad/removed-product-images.tsv`). Os produtos mostram um placeholder
@@ -137,3 +141,22 @@ ANTES do catch-all do catalog (ver `app/vite.config.ts`).
   acumulavam conexões e estouravam o `max_connections=100` na reserva concorrente.
 - **Login/logout**: rota é `/entrar`. `localhost` sem porta vai pro :80. Use `:5175`.
 - Não commitar em cima de agente em voo; `git add` só dos próprios arquivos.
+- **"product not found" no pagamento** = carrinho velho (localStorage) com um
+  produto que foi **arquivado/despublicado** depois. O order pede o produto ao
+  catálogo (`GET /products/by-id` só devolve `published`) e não acha. Produto
+  publicado resolve 200. Fix pro usuário: esvaziar o carrinho. **Pendente
+  (reputação):** tratar item indisponível no checkout com mensagem clara em vez
+  do erro cru.
+
+---
+
+## Onde paramos (checkpoint 2026-08-02)
+
+- **Vitrine: 4.258 produtos reais expostos, todos SEM foto** (placeholder "Sem
+  foto ainda"). Fotos reais entram pelo uploader em lote (`/admin/imagens`).
+- **Proposta comercial** (3 cenários + participação no lucro) está como
+  **rascunho no Gmail** do Marlon (`marlonglopes@gmail.com`) — não foi enviada
+  (a integração só cria rascunho). É doc pessoal, não entra no repo.
+- **Próximo passo sugerido em código:** tratamento gracioso de item indisponível
+  no checkout (reputação) · recorte/rotação de imagem · preço por quantidade.
+  O que trava o lançamento é o balde de decisões do dono (§Bloqueios).
