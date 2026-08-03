@@ -327,29 +327,34 @@ cruzamos campo a campo com o código. Fontes canônicas confirmadas:
 | `order_authorized_with_delay` mapeado (faltava na lista oficial) | `statusFromEvent` | `TestWebhookEventStatusMapping` |
 | Comentários PP/AM e `type` (opcional) corrigidos | `client.go` | — |
 
-### 🔴 Bloqueadores de go-live / homologação (código, ainda abertos)
+### Bloqueadores de go-live / homologação
 
-Ordem natural do fluxo de venda; nenhum depende do dono, só de decisão de escopo
-+ validação no sandbox:
+**✅ Fechados (com teste):**
 
-1. **IP real do comprador.** `gateway.go` manda `0.0.0.0` fixo. A doc exige o IP
-   do cliente no customer e há cenário de **"validação de IP"** na homologação.
-   Precisa: `PayerIP` em `psp.CreateRequest` → handler lê `X-Forwarded-For` →
-   `CustomerInput.IP`. **Provável reprovação sem isso.**
-2. **Parcelamento.** Cartão vai **sempre 1x** (`Installments: 1` hardcoded). A
-   homologação testa cartão **com e sem juros**. Precisa levar `Installments`
-   até `CardChargeInput` (e cotar via `Installments()`).
-3. **Pedido com itens/frete/desconto reais.** Hoje é 1 item sintético com
-   `shipping=0`/`discount=0`. Homologação testa **carrinho multi-produto, frete
-   e cupom**. Enviar `products[]` reais + `shipping_value`/`discount_value`.
-4. **Endereço + UTM no customer** (`Address`/`Tracking` existem no struct e nunca
+1. **IP real do comprador.** `psp.CreateRequest.PayerIP` vem de `c.ClientIP()` no
+   handler (da conexão, nunca do body); o gateway manda esse IP no customer, com
+   `0.0.0.0` só como fallback. (commit `643b48c`)
+2. **Parcelamento.** `Installments` + `CardToken` em `CreatePaymentRequest`; o
+   handler valida o teto (12) e propaga; o gateway passa as parcelas ao
+   `/v1/payments/credit-card`. Plumbing do front pronto. (commits `643b48c`, `70c8a92`)
+3. **Pedido itemizado.** `buildOrderInput` monta `products[]` reais +
+   `shipping_value` + `discount_value` a partir dos itens do order-service, com
+   invariante de dinheiro testada (cobrança == total autoritativo). (commit `a746561`)
+
+**🔴 Ainda abertos:**
+
+4. **Card no browser (Appmax JS).** A tokenização do cartão via Appmax JS
+   (PCI SAQ-A) ainda não está integrada no front — depende do contrato assinado +
+   sandbox. O backend já aceita `card_token`; falta o passo do browser. Pix e
+   boleto seguem 100% ponta a ponta.
+5. **Endereço + UTM no customer** (`Address`/`Tracking` existem no struct e nunca
    são preenchidos) — melhora o antifraude.
-5. **Fluxo de instalação / geração de credencial de merchant** (`/app/authorize`,
+6. **Fluxo de instalação / geração de credencial de merchant** (`/app/authorize`,
    `/app/client/generate`, health-check que responde `{external_id:<UUID v4>}`).
    Sem isso o app não é publicável na AppStore da Appmax. ⚠️ O `external_id` de
    *instalação* é conceito diferente do `external_id` de *pedido* que hoje usamos
    em `APPMAX_V1_EXTERNAL_ID` — separar.
-6. **Gaps de feature** (escopar): Apple Pay (`/v1/payments/apple-pay`),
+7. **Gaps de feature** (escopar): Apple Pay (`/v1/payments/apple-pay`),
    recorrência (objeto `subscription`), upsell (`POST /v1/orders/upsell`).
 
 ### ✅ Checklist de homologação (o que a Appmax exige)
