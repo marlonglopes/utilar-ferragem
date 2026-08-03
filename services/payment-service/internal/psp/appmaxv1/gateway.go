@@ -438,7 +438,10 @@ func statusFromEvent(rawEvent string) psp.PaymentStatus {
 	case "orderapproved", "orderpaid", "orderpaidbypix", "orderintegrated",
 		"orderchargebackgain": // order_charge_back_gain: chargeback ganho → volta a valer
 		return psp.StatusApproved
-	case "orderauthorized", "paymentauthorizedwithdelay":
+	case "orderauthorized", "paymentauthorizedwithdelay", "orderauthorizedwithdelay":
+		// order_authorized_with_delay está na lista oficial de 21 eventos e faltava
+		// no mapa (pego na reconciliação com a doc em 2026-08). Inócuo hoje porque o
+		// handler reconsulta o PSP, mas o mapa deve refletir a lista oficial.
 		return psp.StatusAuthorized
 	case "orderrefund", "orderpartialrefund", "ordercanceled", "ordercancelled":
 		return psp.StatusCancelled

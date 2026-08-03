@@ -450,8 +450,8 @@ type CustomerInput struct {
 	Tracking       *Tracking `json:"tracking,omitempty"`
 }
 
-// OrderProduct — item de /v1/orders. TODOS os campos são obrigatórios pela doc.
-// UnitValue em CENTAVOS.
+// OrderProduct — item de /v1/orders. sku/name/quantity/unit_value são
+// obrigatórios; `type` é OPCIONAL pela doc (default "physical"). UnitValue em CENTAVOS.
 type OrderProduct struct {
 	SKU       string `json:"sku"`
 	Name      string `json:"name"`
@@ -461,8 +461,9 @@ type OrderProduct struct {
 }
 
 // ProductTypePhysical é o `type` usado por padrão nos itens.
-// A doc lista `type` como obrigatório mas não publica o enum; "physical"/"digital"
-// é a convenção herdada do v3 (digital_product bool). Ver docs/appmax-v1-appstore.md.
+// A doc marca `type` como OPCIONAL (default "physical") e não publica o enum além
+// de physical/digital — convenção herdada do v3 (digital_product bool).
+// Ver docs/appmax-v1-appstore.md.
 const (
 	ProductTypePhysical = "physical"
 	ProductTypeDigital  = "digital"
@@ -662,8 +663,10 @@ func (c *Client) pay(ctx context.Context, path string, body map[string]any, orde
 // `total` é o valor TOTAL da compra parcelada, em centavos — a divisão pelo número
 // de parcelas para achar o valor da parcela é responsabilidade da integração.
 //
-// settings: modo de juros — "PP" (Parcela Paga / comprador) ou "AM" (Absorve
-// Merchant / lojista), conforme configurado na conta.
+// settings: MÉTODO DE CÁLCULO de juros do parcelamento, conforme a doc oficial —
+// "PP" = juros Simples por Parcela; "AM" = Financiamento (juros sobre o saldo
+// devedor, tabela Price). NÃO é "quem absorve o custo" (correção do comentário
+// antigo, que estava errado): é a fórmula do juro. Confirmar o modo da conta.
 func (c *Client) Installments(ctx context.Context, installments int, totalValueCents int64, settings string) (map[int]int64, json.RawMessage, error) {
 	body := map[string]any{
 		"installments": installments,
@@ -712,15 +715,26 @@ func InstallmentAmount(totalCents int64, n int) (first, others int64) {
 }
 
 // RefundRequest solicita estorno. refundType: "total" | "partial".
-// ATENÇÃO: pedido COM split só aceita estorno TOTAL.
-func (c *Client) RefundRequest(ctx context.Context, orderID int64, refundType string) (json.RawMessage, error) {
+//
+// Para "partial" o `value` (CENTAVOS) é OBRIGATÓRIO pela doc oficial
+// (POST /v1/orders/refund-request: "value obrigatório quando type=partial").
+// Antes desta correção o value nunca era enviado e o estorno parcial falhava
+// (400) — bug pego na reconciliação com a doc em 2026-08.
+// ATENÇÃO: pedido COM split só aceita estorno TOTAL (observado; ver docs de split).
+func (c *Client) RefundRequest(ctx context.Context, orderID int64, refundType string, valueCents int64) (json.RawMessage, error) {
 	if refundType != "total" && refundType != "partial" {
 		return nil, fmt.Errorf("%w: refund type inválido %q (total|partial)", psp.ErrInvalidRequest, refundType)
 	}
-	return c.doJSON(ctx, http.MethodPost, "/v1/orders/refund-request", map[string]any{
-		"order_id": orderID,
-		"type":     refundType,
-	})
+	body := map[string]any{"order_id": orderID, "type": refundType}
+	if refundType == "partial" {
+		// Fail-closed antes da rede: sem value o estorno parcial é recusado ou
+		// tratado de forma indefinida — inaceitável numa rota que mexe em dinheiro.
+		if valueCents <= 0 {
+			return nil, fmt.Errorf("%w: estorno parcial exige value > 0 em centavos (veio %d)", psp.ErrInvalidRequest, valueCents)
+		}
+		body["value"] = valueCents
+	}
+	return c.doJSON(ctx, http.MethodPost, "/v1/orders/refund-request", body)
 }
 
 // SetShippingTrackingCode registra o código de rastreio.
@@ -845,9 +859,30 @@ func (c *Client) SplitOrder(ctx context.Context, orderID int64, entries []SplitE
 // ATENÇÃO: este é o ÚNICO endpoint da v1 em camelCase; todo o resto é snake_case.
 // O recebedor é IMUTÁVEL depois de criado (não há endpoint de update/delete).
 type RecipientInput struct {
-	Triage  RecipientTriage  `json:"triage"`
-	Account RecipientAccount `json:"account"`
-	Company RecipientCompany `json:"company"`
+	Triage      RecipientTriage      `json:"triage"`
+	Account     RecipientAccount     `json:"account"`
+	Company     RecipientCompany     `json:"company"`
+	BankAccount RecipientBankAccount `json:"bankAccount"`      // OBRIGATÓRIO (doc)
+	Config      *RecipientConfig     `json:"config,omitempty"` // opcional
+}
+
+// RecipientBankAccount é a conta de recebimento do split. OBRIGATÓRIA no fast
+// onboarding pela doc oficial (POST /v1/recipient exige
+// bankAccount{bank,agency,account,bankAccountType}). Sem ela o cadastro toma 422
+// — lacuna pega na reconciliação com a doc em 2026-08.
+type RecipientBankAccount struct {
+	// Bank é o código do banco. `any` porque a doc mostra inteiro, mas alguns
+	// exemplos trazem string — não vale arriscar 422 por typing rígido.
+	Bank            any    `json:"bank"`
+	Agency          string `json:"agency"`
+	Account         string `json:"account"`
+	BankAccountType string `json:"bankAccountType"` // ex.: "checking" | "savings"
+}
+
+// RecipientConfig é opcional: hasAccountAccess indica se o recebedor terá acesso
+// ao painel da Appmax (doc: config.hasAccountAccess).
+type RecipientConfig struct {
+	HasAccountAccess bool `json:"hasAccountAccess"`
 }
 
 type RecipientTriage struct {
@@ -911,7 +946,30 @@ func (c *Client) RecipientStatus(ctx context.Context, hash string) (string, json
 	if err != nil {
 		return "", raw, err
 	}
+	// A doc oficial retorna `{"data":"Onboarding completed"}` — `data` é uma STRING
+	// direta, não um objeto. Tratamos esse caso ANTES do digString (que procura uma
+	// CHAVE `status`): sem isto nunca reconheceríamos o onboarding concluído e o
+	// recebedor jamais seria liberado para split/saque. Bug pego na reconciliação
+	// com a doc em 2026-08. Mantemos o digString como fallback para o shape em objeto.
+	if s := dataString(raw); s != "" {
+		return s, raw, nil
+	}
 	return digString(raw, "status", "onboarding_status"), raw, nil
+}
+
+// dataString devolve `data` quando ele é uma string bare (shape da doc de status).
+func dataString(raw []byte) string {
+	var m map[string]json.RawMessage
+	if json.Unmarshal(raw, &m) != nil {
+		return ""
+	}
+	if d, ok := m["data"]; ok {
+		var s string
+		if json.Unmarshal(d, &s) == nil {
+			return strings.TrimSpace(s)
+		}
+	}
+	return ""
 }
 
 // Balances são os saldos do recebedor, em centavos.
@@ -934,30 +992,61 @@ func (c *Client) RecipientBalances(ctx context.Context, hash string) (*Balances,
 		return b, nil
 	}
 	scope := unwrapData(m)
-	if v, ok := scope["balances"]; ok {
-		switch t := v.(type) {
-		case map[string]any:
-			scope = t
-		case []any:
-			for _, it := range t {
-				e, ok := it.(map[string]any)
-				if !ok {
-					continue
-				}
-				val := toInt64(firstOf(e, "value", "amount", "balance"))
-				switch strings.ToLower(fmt.Sprint(firstOf(e, "type", "name"))) {
-				case "available":
-					b.Available = val
-				case "to_release", "torelease":
-					b.ToRelease = val
-				}
+
+	// A doc oficial devolve `data` como uma LISTA direta: {"data":[{type,value}]}.
+	// Também toleramos data.balances=[...] (shape observado) e, mais abaixo, o
+	// objeto {available,to_release}. Antes o parser só olhava data.balances e
+	// perdia o shape documentado — bug pego na reconciliação com a doc em 2026-08.
+	var list []any
+	if arr, ok := m["data"].([]any); ok {
+		list = arr
+	} else if arr, ok := scope["balances"].([]any); ok {
+		list = arr
+	}
+	if list != nil {
+		for _, it := range list {
+			e, ok := it.(map[string]any)
+			if !ok {
+				continue
 			}
-			return b, nil
+			val := moneyToCents(firstOf(e, "value", "amount", "balance"))
+			switch strings.ToLower(fmt.Sprint(firstOf(e, "type", "name"))) {
+			case "available":
+				b.Available = val
+			case "to_release", "torelease":
+				b.ToRelease = val
+			}
+		}
+		return b, nil
+	}
+	if obj, ok := scope["balances"].(map[string]any); ok {
+		scope = obj
+	}
+	b.Available = moneyToCents(firstOf(scope, "available", "available_balance", "availableBalance"))
+	b.ToRelease = moneyToCents(firstOf(scope, "to_release", "toRelease", "to_release_balance"))
+	return b, nil
+}
+
+// moneyToCents interpreta um valor monetário da Appmax em CENTAVOS.
+//   - número JSON            → já é centavos (ex.: os saques retornam inteiros)
+//   - string decimal "150.00" (COM ponto/vírgula) → é REAIS → arredonda p/ centavos
+//   - string inteira "15000" → centavos
+//
+// Necessário porque /recipient/{hash}/balances mostra value:"0.00" (decimal em
+// REAIS na doc oficial), enquanto os endpoints de saque usam centavos inteiros.
+// Sem distinguir, R$150,00 ("150.00") viraria 150 centavos — erro de ~100×.
+// Bug pego na reconciliação com a doc em 2026-08. ⚠️ Confirmar ao vivo no sandbox
+// antes de usar o saldo em qualquer decisão de saque.
+func moneyToCents(v any) int64 {
+	if s, ok := v.(string); ok {
+		s = strings.TrimSpace(strings.ReplaceAll(s, ",", "."))
+		if strings.Contains(s, ".") {
+			if f, err := strconv.ParseFloat(s, 64); err == nil {
+				return int64(math.Round(f * 100))
+			}
 		}
 	}
-	b.Available = toInt64(firstOf(scope, "available", "available_balance", "availableBalance"))
-	b.ToRelease = toInt64(firstOf(scope, "to_release", "toRelease", "to_release_balance"))
-	return b, nil
+	return toInt64(v)
 }
 
 // AVISO DE AUTORIZAÇÃO (audit AV1-M1) — LEIA ANTES DE EXPOR ISTO EM HTTP.

@@ -287,3 +287,88 @@ com `httptest.Server` (nenhuma chamada de rede real):
 ```bash
 cd services/payment-service && go test ./internal/psp/appmaxv1/...
 ```
+
+---
+
+## 10. Reconciliação com a doc oficial (2026-08)
+
+Consumimos **toda** a documentação oficial (`appmax.readme.io`, índice em
+`/llms.txt`: ~40 páginas + os 13 status de pedido + os 21 eventos de webhook) e
+cruzamos campo a campo com o código. Fontes canônicas confirmadas:
+
+- Base URLs (sandbox/prod), `expires_in=3600`, **sem refresh token**, valores em
+  **centavos**, webhook **sem assinatura** (integridade via re-consulta) — tudo
+  bate com o código.
+- **Simulador de cartão** (sandbox): aprova `4000000000000010`, recusa
+  `4000000000000028`, qualquer outro recusa.
+- **Credenciais são DOIS pares**: o par do *app* (instalar/gerar) e o par do
+  *merchant* (transacionar). É o do **merchant** que vai em `APPMAX_V1_CLIENT_*`.
+- **Status de pedido (13)** e **eventos de webhook (21)**: `NormalizeStatus` e
+  `statusFromEvent` cobrem todos.
+- **Estorno**: `POST /v1/orders/refund-request`, `value` **obrigatório** quando
+  `type=partial`.
+- **Recipient**: `bankAccount{bank,agency,account,bankAccountType}` é
+  **obrigatório**; `GET .../status` devolve `{"data":"<string>"}` (string bare);
+  `GET .../balances` devolve `{"data":[{type,value}]}` com `value` **decimal em
+  reais** ("0.00"), enquanto os saques usam **centavos**.
+- **Parcelas**: doc fala **1–12** (não achamos 21x em lugar nenhum — validar com
+  a Appmax se o requisito for 21). `settings` PP/AM são **métodos de cálculo de
+  juros** (PP = simples por parcela; AM = financiamento/Price), **não** "quem
+  absorve o custo".
+
+### Bugs corrigidos nesta rodada (com teste de regressão)
+
+| Correção | Onde | Teste |
+|---|---|---|
+| Estorno **parcial** agora envia `value` (antes nunca ia → 400) | `RefundRequest` | `TestRefundAndTracking` |
+| `RecipientInput` ganhou `bankAccount` (era 422 no onboarding) | `RecipientInput` | `TestRecipientCamelCasePayload` |
+| `RecipientStatus` lê `{"data":"..."}` bare (antes retornava "") | `RecipientStatus`/`dataString` | `TestRecipientStatusAndBalances` + `…ObjectShape` |
+| `RecipientBalances` entende `value:"150.00"` (reais) e `data:[...]` direto | `RecipientBalances`/`moneyToCents` | `TestRecipientBalancesDecimalReais` |
+| `order_authorized_with_delay` mapeado (faltava na lista oficial) | `statusFromEvent` | `TestWebhookEventStatusMapping` |
+| Comentários PP/AM e `type` (opcional) corrigidos | `client.go` | — |
+
+### 🔴 Bloqueadores de go-live / homologação (código, ainda abertos)
+
+Ordem natural do fluxo de venda; nenhum depende do dono, só de decisão de escopo
++ validação no sandbox:
+
+1. **IP real do comprador.** `gateway.go` manda `0.0.0.0` fixo. A doc exige o IP
+   do cliente no customer e há cenário de **"validação de IP"** na homologação.
+   Precisa: `PayerIP` em `psp.CreateRequest` → handler lê `X-Forwarded-For` →
+   `CustomerInput.IP`. **Provável reprovação sem isso.**
+2. **Parcelamento.** Cartão vai **sempre 1x** (`Installments: 1` hardcoded). A
+   homologação testa cartão **com e sem juros**. Precisa levar `Installments`
+   até `CardChargeInput` (e cotar via `Installments()`).
+3. **Pedido com itens/frete/desconto reais.** Hoje é 1 item sintético com
+   `shipping=0`/`discount=0`. Homologação testa **carrinho multi-produto, frete
+   e cupom**. Enviar `products[]` reais + `shipping_value`/`discount_value`.
+4. **Endereço + UTM no customer** (`Address`/`Tracking` existem no struct e nunca
+   são preenchidos) — melhora o antifraude.
+5. **Fluxo de instalação / geração de credencial de merchant** (`/app/authorize`,
+   `/app/client/generate`, health-check que responde `{external_id:<UUID v4>}`).
+   Sem isso o app não é publicável na AppStore da Appmax. ⚠️ O `external_id` de
+   *instalação* é conceito diferente do `external_id` de *pedido* que hoje usamos
+   em `APPMAX_V1_EXTERNAL_ID` — separar.
+6. **Gaps de feature** (escopar): Apple Pay (`/v1/payments/apple-pay`),
+   recorrência (objeto `subscription`), upsell (`POST /v1/orders/upsell`).
+
+### ✅ Checklist de homologação (o que a Appmax exige)
+
+- Prazo: início em ≤3 dias úteis; homologação em ≤7 dias úteis; **cada adequação
+  volta pro fim da fila** (novos 7 dias). Reservar ~10 dias úteis.
+- Entregar: **conta + loja de teste**, **doc passo-a-passo** de instalação, e os
+  acessos para **integracoes@appmax.com.br**; sinalizar no canal oficial.
+- Cenários testados: PF (CPF) e PJ (CNPJ); cartão com/sem juros, Pix, boleto;
+  estorno total (todos os métodos) e parcial (só cartão); soft descriptor;
+  código de rastreio; **validação de IP**; cupom; frete; carrinho multi-produto;
+  atualização de status.
+
+### Incertezas a validar no sandbox (não inventar)
+
+- Aninhamento de `document_number` em pix/boleto (a doc de boleto sugere
+  top-level; enviamos aninhado em `payment_data.{pix,boleto}`).
+- Formato exato do `pix_qrcode` de resposta (base64 sem `data:`) e nomes de campo
+  de boleto — o parser é tolerante, mas confirmar evita QR/linha quebrados.
+- Unidade de `balances.value` (tratamos string decimal como reais; número como
+  centavos) — **não usar saldo em decisão de saque antes de confirmar**.
+- Content-type aceito por `oauth2/token` (usamos `x-www-form-urlencoded`).

@@ -76,6 +76,7 @@ func TestWebhookEventStatusMapping(t *testing.T) {
 		{"order_charge_back_gain", psp.StatusApproved},
 		{"order_authorized", psp.StatusAuthorized},
 		{"payment_authorized_with_delay", psp.StatusAuthorized},
+		{"order_authorized_with_delay", psp.StatusAuthorized},
 		{"order_refund", psp.StatusCancelled},
 		{"order_partial_refund", psp.StatusCancelled},
 		{"order_pix_expired", psp.StatusExpired},

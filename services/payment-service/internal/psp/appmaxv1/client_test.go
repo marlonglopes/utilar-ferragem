@@ -652,7 +652,12 @@ func TestRefundAndTracking(t *testing.T) {
 	s.on(func(w http.ResponseWriter, r *http.Request, body []byte) bool {
 		switch r.URL.Path {
 		case "/v1/orders/refund-request":
-			if !strings.Contains(string(body), `"type":"total"`) {
+			// Estorno parcial DEVE carregar `value` (centavos); total não manda value.
+			if strings.Contains(string(body), `"type":"partial"`) {
+				if !strings.Contains(string(body), `"value":2500`) {
+					t.Errorf("estorno parcial sem value = %s", body)
+				}
+			} else if !strings.Contains(string(body), `"type":"total"`) {
 				t.Errorf("body = %s", body)
 			}
 			return jsonRespond(w, 200, `{"data":{"ok":true}}`)
@@ -666,10 +671,19 @@ func TestRefundAndTracking(t *testing.T) {
 	})
 	c, _ := s.client(t)
 	ctx := context.Background()
-	if _, err := c.RefundRequest(ctx, 5, "total"); err != nil {
+	if _, err := c.RefundRequest(ctx, 5, "total", 0); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.RefundRequest(ctx, 5, "meia"); !errors.Is(err, psp.ErrInvalidRequest) {
+	// Estorno parcial COM value passa e envia o value (checado no stub acima).
+	if _, err := c.RefundRequest(ctx, 5, "partial", 2500); err != nil {
+		t.Fatal(err)
+	}
+	// TestRegression_RefundPartialExigeValue: parcial SEM value é bloqueado antes
+	// da rede (a doc exige value quando type=partial; antes o value nunca ia).
+	if _, err := c.RefundRequest(ctx, 5, "partial", 0); !errors.Is(err, psp.ErrInvalidRequest) {
+		t.Fatalf("estorno parcial sem value deveria falhar: %v", err)
+	}
+	if _, err := c.RefundRequest(ctx, 5, "meia", 0); !errors.Is(err, psp.ErrInvalidRequest) {
 		t.Fatalf("refund type inválido deveria falhar: %v", err)
 	}
 	if _, err := c.SetShippingTrackingCode(ctx, 5, "BR123"); err != nil {
@@ -783,7 +797,7 @@ func TestRecipientCamelCasePayload(t *testing.T) {
 			return false
 		}
 		// Este endpoint é o único em camelCase.
-		for _, k := range []string{`"storeUrl"`, `"dateOfBirth"`, `"companyDocumentNumber"`, `"companyAddressNeighborhood"`} {
+		for _, k := range []string{`"storeUrl"`, `"dateOfBirth"`, `"companyDocumentNumber"`, `"companyAddressNeighborhood"`, `"bankAccount"`, `"bankAccountType"`} {
 			if !strings.Contains(string(body), k) {
 				t.Errorf("payload deve ser camelCase, faltou %s: %s", k, body)
 			}
@@ -792,9 +806,10 @@ func TestRecipientCamelCasePayload(t *testing.T) {
 	})
 	c, _ := s.client(t)
 	hash, _, err := c.CreateRecipient(context.Background(), RecipientInput{
-		Triage:  RecipientTriage{Revenue: 100000, StoreURL: "https://utilar.com.br"},
-		Account: RecipientAccount{Email: "s@x.com", Name: "Seller", CPF: "12345678909", Phone: "5511999998888", DateOfBirth: "1990-01-01"},
-		Company: RecipientCompany{CompanyName: "Seller ME", CompanyDocumentNumber: "12345678000199", CompanyAddressNeighborhood: "Centro"},
+		Triage:      RecipientTriage{Revenue: 100000, StoreURL: "https://utilar.com.br"},
+		Account:     RecipientAccount{Email: "s@x.com", Name: "Seller", CPF: "12345678909", Phone: "5511999998888", DateOfBirth: "1990-01-01"},
+		Company:     RecipientCompany{CompanyName: "Seller ME", CompanyDocumentNumber: "12345678000199", CompanyAddressNeighborhood: "Centro"},
+		BankAccount: RecipientBankAccount{Bank: 341, Agency: "1234", Account: "56789-0", BankAccountType: "checking"},
 	})
 	if err != nil || hash != "rcp_abc123" {
 		t.Fatalf("hash=%q err=%v", hash, err)
@@ -806,7 +821,8 @@ func TestRecipientStatusAndBalances(t *testing.T) {
 	s.on(func(w http.ResponseWriter, r *http.Request, _ []byte) bool {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/status"):
-			return jsonRespond(w, 200, `{"data":{"status":"Onboarding completed"}}`)
+			// Shape OFICIAL da doc: `data` é uma STRING bare, não um objeto.
+			return jsonRespond(w, 200, `{"data":"Onboarding completed"}`)
 		case strings.HasSuffix(r.URL.Path, "/balances"):
 			return jsonRespond(w, 200, `{"data":{"balances":[{"type":"available","value":15000},{"type":"to_release","value":2500}]}}`)
 		}
@@ -815,6 +831,9 @@ func TestRecipientStatusAndBalances(t *testing.T) {
 	c, _ := s.client(t)
 	ctx := context.Background()
 
+	// TestRegression_RecipientStatusBareString: a doc devolve {"data":"..."} e o
+	// digString (que buscava a CHAVE `status`) retornava "" — o recebedor nunca
+	// seria reconhecido como concluído. Agora lemos o data string direto.
 	st, _, err := c.RecipientStatus(ctx, "rcp_abc")
 	if err != nil || st != RecipientCompleted {
 		t.Fatalf("status=%q err=%v", st, err)
@@ -822,6 +841,33 @@ func TestRecipientStatusAndBalances(t *testing.T) {
 	b, err := c.RecipientBalances(ctx, "rcp_abc")
 	if err != nil || b.Available != 15000 || b.ToRelease != 2500 {
 		t.Fatalf("balances = %+v err=%v", b, err)
+	}
+}
+
+// Fallback: shape antigo com a chave `status` em objeto continua funcionando.
+func TestRecipientStatusObjectShape(t *testing.T) {
+	s := newStub(t)
+	s.on(func(w http.ResponseWriter, r *http.Request, _ []byte) bool {
+		return jsonRespond(w, 200, `{"data":{"status":"Onboarding on verification"}}`)
+	})
+	c, _ := s.client(t)
+	st, _, err := c.RecipientStatus(context.Background(), "h")
+	if err != nil || st != RecipientOnVerification {
+		t.Fatalf("status=%q err=%v", st, err)
+	}
+}
+
+// TestRegression_RecipientBalancesDecimalReais: a doc mostra value:"150.00"
+// (decimal em REAIS). Tratar como centavos daria erro de ~100×. Deve virar 15000.
+func TestRecipientBalancesDecimalReais(t *testing.T) {
+	s := newStub(t)
+	s.on(func(w http.ResponseWriter, r *http.Request, _ []byte) bool {
+		return jsonRespond(w, 200, `{"data":[{"type":"available","value":"150.00"},{"type":"to_release","value":"25.50"}]}`)
+	})
+	c, _ := s.client(t)
+	b, err := c.RecipientBalances(context.Background(), "h")
+	if err != nil || b.Available != 15000 || b.ToRelease != 2550 {
+		t.Fatalf("balances decimais = %+v err=%v", b, err)
 	}
 }
 
