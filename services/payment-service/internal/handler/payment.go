@@ -23,6 +23,11 @@ import (
 // é ~1KB; 16KB é folga generosa pra futuros campos sem abrir DoS por body grande.
 const maxPaymentRequestBody = 16 * 1024
 
+// maxCardInstallments é o teto de parcelas no cartão. A doc da Appmax v1 cobre
+// 1..12; contas específicas podem ir a 21 (marketing), então mantemos 12 como
+// teto seguro e conservador até validar o limite real da conta no sandbox.
+const maxCardInstallments = 12
+
 // extractBearerToken pega o JWT do header Authorization. Vazio se ausente/malformado.
 func extractBearerToken(c *gin.Context) string {
 	auth := c.GetHeader("Authorization")
@@ -195,7 +200,20 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Call PSP via Gateway abstraction com amount autoritativo
+	// Parcelas: default à vista; só cartão parcela. Teto validado ANTES do PSP
+	// pra dar erro limpo (a doc Appmax cobre 1..maxCardInstallments).
+	installments := req.Installments
+	if installments <= 0 {
+		installments = 1
+	}
+	if req.Method == "card" && installments > maxCardInstallments {
+		BadRequest(c, fmt.Sprintf("installments %d acima do máximo (%d)", installments, maxCardInstallments))
+		return
+	}
+
+	// Call PSP via Gateway abstraction com amount autoritativo.
+	// PayerIP vem da CONEXÃO (c.ClientIP()), nunca do body — cliente não dita o IP.
+	// É insumo de antifraude da Appmax e exigido na homologação.
 	pspReq := psp.CreateRequest{
 		OrderID:        req.OrderID,
 		UserID:         userID,
@@ -206,6 +224,9 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		PayerName:      payerName,
 		PayerCPF:       payerCPF,
 		PayerPhone:     req.PayerPhone,
+		PayerIP:        c.ClientIP(),
+		CardToken:      req.CardToken,
+		Installments:   installments,
 		IdempotencyKey: c.GetString("request_id"),
 	}
 	result, pspErr := h.gateway.CreatePayment(c.Request.Context(), pspReq)

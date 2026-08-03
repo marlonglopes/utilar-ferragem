@@ -495,6 +495,13 @@ func TestCardFlow(t *testing.T) {
 	s.on(func(w http.ResponseWriter, r *http.Request, body []byte) bool {
 		switch r.URL.Path {
 		case "/v1/customers":
+			// O IP REAL do comprador (propagado pelo handler) tem de chegar ao
+			// customer — é insumo de antifraude e exigência da homologação.
+			var cin CustomerInput
+			_ = json.Unmarshal(body, &cin)
+			if cin.IP != "203.0.113.7" {
+				t.Errorf("customer ip = %q, esperava o IP real do comprador", cin.IP)
+			}
 			return jsonRespond(w, 201, `{"data":{"customer":{"id":3}}}`)
 		case "/v1/orders":
 			return jsonRespond(w, 201, `{"data":{"order":{"id":900,"status":"pendente"}}}`)
@@ -509,8 +516,9 @@ func TestCardFlow(t *testing.T) {
 			if cc["holder_document_number"] != "12345678909" {
 				t.Errorf("holder_document_number = %v", cc["holder_document_number"])
 			}
-			if toInt(cc["installments"]) != 1 {
-				t.Errorf("installments = %v", cc["installments"])
+			// As parcelas escolhidas pelo comprador têm de chegar ao PSP (antes ia 1 fixo).
+			if toInt(cc["installments"]) != 3 {
+				t.Errorf("installments = %v (esperava 3, o que o comprador escolheu)", cc["installments"])
 			}
 			return jsonRespond(w, 200, `{"data":{"order":{"id":900,"status":"aprovado"},"payment":{"method":"creditcard","installments":3,"paid_at":"2026-07-18 12:00:00"},"upsell_hash":"uh_abc"}}`)
 		}
@@ -521,6 +529,7 @@ func TestCardFlow(t *testing.T) {
 
 	res, err := g.CreatePayment(context.Background(), psp.CreateRequest{
 		OrderID: "o-1", Amount: 500, Method: psp.MethodCard, CardToken: "tok_browser_123",
+		Installments: 3, PayerIP: "203.0.113.7",
 		PayerName: "Ana Paula", PayerEmail: "a@b.c", PayerCPF: "12345678909", PayerPhone: "11999998888",
 	})
 	if err != nil {
@@ -533,6 +542,38 @@ func TestCardFlow(t *testing.T) {
 	_ = json.Unmarshal(res.ClientData, &cd)
 	if cd["installments"] != float64(3) {
 		t.Fatalf("installments = %v", cd["installments"])
+	}
+}
+
+// TestRegression_CustomerIPFallback: quando o handler não resolve o IP (vazio),
+// o customer ainda precisa de um `ip` válido (obrigatório — vazio dá 422). O
+// fallback é 0.0.0.0, nunca string vazia.
+func TestRegression_CustomerIPFallback(t *testing.T) {
+	s := newStub(t)
+	s.on(func(w http.ResponseWriter, r *http.Request, body []byte) bool {
+		switch r.URL.Path {
+		case "/v1/customers":
+			var cin CustomerInput
+			_ = json.Unmarshal(body, &cin)
+			if cin.IP != "0.0.0.0" {
+				t.Errorf("ip fallback = %q, esperava 0.0.0.0", cin.IP)
+			}
+			return jsonRespond(w, 201, `{"data":{"customer":{"id":1}}}`)
+		case "/v1/orders":
+			return jsonRespond(w, 201, `{"data":{"order":{"id":1,"status":"pendente"}}}`)
+		case "/v1/payments/pix":
+			return jsonRespond(w, 200, `{"data":{"order":{"id":1,"status":"pendente"},"payment":{"method":"pix"}}}`)
+		}
+		return false
+	})
+	c, _ := s.client(t)
+	g := &Gateway{client: c}
+	_, err := g.CreatePayment(context.Background(), psp.CreateRequest{
+		OrderID: "o-1", Amount: 10, Method: psp.MethodPix, PayerIP: "  ", // em branco → fallback
+		PayerName: "A B", PayerEmail: "a@b.c", PayerCPF: "12345678909", PayerPhone: "11999998888",
+	})
+	if err != nil {
+		t.Fatalf("CreatePayment: %v", err)
 	}
 }
 

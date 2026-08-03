@@ -76,13 +76,20 @@ func (g *Gateway) CreatePayment(ctx context.Context, req psp.CreateRequest) (*ps
 	}
 
 	// 1. Customer — first_name/last_name/email/phone/ip são obrigatórios.
+	// IP: usamos o IP REAL do comprador (propagado pelo handler via c.ClientIP()).
+	// 0.0.0.0 é só fallback quando o handler não conseguiu resolver — mandar o IP
+	// real melhora a aprovação de cartão e é exigido na homologação Appmax.
+	ip := strings.TrimSpace(req.PayerIP)
+	if ip == "" {
+		ip = defaultCustomerIP
+	}
 	first, last := splitName(req.PayerName)
 	customerID, _, err := g.client.CreateCustomer(ctx, CustomerInput{
 		FirstName:      first,
 		LastName:       last,
 		Email:          req.PayerEmail,
 		Phone:          digitsOnly(req.PayerPhone),
-		IP:             defaultCustomerIP,
+		IP:             ip,
 		DocumentNumber: digitsOnly(req.PayerCPF),
 	})
 	if err != nil {
@@ -117,11 +124,16 @@ func (g *Gateway) CreatePayment(ctx context.Context, req psp.CreateRequest) (*ps
 	case psp.MethodBoleto:
 		pr, err = g.client.PayBoleto(ctx, orderID, cpf)
 	case psp.MethodCard:
+		// Parcelas: usa o que o comprador escolheu (validado no handler); <=0 = à vista.
+		installments := req.Installments
+		if installments <= 0 {
+			installments = 1
+		}
 		pr, err = g.client.PayCreditCard(ctx, orderID, customerID, CardChargeInput{
 			Token:                req.CardToken,
 			HolderDocumentNumber: cpf,
 			HolderName:           req.PayerName,
-			Installments:         1, // psp.CreateRequest ainda não carrega parcelas
+			Installments:         installments,
 			SoftDescriptor:       "UTILAR",
 		})
 	default:

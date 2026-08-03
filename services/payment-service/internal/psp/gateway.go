@@ -67,6 +67,16 @@ type CreateRequest struct {
 	PayerCPF   string // obrigatório pra boleto (ambos PSPs)
 	PayerPhone string // celular — OBRIGATÓRIO no customer da Appmax (validado ao vivo)
 
+	// PayerIP é o IP REAL do comprador (do c.ClientIP() do handler, NUNCA do body
+	// — cliente não dita). A Appmax exige o IP do cliente no customer e usa como
+	// insumo do antifraude; mandar 0.0.0.0 fixo degrada a aprovação de cartão e é
+	// cenário de reprovação na homologação. Vazio → o gateway cai no fallback.
+	PayerIP string
+
+	// Installments é o número de parcelas do cartão (1 = à vista). Só usado com
+	// Method=card. Zero/1 = à vista. Validação de teto fica no handler.
+	Installments int
+
 	// CardToken é opcional e só usado com Method=card em certos fluxos.
 	// Stripe: client-side `stripe.confirmPayment` costuma ser suficiente
 	// (retornamos client_secret e o frontend completa); esse campo existe

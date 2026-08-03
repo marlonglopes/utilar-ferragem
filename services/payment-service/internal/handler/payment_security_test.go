@@ -119,6 +119,28 @@ func makePaymentReq(t *testing.T, amount float64) *http.Request {
 	return req
 }
 
+// makeCardReq monta um POST de cartão com token e parcelas.
+func makeCardReq(t *testing.T, installments int) *http.Request {
+	t.Helper()
+	body, _ := json.Marshal(map[string]any{
+		"order_id":     testOrderID,
+		"method":       "card",
+		"amount":       99.90,
+		"card_token":   "tok_browser_x",
+		"installments": installments,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/payments", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fake-jwt-for-propagation")
+	req.Header.Set("Content-Type", "application/json")
+	return req
+}
+
+func pendingOrder(total float64) *stubOrderClient {
+	return &stubOrderClient{order: &orderclient.Order{
+		ID: testOrderID, UserID: testUserID, Status: "pending_payment", Total: total,
+	}}
+}
+
 // --- tests -------------------------------------------------------------------
 
 // C1: amount cobrado vem do order-service, não do body.
@@ -147,6 +169,59 @@ func TestCreate_AmountTamperBlocked_UsesOrderTotal(t *testing.T) {
 	// Amount enviado pro PSP deve ser 5000.00, NÃO 0.01
 	if gw.lastReq.Amount != 5000.00 {
 		t.Errorf("PSP recebeu amount tampered: got %.2f, want 5000.00", gw.lastReq.Amount)
+	}
+}
+
+// PayerIP vem da CONEXÃO (c.ClientIP()), NUNCA do body — cliente não dita o IP.
+func TestCreate_PayerIPFromConnection(t *testing.T) {
+	gw := &stubGatewayCapture{stubGateway: &stubGateway{}}
+	r, cleanup := setupPaymentRouter(t, gw, pendingOrder(99.90), false)
+	defer cleanup()
+
+	req := makePaymentReq(t, 99.90)
+	req.RemoteAddr = "203.0.113.9:5555"
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("want 201, got %d (%s)", w.Code, w.Body.String())
+	}
+	if gw.lastReq.PayerIP != "203.0.113.9" {
+		t.Errorf("PayerIP = %q, esperava o IP da conexão", gw.lastReq.PayerIP)
+	}
+}
+
+// Parcelas escolhidas pelo comprador chegam ao PSP (dentro do teto).
+func TestCreate_InstallmentsPassThrough(t *testing.T) {
+	gw := &stubGatewayCapture{stubGateway: &stubGateway{}}
+	r, cleanup := setupPaymentRouter(t, gw, pendingOrder(99.90), false)
+	defer cleanup()
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, makeCardReq(t, 6))
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("want 201, got %d (%s)", w.Code, w.Body.String())
+	}
+	if gw.lastReq.Installments != 6 {
+		t.Errorf("Installments = %d, esperava 6", gw.lastReq.Installments)
+	}
+	if gw.lastReq.CardToken != "tok_browser_x" {
+		t.Errorf("CardToken = %q, esperava o token do browser", gw.lastReq.CardToken)
+	}
+}
+
+// Parcelas acima do teto são recusadas ANTES do PSP (erro limpo).
+func TestCreate_InstallmentsAboveCapRejected(t *testing.T) {
+	gw := &stubGatewayCapture{stubGateway: &stubGateway{}}
+	r, cleanup := setupPaymentRouter(t, gw, pendingOrder(99.90), false)
+	defer cleanup()
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, makeCardReq(t, 13)) // teto é 12
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("want 400 para parcelas acima do teto, got %d (%s)", w.Code, w.Body.String())
 	}
 }
 

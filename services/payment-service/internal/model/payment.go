@@ -50,6 +50,15 @@ type CreatePaymentRequest struct {
 	PayerName string `json:"payer_name,omitempty"`
 	// PayerPhone (celular) — obrigatório no customer da Appmax (validado ao vivo).
 	PayerPhone string `json:"payer_phone,omitempty"`
+
+	// CardToken é o token de USO ÚNICO do cartão, gerado no BROWSER via Appmax JS
+	// (PCI SAQ-A: o PAN nunca toca o backend). Obrigatório quando Method=card no
+	// provider appmax-v1. Nunca recebemos número de cartão aqui.
+	CardToken string `json:"card_token,omitempty"`
+
+	// Installments é o número de parcelas do cartão (1 = à vista). Validado no
+	// handler (1..maxInstallments). Ignorado em pix/boleto.
+	Installments int `json:"installments,omitempty" binding:"omitempty,min=1,max=21"`
 }
 
 // PSPPayload is the response sent back to the SPA per payment method
