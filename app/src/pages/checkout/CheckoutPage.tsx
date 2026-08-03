@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Check, ChevronRight, Loader2, Plus } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
+import { CartIssues } from '@/components/cart/CartIssues'
+import { useCartAvailability } from '@/hooks/useCartAvailability'
 import { useAuthStore } from '@/store/authStore'
 import { useAddressStore, type Address as StoredAddress } from '@/store/addressStore'
 import { usePayment, type PaymentMethod } from '@/hooks/usePayment'
@@ -481,10 +483,12 @@ function PaymentStep({
   total,
   ensureOrderId,
   onPaymentCreated,
+  blocked = false,
 }: {
   total: number
   ensureOrderId: (method: PaymentMethod) => Promise<string>
   onPaymentCreated: (paymentId: string, method: PaymentMethod) => void
+  blocked?: boolean
 }) {
   const { t } = useTranslation('checkout')
   const { result, error, createPayment, simulateConfirm, markConfirmed, markFailed } = usePayment()
@@ -592,6 +596,19 @@ function PaymentStep({
   // Só considera "creating" se for do método atual — evita travar botão quando
   // user troca de método durante criação anterior em flight.
   const isCreating = result?.status === 'creating' && result?.method === method
+
+  // Carrinho com item indisponível: não mostra as formas de pagamento (nenhum
+  // botão de pagar clicável). O aviso com "Remover" está logo acima (CartIssues).
+  if (blocked) {
+    return (
+      <div className="flex flex-col gap-3">
+        <h2 className="text-lg font-bold text-gray-900">{t('payment.title')}</h2>
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          Há itens indisponíveis no carrinho. Ajuste-os no aviso acima para liberar o pagamento.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -774,6 +791,10 @@ export default function CheckoutPage() {
   const items = useCartStore((s) => s.items)
   const clearCart = useCartStore((s) => s.clearCart)
   const accessToken = useAuthStore((s) => s.user?.token ?? null)
+  // Item arquivado/despublicado/sem saldo no carrinho: avisa e bloqueia ANTES do
+  // pagamento, em vez de estourar "product not found" no POST do pedido.
+  const { data: cartIssues = [] } = useCartAvailability()
+  const hasCartIssues = cartIssues.length > 0
 
   const [step, setStep] = useState<Step>('address')
   const [address, setAddress] = useState<Address | null>(null)
@@ -804,6 +825,11 @@ export default function CheckoutPage() {
   // Mantém um único pedido por sessão de checkout (PaymentStep cacheia o id).
   const ensureOrderId = useCallback(
     async (method: PaymentMethod): Promise<string> => {
+      // Choke point: nunca cria pedido com item indisponível — o backstop do
+      // "product not found". O banner (CartIssues) mostra o item e deixa remover.
+      if (hasCartIssues) {
+        throw new Error('Há itens indisponíveis no carrinho. Ajuste-os acima para continuar.')
+      }
       if (!isOrderEnabled || !accessToken || !address) {
         // Fallback dev/mock: gera UUID local. Backend real recusará via 404 se for chamado.
         return crypto.randomUUID()
@@ -842,7 +868,7 @@ export default function CheckoutPage() {
       setCommittedOrderNumber(order.number)
       return order.id
     },
-    [accessToken, address, items, shipping, shippingCost]
+    [accessToken, address, items, shipping, shippingCost, hasCartIssues]
   )
 
   const handlePaymentCreated = useCallback(
@@ -867,6 +893,12 @@ export default function CheckoutPage() {
         <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6">
           <Stepper current={step} />
 
+          {hasCartIssues && (
+            <div className="mb-5">
+              <CartIssues issues={cartIssues} />
+            </div>
+          )}
+
           {step === 'address' && <AddressStep onNext={handleAddressDone} />}
           {step === 'shipping' && address && (
             <ShippingStep
@@ -881,6 +913,7 @@ export default function CheckoutPage() {
               total={total}
               ensureOrderId={ensureOrderId}
               onPaymentCreated={handlePaymentCreated}
+              blocked={hasCartIssues}
             />
           )}
         </div>

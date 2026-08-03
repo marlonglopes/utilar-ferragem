@@ -354,6 +354,48 @@ export async function catalogGet<T>(path: string): Promise<T> {
   return handleResponse<T>(res)
 }
 
+// Disponibilidade de um item do carrinho na hora da compra.
+//
+// PORQUÊ existe: o carrinho fica no localStorage e pode segurar um produto que a
+// loja ARQUIVOU/despublicou depois. Sem esta checagem, o erro só aparecia como
+// "product not found" cru no MOMENTO DO PAGAMENTO (o order pede o produto ao
+// catálogo, que só devolve `published`). Loja de verdade avisa antes: "este item
+// não está mais disponível". Ver checkout/cart.
+//
+// `indisponivel` = o by-id devolveu 404 (arquivado/despublicado/apagado).
+// `sem_estoque`  = existe, mas o saldo é menor que a quantidade no carrinho.
+// Falha de REDE (não-404) NÃO bloqueia — não travamos a compra por um soluço
+// transitório; a reserva atômica no pedido é a trava final de estoque.
+export interface CartAvailabilityIssue {
+  productId: string
+  reason: 'indisponivel' | 'sem_estoque'
+  available: number // saldo atual (0 quando indisponível)
+}
+
+export async function checkCartAvailability(
+  items: { productId: string; quantity: number }[]
+): Promise<CartAvailabilityIssue[]> {
+  if (!isCatalogEnabled || items.length === 0) return []
+  const results = await Promise.all(
+    items.map(async (it): Promise<CartAvailabilityIssue | null> => {
+      try {
+        const p = await catalogGet<{ stock?: number }>(`/api/v1/products/by-id/${it.productId}`)
+        const stock = typeof p.stock === 'number' ? p.stock : Number.POSITIVE_INFINITY
+        if (stock < it.quantity) {
+          return { productId: it.productId, reason: 'sem_estoque', available: Math.max(0, stock) }
+        }
+        return null
+      } catch (err) {
+        if (err instanceof Error && err.message === 'not_found') {
+          return { productId: it.productId, reason: 'indisponivel', available: 0 }
+        }
+        return null // erro transitório → não bloqueia
+      }
+    })
+  )
+  return results.filter((x): x is CartAvailabilityIssue => x !== null)
+}
+
 // Order API — requer X-User-Id (substitui JWT até auth-service ficar pronto).
 function orderHeaders(userId: string, contentType = false): Record<string, string> {
   const h: Record<string, string> = { 'X-User-Id': userId }

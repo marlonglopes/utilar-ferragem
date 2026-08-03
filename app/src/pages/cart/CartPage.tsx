@@ -5,6 +5,8 @@ import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react'
 import { useCartStore, type CartItem } from '@/store/cartStore'
 import { formatCurrency } from '@/lib/format'
 import { ShippingEstimate } from '@/components/cart/ShippingEstimate'
+import { CartIssues } from '@/components/cart/CartIssues'
+import { useCartAvailability } from '@/hooks/useCartAvailability'
 import type { ShippingOption } from '@/hooks/useShippingQuote'
 
 function QtyControl({ item }: { item: CartItem }) {
@@ -41,6 +43,8 @@ export default function CartPage() {
   const total = items.reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0)
   const totalCount = items.reduce((sum, i) => sum + i.quantity, 0)
   const [frete, setFrete] = useState<ShippingOption | null>(null)
+  const { data: issues = [] } = useCartAvailability()
+  const hasIssues = issues.length > 0
 
   // Group items by seller
   const bySeller = items.reduce<Record<string, CartItem[]>>((acc, item) => {
@@ -164,12 +168,24 @@ export default function CartPage() {
             </span>
           </div>
 
-          <Link
-            to="/checkout"
-            className="w-full h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold text-sm flex items-center justify-center transition-colors"
-          >
-            {t('cartPage.goToCheckout')}
-          </Link>
+          {hasIssues && <CartIssues issues={issues} />}
+
+          {hasIssues ? (
+            <button
+              type="button"
+              disabled
+              className="flex h-11 w-full cursor-not-allowed items-center justify-center rounded-xl bg-gray-200 text-sm font-semibold text-gray-500"
+            >
+              Ajuste os itens acima para continuar
+            </button>
+          ) : (
+            <Link
+              to="/checkout"
+              className="w-full h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold text-sm flex items-center justify-center transition-colors"
+            >
+              {t('cartPage.goToCheckout')}
+            </Link>
+          )}
           <Link to="/" className="text-center text-sm text-brand-orange hover:underline">
             {t('cartPage.exploreCatalog')}
           </Link>
