@@ -96,22 +96,12 @@ func (g *Gateway) CreatePayment(ctx context.Context, req psp.CreateRequest) (*ps
 		return nil, fmt.Errorf("create customer: %w", err)
 	}
 
-	// 2. Order — item sintético a partir do amount autoritativo (o handler já o
-	// derivou do order-service, audit C1). A Appmax não calcula juros: mandamos
-	// products_value/discount/shipping finais.
-	orderID, _, err := g.client.CreateOrder(ctx, OrderInput{
-		CustomerID:    customerID,
-		ProductsValue: totalCents,
-		DiscountValue: 0,
-		ShippingValue: 0,
-		Products: []OrderProduct{{
-			SKU:       "UTILAR-" + shortRef(req.OrderID),
-			Name:      "Pedido UtiLar Ferragem",
-			Quantity:  1,
-			UnitValue: totalCents,
-			Type:      ProductTypePhysical,
-		}},
-	})
+	// 2. Order — itemizado a partir dos itens reais do pedido (homologação exige
+	// carrinho multi-produto). O valor cobrado continua sendo o amount autoritativo
+	// (o handler já o derivou do order-service, audit C1): buildOrderInput concilia
+	// qualquer arredondamento no desconto. A Appmax não calcula juros — os valores
+	// vão finais.
+	orderID, _, err := g.client.CreateOrder(ctx, buildOrderInput(customerID, req, totalCents))
 	if err != nil {
 		return nil, fmt.Errorf("create order: %w", err)
 	}
@@ -470,6 +460,78 @@ func statusFromEvent(rawEvent string) psp.PaymentStatus {
 }
 
 // ===================== helpers =====================
+
+// buildOrderInput monta o pedido Appmax. Com itens reais (req.Items) ele
+// ITEMIZA — a homologação Appmax testa carrinho multi-produto, frete e cupom.
+// Sem itens, cai num item sintético a partir do amount (comportamento antigo).
+//
+// INVARIANTE DE DINHEIRO (testada em TestBuildOrderInput*): o valor cobrado pela
+// Appmax é products_value + shipping_value - discount_value, e ele TEM de bater
+// com o totalCents autoritativo (derivado do order-service). Como converter cada
+// unit_price/frete pra centavos separadamente pode divergir 1-2 centavos do
+// total, o DESCONTO absorve a diferença — nunca cobramos valor diferente do
+// autoritativo. Se o total exceder itens+frete (desconto ficaria negativo), a
+// diferença entra no frete.
+func buildOrderInput(customerID int64, req psp.CreateRequest, totalCents int64) OrderInput {
+	if len(req.Items) == 0 {
+		return OrderInput{
+			CustomerID:    customerID,
+			ProductsValue: totalCents,
+			DiscountValue: 0,
+			ShippingValue: 0,
+			Products: []OrderProduct{{
+				SKU:       "UTILAR-" + shortRef(req.OrderID),
+				Name:      "Pedido UtiLar Ferragem",
+				Quantity:  1,
+				UnitValue: totalCents,
+				Type:      ProductTypePhysical,
+			}},
+		}
+	}
+
+	products := make([]OrderProduct, 0, len(req.Items))
+	var productsCents int64
+	for i, it := range req.Items {
+		qty := it.Quantity
+		if qty <= 0 {
+			qty = 1
+		}
+		unit := ToCents(it.UnitPrice)
+		productsCents += unit * int64(qty)
+		sku := strings.TrimSpace(it.Ref)
+		if sku == "" {
+			sku = "UTILAR-" + shortRef(req.OrderID) + "-" + strconv.Itoa(i)
+		}
+		name := strings.TrimSpace(it.Name)
+		if name == "" {
+			name = "Item"
+		}
+		products = append(products, OrderProduct{
+			SKU:       sku,
+			Name:      name,
+			Quantity:  qty,
+			UnitValue: unit,
+			Type:      ProductTypePhysical,
+		})
+	}
+
+	shippingCents := ToCents(req.Shipping)
+	// desconto = itens + frete - total autoritativo (absorve o arredondamento).
+	discountCents := productsCents + shippingCents - totalCents
+	if discountCents < 0 {
+		// total autoritativo > itens+frete → joga a diferença no frete, sem desconto.
+		shippingCents -= discountCents // += |discountCents|
+		discountCents = 0
+	}
+
+	return OrderInput{
+		CustomerID:    customerID,
+		ProductsValue: productsCents,
+		DiscountValue: discountCents,
+		ShippingValue: shippingCents,
+		Products:      products,
+	}
+}
 
 func splitName(full string) (first, last string) {
 	full = strings.TrimSpace(full)

@@ -39,6 +39,37 @@ func TestGet_Success(t *testing.T) {
 	}
 }
 
+// Decodifica itens + frete (usados pra itemizar no PSP). O total continua sendo
+// a fonte autoritativa; os itens são só pra itemização.
+func TestGet_DecodesItemsAndShipping(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"id": "abc", "userId": "u", "status": "pending_payment",
+			"total": 115.00, "shippingCost": 15.00,
+			"items": []map[string]any{
+				{"productId": "p1", "name": "Parafuso", "quantity": 2, "unitPrice": 40.00},
+				{"productId": "p2", "name": "Furadeira", "quantity": 1, "unitPrice": 20.00},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := orderclient.New(srv.URL)
+	order, err := c.Get(context.Background(), "abc", "jwt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if order.ShippingCost != 15.00 {
+		t.Errorf("shippingCost = %v", order.ShippingCost)
+	}
+	if len(order.Items) != 2 {
+		t.Fatalf("esperava 2 itens, veio %d", len(order.Items))
+	}
+	if order.Items[0].ProductID != "p1" || order.Items[0].Quantity != 2 || order.Items[0].UnitPrice != 40.00 {
+		t.Errorf("item 0 = %+v", order.Items[0])
+	}
+}
+
 func TestGet_404IsNotFound(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)

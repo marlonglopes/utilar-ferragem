@@ -102,6 +102,10 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 	// Resolve order no order-service (audit C1+C2).
 	// authoritativeAmount é o que vamos cobrar — sempre source-of-truth do server.
 	authoritativeAmount := req.Amount
+	// Itens/frete REAIS pra itemizar no PSP — vêm do order-service (autoritativo),
+	// nunca do body. Vazios → o gateway usa item sintético.
+	var lineItems []psp.LineItem
+	var shipping float64
 	if h.orderClient != nil {
 		jwt := extractBearerToken(c)
 		if jwt == "" {
@@ -155,6 +159,15 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 				"request_id", c.GetString("request_id"))
 		}
 		authoritativeAmount = order.Total
+		shipping = order.ShippingCost
+		for _, it := range order.Items {
+			lineItems = append(lineItems, psp.LineItem{
+				Ref:       it.ProductID,
+				Name:      it.Name,
+				Quantity:  it.Quantity,
+				UnitPrice: it.UnitPrice,
+			})
+		}
 	} else if !h.devMode {
 		// Sem orderClient e não está em dev → config bug
 		slog.Error("create payment: orderClient is nil in non-dev mode",
@@ -227,6 +240,8 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 		PayerIP:        c.ClientIP(),
 		CardToken:      req.CardToken,
 		Installments:   installments,
+		Items:          lineItems,
+		Shipping:       shipping,
 		IdempotencyKey: c.GetString("request_id"),
 	}
 	result, pspErr := h.gateway.CreatePayment(c.Request.Context(), pspReq)

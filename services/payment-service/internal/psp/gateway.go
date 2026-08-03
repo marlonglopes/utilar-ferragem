@@ -77,6 +77,15 @@ type CreateRequest struct {
 	// Method=card. Zero/1 = à vista. Validação de teto fica no handler.
 	Installments int
 
+	// Items são os itens REAIS do pedido (para PSPs que itemizam, como a Appmax —
+	// homologação exige carrinho multi-produto). Vazio → o gateway cai num item
+	// sintético a partir do Amount. O gateway garante que o valor cobrado continua
+	// sendo o Amount autoritativo, absorvendo arredondamento no desconto.
+	Items []LineItem
+
+	// Shipping é o frete em reais (vai como shipping_value no pedido Appmax).
+	Shipping float64
+
 	// CardToken é opcional e só usado com Method=card em certos fluxos.
 	// Stripe: client-side `stripe.confirmPayment` costuma ser suficiente
 	// (retornamos client_secret e o frontend completa); esse campo existe
@@ -86,6 +95,15 @@ type CreateRequest struct {
 	// IdempotencyKey — passado pro PSP (Stripe suporta nativo; MP via X-Idempotency-Key).
 	// Evita double-charge em retry de rede. Recomenda-se UUID.
 	IdempotencyKey string
+}
+
+// LineItem é um item do pedido para o PSP. UnitPrice em REAIS (o gateway converte
+// pra centavos). Ref é o identificador (productId/sku) que vira o sku no PSP.
+type LineItem struct {
+	Ref       string
+	Name      string
+	Quantity  int
+	UnitPrice float64
 }
 
 // CreateResult é o que a Gateway devolve ao handler após criar o pagamento.

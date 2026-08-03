@@ -29,12 +29,27 @@ import (
 
 // Order é o subset do Order do order-service que o payment-service consome.
 // Mantido enxuto pra reduzir dependências entre serviços (anti-corruption layer).
+//
+// Items/ShippingCost são consumidos para itemizar o pedido no PSP (Appmax exige
+// carrinho multi-produto na homologação). O `Total` continua sendo a ÚNICA fonte
+// autoritativa do valor cobrado — os itens são para itemização, não para recompor
+// o valor (o gateway concilia qualquer arredondamento contra o Total).
 type Order struct {
-	ID            string  `json:"id"`
-	UserID        string  `json:"userId"`
-	Status        string  `json:"status"`
-	Total         float64 `json:"total"`
-	PaymentMethod string  `json:"paymentMethod"`
+	ID            string      `json:"id"`
+	UserID        string      `json:"userId"`
+	Status        string      `json:"status"`
+	Total         float64     `json:"total"`
+	PaymentMethod string      `json:"paymentMethod"`
+	Items         []OrderItem `json:"items"`
+	ShippingCost  float64     `json:"shippingCost"`
+}
+
+// OrderItem é o item enxuto que o payment-service precisa pra itemizar no PSP.
+type OrderItem struct {
+	ProductID string  `json:"productId"`
+	Name      string  `json:"name"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unitPrice"`
 }
 
 // Errors normalizados que callers devem checar via errors.Is.

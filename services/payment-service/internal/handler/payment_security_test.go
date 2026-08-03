@@ -191,6 +191,37 @@ func TestCreate_PayerIPFromConnection(t *testing.T) {
 	}
 }
 
+// Os itens e o frete do pedido (autoritativos) chegam ao PSP pra itemização.
+func TestCreate_ItemsAndShippingReachGateway(t *testing.T) {
+	gw := &stubGatewayCapture{stubGateway: &stubGateway{}}
+	oc := &stubOrderClient{order: &orderclient.Order{
+		ID: testOrderID, UserID: testUserID, Status: "pending_payment",
+		Total: 115.00, ShippingCost: 15.00,
+		Items: []orderclient.OrderItem{
+			{ProductID: "p1", Name: "Parafuso", Quantity: 2, UnitPrice: 40.00},
+			{ProductID: "p2", Name: "Furadeira", Quantity: 1, UnitPrice: 20.00},
+		},
+	}}
+	r, cleanup := setupPaymentRouter(t, gw, oc, false)
+	defer cleanup()
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, makePaymentReq(t, 115.00))
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("want 201, got %d (%s)", w.Code, w.Body.String())
+	}
+	if len(gw.lastReq.Items) != 2 {
+		t.Fatalf("PSP recebeu %d itens, esperava 2", len(gw.lastReq.Items))
+	}
+	if gw.lastReq.Items[0].Ref != "p1" || gw.lastReq.Items[0].Quantity != 2 || gw.lastReq.Items[0].UnitPrice != 40.00 {
+		t.Errorf("item 0 = %+v", gw.lastReq.Items[0])
+	}
+	if gw.lastReq.Shipping != 15.00 {
+		t.Errorf("Shipping = %v, esperava 15.00", gw.lastReq.Shipping)
+	}
+}
+
 // Parcelas escolhidas pelo comprador chegam ao PSP (dentro do teto).
 func TestCreate_InstallmentsPassThrough(t *testing.T) {
 	gw := &stubGatewayCapture{stubGateway: &stubGateway{}}
