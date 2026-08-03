@@ -7,6 +7,7 @@ import { compressImage } from '@/lib/imageCompress'
 import {
   isBulkImagesEnabled,
   resolveBySku,
+  runPool,
   skuCandidates,
   skuFromFilename,
   uploadProductImage,
@@ -29,17 +30,6 @@ interface Item {
 
 const CONCURRENCY = 5
 let seq = 0
-
-async function runPool<T>(items: T[], worker: (t: T) => Promise<void>, concurrency: number) {
-  let idx = 0
-  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (idx < items.length) {
-      const i = idx++
-      await worker(items[i])
-    }
-  })
-  await Promise.all(runners)
-}
 
 /**
  * Upload de imagens EM LOTE por SKU — o que faltava para dar foto a centenas de

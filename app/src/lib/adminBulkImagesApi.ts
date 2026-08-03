@@ -16,6 +16,27 @@ export interface SkuMatch {
   hasImage: boolean
 }
 
+/**
+ * Pool de concorrência: roda `worker` sobre `items` com no máximo `concurrency`
+ * em voo. É o que sobe as fotos em paralelo sem estourar o navegador/servidor
+ * com centenas de uploads simultâneos. Todos os itens são processados; a espera
+ * total é a do runner mais lento, não a soma.
+ */
+export async function runPool<T>(
+  items: T[],
+  worker: (t: T) => Promise<void>,
+  concurrency: number
+): Promise<void> {
+  let idx = 0
+  const runners = Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, async () => {
+    while (idx < items.length) {
+      const i = idx++
+      await worker(items[i])
+    }
+  })
+  await Promise.all(runners)
+}
+
 /** Base do nome do arquivo: tira caminho e extensão. */
 function fileBase(name: string): string {
   return name
