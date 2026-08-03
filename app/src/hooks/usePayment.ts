@@ -286,7 +286,15 @@ export function usePayment() {
       amount: number,
       // payer_phone é OBRIGATÓRIO na Appmax (403 "O campo Celular é obrigatório",
       // confirmado no sandbox). Stripe/MP ignoram.
-      extras?: { payer_cpf?: string; payer_name?: string; payer_phone?: string }
+      // card_token: token de uso único do cartão gerado no BROWSER via Appmax JS
+      // (PCI SAQ-A — o PAN nunca vem pra cá). installments: parcelas do cartão.
+      extras?: {
+        payer_cpf?: string
+        payer_name?: string
+        payer_phone?: string
+        card_token?: string
+        installments?: number
+      }
     ) => {
       setError('')
       setResult((prev) =>
