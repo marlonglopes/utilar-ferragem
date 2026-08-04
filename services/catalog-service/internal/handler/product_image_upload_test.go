@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -806,4 +807,110 @@ func pngCRC32(b []byte) uint32 {
 		}
 	}
 	return c ^ 0xFFFFFFFF
+}
+
+// imagelessProduct pega um produto SEM nenhuma imagem — pra a corrida de capa
+// começar do zero (sort_order 0 livre), sem uma imagem externa já ocupando a capa.
+func imagelessProduct(t *testing.T, db *sql.DB) string {
+	t.Helper()
+	var id string
+	err := db.QueryRow(
+		`SELECT p.id FROM products p
+		 WHERE NOT EXISTS (SELECT 1 FROM product_images i WHERE i.product_id = p.id)
+		 LIMIT 1`).Scan(&id)
+	if err != nil {
+		t.Skipf("sem produto sem imagens: %v", err)
+	}
+	return id
+}
+
+// TestRegression_UploadConcurrentCoverRace: prova (contra o Postgres de verdade)
+// que N uploads SIMULTÂNEOS do mesmo produto não geram várias "capas".
+//
+// Sem o lock por produto, os N liam max(sort_order)=NULL e TODOS gravavam
+// sort_order 0 — a capa da vitrine virava desempate arbitrário do Postgres
+// (reproduzido em teste de carga: 12 uploads → 12 capas). Com o
+// pg_advisory_xact_lock no processOne, os sort_order saem únicos (0..N-1) e há
+// exatamente UMA capa.
+func TestRegression_UploadConcurrentCoverRace(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	r, _ := uploadRouter(t, db)
+	productID := imagelessProduct(t, db)
+	token := tokenFor(t, "admin")
+
+	const N = 10
+	// Pré-monta N corpos com imagens DIFERENTES (checksums distintos → sem dedup),
+	// no goroutine do teste (multipartBody usa t.Fatal, que não vale fora dele).
+	bodies := make([][]byte, N)
+	cts := make([]string, N)
+	for i := 0; i < N; i++ {
+		body, ct := multipartBody(t, []imgFile{
+			{filename: fmt.Sprintf("f%d.jpg", i), data: testJPEG(t, 800+i, 600)},
+		})
+		b, err := io.ReadAll(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bodies[i], cts[i] = b, ct
+	}
+	// Limpa o que este teste inserir (conexão ainda aberta — ver nota do cleanupImages).
+	defer func() {
+		_, _ = db.Exec(`DELETE FROM product_images WHERE product_id::text=$1 AND checksum IS NOT NULL`, productID)
+	}()
+
+	var wg sync.WaitGroup
+	codes := make([]int, N)
+	for i := 0; i < N; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodPost,
+				"/api/v1/admin/products/by-id/"+productID+"/images/upload", bytes.NewReader(bodies[i]))
+			req.Header.Set("Content-Type", cts[i])
+			req.Header.Set("Authorization", "Bearer "+token)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			codes[i] = w.Code
+		}(i)
+	}
+	wg.Wait()
+
+	for i, c := range codes {
+		if c != http.StatusCreated {
+			t.Fatalf("upload %d: status %d (esperado 201)", i, c)
+		}
+	}
+
+	rows, err := db.Query(
+		`SELECT sort_order, count(*) FROM product_images
+		 WHERE product_id::text=$1 AND checksum IS NOT NULL
+		 GROUP BY sort_order ORDER BY sort_order`, productID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var capas, total int
+	for rows.Next() {
+		var so, cnt int
+		if err := rows.Scan(&so, &cnt); err != nil {
+			t.Fatal(err)
+		}
+		if cnt != 1 {
+			t.Errorf("sort_order %d tem %d fotos (esperado 1) — corrida de posição/capa", so, cnt)
+		}
+		if so == 0 {
+			capas = cnt
+		}
+		total += cnt
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if capas != 1 {
+		t.Fatalf("capas (sort_order 0) = %d, esperado exatamente 1", capas)
+	}
+	if total != N {
+		t.Fatalf("total de fotos = %d, esperado %d", total, N)
+	}
 }

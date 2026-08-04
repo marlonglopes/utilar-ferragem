@@ -179,25 +179,19 @@ func (h *ProductImageHandler) Upload(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), uploadDeadline)
 	defer cancel()
 
-	// A próxima posição da galeria. Novas imagens entram no FIM — subir foto
-	// nunca deve trocar a capa que o lojista escolheu.
-	next, err := h.nextSortOrder(productID)
-	if err != nil {
-		DBError(c, err)
-		return
-	}
-
+	// sort_order (posição na galeria; 0 = capa) é resolvido ATOMICAMENTE dentro do
+	// processOne, sob lock por produto. Corrida provada em teste de carga: 12
+	// uploads simultâneos do mesmo produto davam 12 fotos com sort_order 0 — a capa
+	// da vitrine virava desempate arbitrário do Postgres. Novas fotos entram no
+	// FIM; subir foto nunca troca a capa que o lojista escolheu.
 	resp := UploadResponse{Uploaded: []UploadedImage{}, Rejected: []UploadRejection{}}
 	for _, fh := range files {
-		img, rej := h.processOne(ctx, productID, fh, altBase, next)
+		img, rej := h.processOne(ctx, productID, fh, altBase)
 		if rej != nil {
 			resp.Rejected = append(resp.Rejected, *rej)
 			continue
 		}
 		resp.Uploaded = append(resp.Uploaded, *img)
-		if !img.Deduplicated {
-			next++
-		}
 	}
 
 	audit(h.db, c, "product.images.upload", "product", productID, AuditChanges{
@@ -218,7 +212,7 @@ func (h *ProductImageHandler) Upload(c *gin.Context) {
 // processOne roda o pipeline de UM arquivo. Devolve ou a imagem gravada, ou a
 // recusa — nunca os dois.
 func (h *ProductImageHandler) processOne(
-	ctx context.Context, productID string, fh *multipart.FileHeader, altBase string, sortOrder int,
+	ctx context.Context, productID string, fh *multipart.FileHeader, altBase string,
 ) (*UploadedImage, *UploadRejection) {
 	shown := SanitizeFilename(fh.Filename)
 	reject := func(code string, err error) *UploadRejection {
@@ -300,8 +294,32 @@ func (h *ProductImageHandler) processOne(
 	masterKey := variants["large"]
 	variantsJSON, _ := json.Marshal(variants)
 
+	// Lock consultivo POR PRODUTO: serializa o read do próximo sort_order + o
+	// INSERT, que antes eram uma corrida (dois uploads liam max=NULL e ambos
+	// gravavam 0). Produtos diferentes hasham diferente e não se bloqueiam; o lock
+	// só envolve o read+insert (rápido), nunca o storage. Prova em teste de carga.
+	tx, err := h.db.BeginTx(ctx, nil)
+	if err != nil {
+		rollback()
+		return nil, reject("db_error", err)
+	}
+	defer tx.Rollback() //nolint:errcheck  — no-op após Commit
+
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, productID); err != nil {
+		rollback()
+		return nil, reject("db_error", err)
+	}
+	// Próxima posição da galeria, já sob o lock (leitura atômica com o insert).
+	var sortOrder int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COALESCE(max(sort_order)+1, 0) FROM product_images WHERE product_id = $1`,
+		productID).Scan(&sortOrder); err != nil {
+		rollback()
+		return nil, reject("db_error", err)
+	}
+
 	var id string
-	err = h.db.QueryRow(`
+	err = tx.QueryRowContext(ctx, `
 		INSERT INTO product_images
 			(product_id, url, alt, sort_order, storage_key, content_type,
 			 width, height, bytes, original_bytes, original_filename, checksum, variants)
@@ -316,6 +334,7 @@ func (h *ProductImageHandler) processOne(
 		// DO NOTHING não devolve linha: outro upload simultâneo do MESMO
 		// arquivo ganhou a corrida. Os objetos que gravamos têm a mesma chave
 		// (derivada do hash), então são idênticos aos dele — nada a limpar.
+		_ = tx.Rollback()
 		if dup, ok, e := h.findByChecksum(productID, res.Checksum); e == nil && ok {
 			dup.Deduplicated = true
 			return dup, nil
@@ -323,6 +342,10 @@ func (h *ProductImageHandler) processOne(
 		return nil, reject("conflict", errors.New("imagem duplicada"))
 	}
 	if err != nil {
+		rollback()
+		return nil, reject("db_error", err)
+	}
+	if err := tx.Commit(); err != nil {
 		rollback()
 		return nil, reject("db_error", err)
 	}
@@ -554,19 +577,6 @@ func (h *ProductImageHandler) countImages(productID string) (int, error) {
 	err := h.db.QueryRow(
 		`SELECT count(*) FROM product_images WHERE product_id::text = $1`, productID).Scan(&n)
 	return n, err
-}
-
-func (h *ProductImageHandler) nextSortOrder(productID string) (int, error) {
-	var n sql.NullInt64
-	err := h.db.QueryRow(
-		`SELECT max(sort_order) FROM product_images WHERE product_id::text = $1`, productID).Scan(&n)
-	if err != nil {
-		return 0, err
-	}
-	if !n.Valid {
-		return 0, nil
-	}
-	return int(n.Int64) + 1, nil
 }
 
 func (h *ProductImageHandler) findByChecksum(productID, checksum string) (*UploadedImage, bool, error) {
