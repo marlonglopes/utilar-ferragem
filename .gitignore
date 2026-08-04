@@ -70,3 +70,6 @@ services/catalog-service/data/
 # Python
 __pycache__/
 *.pyc
+
+# scratchpad de trabalho (binários, imagens de teste, etc.) — nunca versionar
+scratchpad/

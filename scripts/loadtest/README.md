@@ -34,16 +34,40 @@ pasta).
 
 ## 2. Estresse em navegador real (memória/DOM/travamento)
 
-jsdom não mede memória nem renderização. Para isso, gere a árvore e arraste:
+jsdom não mede memória nem renderização. Para isso, gere a árvore e arraste.
+Há DOIS geradores, para dois objetivos:
+
+### (a) Carga pura — JPEGs mínimos (mede pasta/memória/414)
 
 ```bash
 node scripts/loadtest/gen-images.mjs                  # 500 pastas x 3 fotos
 node scripts/loadtest/gen-images.mjs --folders 500 --per 5
-node scripts/loadtest/gen-images.mjs --skus skus.txt  # 1 pasta por SKU REAL (um por linha)
+node scripts/loadtest/gen-images.mjs --skus skus.txt  # 1 pasta por SKU REAL
 ```
 
-Saída em `<scratchpad>/loadtest-images/<SKU>/<i>.jpg` (JPEGs mínimos válidos,
-~0,13 KB cada — o que importa é a QUANTIDADE, não o tamanho).
+Saída: `<scratchpad>/loadtest-images/<SKU>/<i>.jpg` (JPEGs 1x1, ~0,13 KB — o que
+importa é a QUANTIDADE). ⚠️ O backend REJEITA imagem pequena, então estes NÃO
+servem pra testar o envio de verdade — só o casamento/memória/414.
+
+### (b) Teste ponta-a-ponta — JPEGs REAIS 800x600 (envia mesmo)
+
+Requer Python 3 + PIL. Gera imagens válidas e DISTINTAS, cada uma com o SKU e o
+número da foto desenhados — dá pra conferir a olho que a foto foi pro produto
+certo e que a "Foto 1" virou a capa.
+
+```bash
+# 100 pastas de SKUs REAIS (um por linha em skus.txt), 3 fotos cada:
+python3 scripts/loadtest/gen-images.py --skus skus.txt --per 3 --out ~/utilar-test-images
+# ou SKUs sintéticos:
+python3 scripts/loadtest/gen-images.py --folders 100 --per 3
+```
+
+Para pegar SKUs reais publicados:
+
+```bash
+docker exec utilar_catalog_db psql -U utilar -d catalog_service -tAc \
+  "SELECT sku FROM products WHERE sku<>'' AND status='published' ORDER BY random() LIMIT 100" > skus.txt
+```
 
 Depois, **num navegador de verdade** (não headless):
 1. Admin → Imagens em lote.
