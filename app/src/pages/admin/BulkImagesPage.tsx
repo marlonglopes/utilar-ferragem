@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, RotateCw, Trash2, UploadCloud, XCircle } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  RotateCw,
+  Trash2,
+  UploadCloud,
+  XCircle,
+} from 'lucide-react'
 import { AdminShell } from '@/components/admin/AdminShell'
 import { Section } from '@/components/admin/primitives'
 import { cn } from '@/lib/cn'
@@ -53,6 +61,8 @@ export default function BulkImagesPage() {
   const [items, setItems] = useState<Item[]>([])
   const [dragging, setDragging] = useState(false)
   const [resolving, setResolving] = useState(false)
+  const [reading, setReading] = useState(false)
+  const [notice, setNotice] = useState('')
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
@@ -94,7 +104,15 @@ export default function BulkImagesPage() {
 
   const addCollected = useCallback(async (collected: CollectedFile[]) => {
     const imgs = collected.filter((c) => c.file.type.startsWith('image/'))
-    if (imgs.length === 0) return
+    if (imgs.length === 0) {
+      setNotice(
+        collected.length > 0
+          ? `Li ${collected.length} arquivo(s), mas nenhum é imagem (use jpg/png/webp).`
+          : 'Nada foi lido. Arraste pastas ou arquivos de imagem.'
+      )
+      return
+    }
+    setNotice(`${imgs.length} foto(s) lida(s) — casando por SKU…`)
     const novos: Item[] = imgs.map(({ file, path }) => {
       const candidates = skuCandidatesForFile(path)
       // Preview só até o teto — o resto é enviado sem preview (não trava a aba).
@@ -151,7 +169,14 @@ export default function BulkImagesPage() {
     e.preventDefault()
     setDragging(false)
     // Desce em pastas (webkitGetAsEntry): arrastar pastas inteiras agora funciona.
-    void collectFilesFromDataTransfer(e.dataTransfer).then(addCollected)
+    setReading(true)
+    setNotice('Lendo pastas…')
+    collectFilesFromDataTransfer(e.dataTransfer)
+      .then(addCollected)
+      .catch((err) =>
+        setNotice(`Erro ao ler: ${err instanceof Error ? err.message : 'desconhecido'}`)
+      )
+      .finally(() => setReading(false))
   }
   const onPaste = (e: React.ClipboardEvent) => {
     const files = Array.from(e.clipboardData.files)
@@ -305,6 +330,20 @@ export default function BulkImagesPage() {
             }}
           />
         </div>
+
+        {/* Feedback imediato do drop: lendo pastas / quantas fotos / erro. */}
+        {(reading || notice) && (
+          <p
+            className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+            role="status"
+            aria-live="polite"
+          >
+            {reading && (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand-orange" aria-hidden="true" />
+            )}
+            {reading ? 'Lendo pastas…' : notice}
+          </p>
+        )}
 
         {/* Barra de ação / resumo */}
         {items.length > 0 && (
