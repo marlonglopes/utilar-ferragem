@@ -3,6 +3,12 @@
 **Última atualização:** 2026-08-02 (checkpoint antes de pausa). Leia isto primeiro
 ao reabrir a Utilar. Aponta para os docs de detalhe; não os duplica.
 
+> 📘 **Vai USAR ou IMPLANTAR a Utilar?** Comece pelo
+> **[`manual-utilar.md`](manual-utilar.md)** — guia de ponta a ponta: subir o
+> sistema, configurar, **cadastrar produtos**, **subir imagens (pasta por SKU)**,
+> vender (loja e balcão) e operar. Este ESTADO é o mapa técnico; o manual é o
+> "como fazer".
+
 > ⭐ **Régua permanente:** a Utilar é uma **loja física REAL, já existente e com
 > ótima reputação**. Nada entra pro cliente com problema. Sempre separe
 > "verde nos testes / funciona na demo" de "seguro pra cliente real". Ver
