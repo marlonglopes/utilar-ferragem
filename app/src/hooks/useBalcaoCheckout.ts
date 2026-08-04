@@ -313,6 +313,22 @@ export function useBalcaoCheckout() {
           return done
         }
 
+        // Acima do teto: pedido criado, aguardando o gerente. NÃO cobra (nem gera
+        // QR de Pix / boleto) antes da aprovação — o cliente não deve pagar um
+        // desconto que o gerente ainda não homologou. Conclui-se após aprovada.
+        // (O externo já é tratado acima; o backend também bloqueia a liquidação
+        // de pedido pendente — isto evita cobrar cedo, não é a única barreira.)
+        if (settled.requiresApproval) {
+          const done: BalcaoChargeOutcome = {
+            orderId: order.id,
+            orderNumber: order.number,
+            method: input.method,
+            ...settled,
+          }
+          setOutcome(done)
+          return done
+        }
+
         const result = await payment.createPayment(order.id, input.method, input.pricing.total, {
           payer_name: input.customer.name,
           payer_cpf: input.customer.document.replace(/\D/g, ''),

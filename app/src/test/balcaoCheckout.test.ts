@@ -189,6 +189,36 @@ describe('useBalcaoCheckout — payload do pedido', () => {
     expect(result.current.outcome?.external?.settled).toBe(false)
   })
 
+  it('acima do teto NÃO cobra Pix antes da aprovação (sem QR / sem pagamento)', async () => {
+    orderPostWithJWT.mockResolvedValue({
+      id: 'ord-7',
+      number: 'BAL-0007',
+      approvalStatus: 'pending',
+      discountPct: 20,
+      discountAmount: 40,
+    })
+
+    const { result } = renderHook(() => useBalcaoCheckout())
+    const items = [item()]
+
+    await act(async () => {
+      await result.current.charge({
+        items,
+        pricing: pricingFor(items, 20), // 20% > teto 12% → aprovação
+        customer: CUSTOMER,
+        method: 'pix',
+      })
+    })
+
+    await waitFor(() => {
+      expect(result.current.outcome?.requiresApproval).toBe(true)
+    })
+    // Só criou o pedido; NÃO gerou cobrança — o cliente não paga um desconto que
+    // o gerente ainda não homologou.
+    expect(result.current.outcome?.payment).toBeUndefined()
+    expect(orderPostWithJWT).toHaveBeenCalledTimes(1)
+  })
+
   it('liquidação da maquininha falha → erro no caixa, sem falso "pago"', async () => {
     orderPostWithJWT
       .mockResolvedValueOnce({ id: 'ord-9', number: 'BAL-0009', approvalStatus: 'not_required' })
