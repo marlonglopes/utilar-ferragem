@@ -74,6 +74,9 @@ export default function AdminProductsPage() {
   const category = params.get('categoria') ?? ''
   const statusParam = params.get('situacao') ?? ''
   const status: ProductStatus | '' = isProductStatus(statusParam) ? statusParam : ''
+  const fotoParam = params.get('foto') ?? ''
+  const withImage: '' | 'true' | 'false' =
+    fotoParam === 'true' || fotoParam === 'false' ? fotoParam : ''
   const sort = (params.get('ordem') as ProductSortKey | null) ?? 'name'
   const dir = params.get('dir') === 'desc' ? 'desc' : 'asc'
   const page = Math.max(1, Number(params.get('pagina') ?? '1') || 1)
@@ -95,8 +98,8 @@ export default function AdminProductsPage() {
   )
 
   const query: AdminProductQuery = useMemo(
-    () => ({ q, category, status, sort, dir, page, pageSize: PAGE_SIZE }),
-    [q, category, status, sort, dir, page]
+    () => ({ q, category, status, withImage, sort, dir, page, pageSize: PAGE_SIZE }),
+    [q, category, status, withImage, sort, dir, page]
   )
 
   const { data, isLoading, isError, error, refetch } = useAdminProductList(query)
@@ -248,6 +251,22 @@ export default function AdminProductsPage() {
                     {STATUS_LABEL[s]}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="pf-foto" className="block text-xs font-semibold text-gray-700">
+                Foto
+              </label>
+              <select
+                id="pf-foto"
+                value={withImage}
+                onChange={(e) => setParam('foto', e.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue"
+              >
+                <option value="">Todas</option>
+                <option value="true">Com foto</option>
+                <option value="false">Sem foto</option>
               </select>
             </div>
           </div>

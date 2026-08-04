@@ -210,6 +210,7 @@ export async function fetchAdminProducts(q: AdminProductQuery): Promise<AdminPro
       q: q.q,
       category: q.category,
       status: q.status,
+      withImage: q.withImage,
       sort: q.sort,
       dir: q.dir,
       page: q.page,

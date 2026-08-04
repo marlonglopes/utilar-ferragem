@@ -78,6 +78,14 @@ func (h *CatalogAdminHandler) ListProducts(c *gin.Context) {
 			idx++
 		}
 	}
+	// Filtro por presença de foto — útil depois de um upload em lote pra ver o que
+	// já tem/falta foto. SQL literal (EXISTS), sem placeholder; whitelist de valor.
+	switch strings.ToLower(strings.TrimSpace(c.Query("withImage"))) {
+	case "true", "1", "yes", "com":
+		where = append(where, "EXISTS (SELECT 1 FROM product_images pi WHERE pi.product_id = p.id)")
+	case "false", "0", "no", "sem":
+		where = append(where, "NOT EXISTS (SELECT 1 FROM product_images pi WHERE pi.product_id = p.id)")
+	}
 	whereSQL := strings.Join(where, " AND ")
 
 	// Whitelist de ordenação — o valor vem da URL e NUNCA pode entrar no SQL.

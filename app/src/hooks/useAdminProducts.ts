@@ -58,6 +58,7 @@ export const productKeys = {
       q.q ?? '',
       q.category ?? '',
       q.status ?? '',
+      q.withImage ?? '',
       q.sort,
       q.dir,
       q.page,

@@ -198,6 +198,8 @@ export interface AdminProductQuery {
   q?: string
   category?: string
   status?: ProductStatus | ''
+  /** Filtro por presença de foto: '' = todas, 'true' = com foto, 'false' = sem. */
+  withImage?: '' | 'true' | 'false'
   sort: ProductSortKey
   dir: 'asc' | 'desc'
   page: number
