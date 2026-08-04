@@ -67,9 +67,135 @@ export function skuFromFilename(name: string): string {
   return c[c.length - 1]
 }
 
+/**
+ * Candidatos de SKU a partir do CAMINHO RELATIVO do arquivo (com pastas).
+ *
+ * O plano da loja é "1 pasta por SKU" (fotografa tudo, cada pasta é um código).
+ * Então a PASTA imediata é o candidato primário; o nome do arquivo entra como
+ * fallback (mantém o modelo antigo "6320.jpg" solto funcionando). Ex.:
+ *   "6320/IMG_0001.jpg"            → ["6320", "IMG_0001", "IMG"]  (casa por pasta)
+ *   "lote/6320/foto.jpg"           → ["6320", "foto"]            (pasta imediata)
+ *   "6320.jpg"                     → ["6320"]                    (solto, como antes)
+ */
+export function skuCandidatesForFile(path: string): string[] {
+  const parts = path.split('/').filter(Boolean)
+  const fileName = parts[parts.length - 1] ?? path
+  const folder = parts.length >= 2 ? parts[parts.length - 2].trim() : ''
+  const fromName = skuCandidates(fileName)
+  const out = folder ? [folder, ...fromName] : fromName
+  return Array.from(new Set(out.filter(Boolean)))
+}
+
+/** Arquivo coletado com seu caminho relativo (preserva a pasta = SKU). */
+export interface CollectedFile {
+  file: File
+  /** Caminho relativo, ex.: "6320/IMG_0001.jpg". Sem pasta = só o nome. */
+  path: string
+}
+
+// Tipos mínimos da File System API de drag-and-drop (não vêm no lib.dom padrão).
+interface FSEntry {
+  isFile: boolean
+  isDirectory: boolean
+  name: string
+  file?: (onOk: (f: File) => void, onErr?: (e: unknown) => void) => void
+  createReader?: () => FSDirectoryReader
+}
+interface FSDirectoryReader {
+  readEntries: (onOk: (entries: FSEntry[]) => void, onErr?: (e: unknown) => void) => void
+}
+
+/**
+ * Extrai TODOS os arquivos de um drop, DESCENDO em pastas (recursivo).
+ *
+ * `dataTransfer.files` NÃO expande diretórios — por isso arrastar pastas não
+ * trazia nada. Aqui usamos `webkitGetAsEntry()` + travessia recursiva, que é o
+ * único jeito de ler o conteúdo de pastas soltas na área. Sem suporte a entries
+ * (navegador antigo), cai no comportamento antigo (`files`, sem pastas).
+ */
+export async function collectFilesFromDataTransfer(dt: DataTransfer): Promise<CollectedFile[]> {
+  const items = dt.items
+  const first = items && items.length > 0 ? items[0] : null
+  const canTraverse =
+    !!first && typeof (first as { webkitGetAsEntry?: unknown }).webkitGetAsEntry === 'function'
+
+  if (!canTraverse) {
+    return Array.from(dt.files).map((file) => ({ file, path: file.name }))
+  }
+
+  const roots: FSEntry[] = []
+  for (let i = 0; i < items.length; i++) {
+    const getEntry = (items[i] as { webkitGetAsEntry?: () => FSEntry | null }).webkitGetAsEntry
+    const entry = getEntry ? getEntry.call(items[i]) : null
+    if (entry) roots.push(entry)
+  }
+  const out: CollectedFile[] = []
+  await Promise.all(roots.map((e) => walkEntry(e, '', out)))
+  return out
+}
+
+function walkEntry(entry: FSEntry, prefix: string, out: CollectedFile[]): Promise<void> {
+  if (entry.isFile && entry.file) {
+    return new Promise((resolve) => {
+      entry.file!(
+        (f) => {
+          out.push({ file: f, path: prefix + entry.name })
+          resolve()
+        },
+        () => resolve()
+      )
+    })
+  }
+  if (entry.isDirectory && entry.createReader) {
+    const reader = entry.createReader()
+    return readAllEntries(reader).then((children) =>
+      Promise.all(children.map((c) => walkEntry(c, prefix + entry.name + '/', out))).then(
+        () => undefined
+      )
+    )
+  }
+  return Promise.resolve()
+}
+
+// readEntries devolve no MÁXIMO ~100 por chamada; é preciso chamar em loop até
+// vir um lote vazio. Esquecer disso perde arquivos em pastas grandes.
+function readAllEntries(reader: FSDirectoryReader): Promise<FSEntry[]> {
+  return new Promise((resolve) => {
+    const all: FSEntry[] = []
+    const readBatch = () => {
+      reader.readEntries(
+        (batch) => {
+          if (!batch.length) {
+            resolve(all)
+            return
+          }
+          all.push(...batch)
+          readBatch()
+        },
+        () => resolve(all)
+      )
+    }
+    readBatch()
+  })
+}
+
+// Tamanho do lote da consulta by-sku. 200 SKUs EAN-13 ≈ 2,8 KB de query —
+// folgadamente abaixo do teto de ~4-8 KB dos proxies. Mandar tudo numa query só
+// estourava 414 (URI Too Long) já em ~250-520 SKUs — ver o teste de carga.
+const BY_SKU_BATCH = 200
+
 export async function resolveBySku(skus: string[]): Promise<SkuMatch[]> {
   if (skus.length === 0) return []
   if (!isBulkImagesEnabled) return mockResolve(skus)
+  const batches: string[][] = []
+  for (let i = 0; i < skus.length; i += BY_SKU_BATCH) {
+    batches.push(skus.slice(i, i + BY_SKU_BATCH))
+  }
+  const results = await Promise.all(batches.map(fetchBySkuBatch))
+  return results.flat()
+}
+
+async function fetchBySkuBatch(skus: string[]): Promise<SkuMatch[]> {
   const q = encodeURIComponent(skus.join(','))
   const res = await adminGet<{ data: SkuMatch[] }>(
     CATALOG_URL,

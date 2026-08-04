@@ -182,6 +182,32 @@ describe('resolveBySku — caminho real (HTTP)', () => {
     expect(r[0].sku).toBe('6320')
   })
 
+  it('fatia em lotes de 200 (mata o 414) e mescla os resultados', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_CATALOG_URL', 'http://catalog.test')
+    const adminGet = vi.fn().mockImplementation((_base: string, path: string) => {
+      const skusParam = decodeURIComponent(path.split('skus=')[1] ?? '')
+      const first = skusParam.split(',')[0]
+      // um match sintético por lote → dá pra contar lotes pelo tamanho do merge
+      return Promise.resolve({ data: [{ sku: first, id: `p-${first}`, name: 'X', hasImage: false }] })
+    })
+    vi.doMock('@/lib/adminApi', () => ({ adminGet }))
+    vi.doMock('@/lib/api', () => ({ refreshAccessToken: vi.fn() }))
+    vi.doMock('@/store/authStore', () => ({ useAuthStore: { getState: () => ({ user: null }) } }))
+    const { resolveBySku } = await import('@/lib/adminBulkImagesApi')
+
+    const skus = Array.from({ length: 450 }, (_, i) => `S${i}`)
+    const r = await resolveBySku(skus)
+    expect(adminGet).toHaveBeenCalledTimes(3) // 200 + 200 + 50
+    expect(r).toHaveLength(3) // um match por lote, mesclados
+    // nenhuma query passa de ~200 SKUs → longe do teto de 414
+    for (const call of adminGet.mock.calls) {
+      const path = call[1] as string
+      const n = decodeURIComponent(path.split('skus=')[1] ?? '').split(',').length
+      expect(n).toBeLessThanOrEqual(200)
+    }
+  })
+
   it('resposta sem data → []', async () => {
     vi.resetModules()
     vi.stubEnv('VITE_CATALOG_URL', 'http://catalog.test')

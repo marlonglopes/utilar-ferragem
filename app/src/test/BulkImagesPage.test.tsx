@@ -50,6 +50,45 @@ describe('BulkImagesPage — solta uma pasta e casa por SKU', () => {
     expect(screen.getByRole('button', { name: /Enviar 2 foto/ })).toBeInTheDocument()
   })
 
+  it('arrastar uma PASTA nomeada pelo SKU casa pela pasta (foto com nome qualquer)', async () => {
+    render(
+      <MemoryRouter>
+        <BulkImagesPage />
+      </MemoryRouter>
+    )
+    const zone = screen.getByRole('button', { name: /Arraste imagens/i })
+
+    // Pasta "6320" com uma foto cujo NOME não é o SKU — só a pasta identifica.
+    const fileEntry = {
+      isFile: true,
+      isDirectory: false,
+      name: 'IMG_1.jpg',
+      file: (ok: (f: File) => void) => ok(new File(['x'], 'IMG_1.jpg', { type: 'image/jpeg' })),
+    }
+    const dirEntry = {
+      isFile: false,
+      isDirectory: true,
+      name: '6320',
+      createReader: () => {
+        let served = false
+        return {
+          readEntries: (ok: (e: unknown[]) => void) => {
+            if (served) return ok([])
+            served = true
+            ok([fileEntry])
+          },
+        }
+      },
+    }
+    const dataTransfer = { items: [{ webkitGetAsEntry: () => dirEntry }], files: [] }
+
+    fireEvent.drop(zone, { dataTransfer })
+
+    await waitFor(() => expect(screen.getByText('Casados por SKU')).toBeInTheDocument())
+    // Casou pela PASTA 6320 — a foto se chama IMG_1, que sozinha não casaria.
+    expect(screen.getByText('SKU 6320')).toBeInTheDocument()
+  })
+
   it('nenhuma imagem (só .txt) não cria itens', async () => {
     const { container } = render(
       <MemoryRouter>

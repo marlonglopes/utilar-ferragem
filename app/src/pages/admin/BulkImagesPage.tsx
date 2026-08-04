@@ -5,12 +5,13 @@ import { Section } from '@/components/admin/primitives'
 import { cn } from '@/lib/cn'
 import { compressImage } from '@/lib/imageCompress'
 import {
+  collectFilesFromDataTransfer,
   isBulkImagesEnabled,
   resolveBySku,
   runPool,
-  skuCandidates,
-  skuFromFilename,
+  skuCandidatesForFile,
   uploadProductImage,
+  type CollectedFile,
   type SkuMatch,
 } from '@/lib/adminBulkImagesApi'
 
@@ -29,16 +30,23 @@ interface Item {
 }
 
 const CONCURRENCY = 5
+
+// Teto de previews/cards renderizados de uma vez. Um lote pode ter MILHARES de
+// fotos (500 pastas x N); criar object URL + <img> pra todas trava a aba. Acima
+// do teto, os itens continuam sendo casados e ENVIADOS normalmente — só não
+// geram preview nem card (mostramos um resumo "+N"). Ver o teste de carga.
+const PREVIEW_CAP = 150
 let seq = 0
 
 /**
  * Upload de imagens EM LOTE por SKU — o que faltava para dar foto a centenas de
  * produtos sem abrir um por um.
  *
- * A loja fotografa cada produto no celular, nomeia o arquivo pelo SKU (6320.jpg),
- * solta tudo aqui; casamos por SKU, comprimimos no cliente e subimos em paralelo
- * (5 por vez) pelo pipeline de normalização que já existe. Progresso e retry por
- * arquivo; foto errada nunca acontece porque o casamento é pelo código.
+ * A loja fotografa cada produto no celular e organiza por SKU — seja nomeando o
+ * arquivo pelo código (6320.jpg) OU criando 1 PASTA por SKU (6320/foto1.jpg).
+ * Solta tudo aqui (arquivos ou pastas inteiras); casamos por SKU (pasta primeiro,
+ * nome do arquivo como fallback), comprimimos no cliente e subimos em paralelo
+ * (5 por vez). Foto errada nunca acontece porque o casamento é pelo código.
  */
 export default function BulkImagesPage() {
   const [items, setItems] = useState<Item[]>([])
@@ -46,6 +54,18 @@ export default function BulkImagesPage() {
   const [resolving, setResolving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
+  // Conta quantos previews (object URLs) já criamos, pra parar no PREVIEW_CAP.
+  const previewCount = useRef(0)
+
+  // webkitdirectory não é atributo tipado do React — setamos no ref.
+  useEffect(() => {
+    const el = folderInputRef.current
+    if (el) {
+      el.setAttribute('webkitdirectory', '')
+      el.setAttribute('directory', '')
+    }
+  }, [])
 
   // Limpa os object URLs ao desmontar (evita vazamento de memória).
   useEffect(
@@ -71,24 +91,31 @@ export default function BulkImagesPage() {
     setItems((prev) => prev.map((it) => (it.uid === uid ? { ...it, ...up } : it)))
   }, [])
 
-  const addFiles = useCallback(async (files: File[]) => {
-    const imgs = files.filter((f) => f.type.startsWith('image/'))
+  const addCollected = useCallback(async (collected: CollectedFile[]) => {
+    const imgs = collected.filter((c) => c.file.type.startsWith('image/'))
     if (imgs.length === 0) return
-    const novos: Item[] = imgs.map((file) => {
-      const candidates = skuCandidates(file.name)
+    const novos: Item[] = imgs.map(({ file, path }) => {
+      const candidates = skuCandidatesForFile(path)
+      // Preview só até o teto — o resto é enviado sem preview (não trava a aba).
+      let previewUrl = ''
+      if (previewCount.current < PREVIEW_CAP) {
+        previewUrl = URL.createObjectURL(file)
+        previewCount.current++
+      }
       return {
         uid: `f${seq++}`,
         file,
         candidates,
-        sku: skuFromFilename(file.name),
-        previewUrl: URL.createObjectURL(file),
+        sku: candidates[0] ?? '',
+        previewUrl,
         status: 'pending' as Status,
         progress: 0,
       }
     })
     setItems((prev) => [...prev, ...novos])
 
-    // Resolve todos os candidatos em lote e casa cada arquivo ao 1º que existir.
+    // Resolve todos os candidatos EM LOTES (resolveBySku fatia p/ não estourar
+    // 414) e casa cada arquivo ao 1º candidato que existir (pasta primeiro).
     setResolving(true)
     try {
       const skus = Array.from(new Set(novos.flatMap((n) => n.candidates).filter(Boolean)))
@@ -113,11 +140,21 @@ export default function BulkImagesPage() {
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragging(false)
-    void addFiles(Array.from(e.dataTransfer.files))
+    // Desce em pastas (webkitGetAsEntry): arrastar pastas inteiras agora funciona.
+    void collectFilesFromDataTransfer(e.dataTransfer).then(addCollected)
   }
   const onPaste = (e: React.ClipboardEvent) => {
     const files = Array.from(e.clipboardData.files)
-    if (files.length) void addFiles(files)
+    if (files.length) void addCollected(files.map((file) => ({ file, path: file.name })))
+  }
+
+  // Arquivos ou pasta (webkitdirectory): webkitRelativePath preserva a pasta=SKU.
+  const onPick = (list: FileList | null) => {
+    const collected = Array.from(list ?? []).map((file) => ({
+      file,
+      path: file.webkitRelativePath || file.name,
+    }))
+    if (collected.length) void addCollected(collected)
   }
 
   const uploadOne = useCallback(
@@ -148,18 +185,20 @@ export default function BulkImagesPage() {
     setUploading(false)
   }, [items, uploadOne])
 
+  // Revogar/decrementar FORA do updater do setState (updater tem de ser puro).
+  const dropPreview = (it?: Item) => {
+    if (it?.previewUrl) {
+      URL.revokeObjectURL(it.previewUrl)
+      previewCount.current = Math.max(0, previewCount.current - 1)
+    }
+  }
   const removeItem = (uid: string) => {
-    setItems((prev) => {
-      const it = prev.find((x) => x.uid === uid)
-      if (it) URL.revokeObjectURL(it.previewUrl)
-      return prev.filter((x) => x.uid !== uid)
-    })
+    dropPreview(items.find((x) => x.uid === uid))
+    setItems((prev) => prev.filter((x) => x.uid !== uid))
   }
   const clearDone = () => {
-    setItems((prev) => {
-      prev.filter((x) => x.status === 'done').forEach((x) => URL.revokeObjectURL(x.previewUrl))
-      return prev.filter((x) => x.status !== 'done')
-    })
+    items.filter((x) => x.status === 'done').forEach(dropPreview)
+    setItems((prev) => prev.filter((x) => x.status !== 'done'))
   }
 
   const matched = items.filter((it) => it.match)
@@ -170,7 +209,7 @@ export default function BulkImagesPage() {
   return (
     <AdminShell
       title="Imagens em lote"
-      description="Solte fotos nomeadas pelo SKU (ex.: 6320.jpg); casamos por código e subimos em paralelo."
+      description="Solte fotos nomeadas pelo SKU (6320.jpg) ou 1 pasta por SKU; casamos por código e subimos em paralelo."
     >
       <div className="space-y-4">
         {!isBulkImagesEnabled && (
@@ -206,12 +245,22 @@ export default function BulkImagesPage() {
         >
           <UploadCloud className="h-9 w-9 text-gray-400" aria-hidden="true" />
           <p className="text-sm font-semibold text-gray-700">
-            Arraste imagens aqui, clique para selecionar ou cole (Ctrl+V)
+            Arraste imagens ou pastas aqui, clique para selecionar, ou cole (Ctrl+V)
           </p>
           <p className="text-xs text-gray-500">
-            Nomeie cada arquivo pelo SKU do produto — <span className="font-mono">6320.jpg</span>.
-            Várias fotos do mesmo produto: <span className="font-mono">6320-2.jpg</span>.
+            Nomeie o arquivo pelo SKU (<span className="font-mono">6320.jpg</span>) ou crie{' '}
+            <strong>1 pasta por SKU</strong> (<span className="font-mono">6320/foto.jpg</span>).
           </p>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              folderInputRef.current?.click()
+            }}
+            className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Selecionar pasta
+          </button>
           <input
             ref={inputRef}
             type="file"
@@ -219,7 +268,18 @@ export default function BulkImagesPage() {
             multiple
             className="hidden"
             onChange={(e) => {
-              void addFiles(Array.from(e.target.files ?? []))
+              onPick(e.target.files)
+              e.target.value = ''
+            }}
+          />
+          {/* webkitdirectory setado via ref (atributo não tipado no React). */}
+          <input
+            ref={folderInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              onPick(e.target.files)
               e.target.value = ''
             }}
           />
@@ -258,11 +318,11 @@ export default function BulkImagesPage() {
           </div>
         )}
 
-        {/* Grade de casados */}
+        {/* Grade de casados — RENDER LIMITADO ao teto (todas são enviadas). */}
         {matched.length > 0 && (
           <Section title="Casados por SKU">
             <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 lg:grid-cols-4 sm:p-4">
-              {matched.map((it) => (
+              {matched.slice(0, PREVIEW_CAP).map((it) => (
                 <ItemCard
                   key={it.uid}
                   item={it}
@@ -272,6 +332,12 @@ export default function BulkImagesPage() {
                 />
               ))}
             </div>
+            {matched.length > PREVIEW_CAP && (
+              <p className="px-4 pb-3 text-xs text-gray-500">
+                Mostrando {PREVIEW_CAP} de <strong>{matched.length}</strong> casados — todas serão
+                enviadas.
+              </p>
+            )}
           </Section>
         )}
 
@@ -279,10 +345,10 @@ export default function BulkImagesPage() {
         {unmatched.length > 0 && (
           <Section
             title="Sem produto"
-            description="O SKU do nome do arquivo não bate com nenhum produto — confira o nome."
+            description="O SKU (pasta ou nome do arquivo) não bate com nenhum produto — confira."
           >
             <ul className="divide-y divide-gray-100">
-              {unmatched.map((it) => (
+              {unmatched.slice(0, PREVIEW_CAP).map((it) => (
                 <li key={it.uid} className="flex items-center gap-3 p-3 text-sm">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
                   <span className="font-mono text-gray-600">{it.file.name}</span>
@@ -300,6 +366,11 @@ export default function BulkImagesPage() {
                 </li>
               ))}
             </ul>
+            {unmatched.length > PREVIEW_CAP && (
+              <p className="px-3 py-2 text-xs text-gray-500">
+                Mostrando {PREVIEW_CAP} de <strong>{unmatched.length}</strong> sem produto.
+              </p>
+            )}
           </Section>
         )}
       </div>
@@ -321,11 +392,18 @@ function ItemCard({
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
       <div className="relative aspect-square bg-gray-50">
-        <img
-          src={item.previewUrl}
-          alt={item.match?.name ?? item.sku}
-          className="h-full w-full object-contain"
-        />
+        {item.previewUrl ? (
+          <img
+            src={item.previewUrl}
+            alt={item.match?.name ?? item.sku}
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          // Além do teto de preview: sem <img> (evita broken image), só o SKU.
+          <div className="flex h-full w-full items-center justify-center font-mono text-xs text-gray-400">
+            {item.sku}
+          </div>
+        )}
         {item.match?.hasImage && item.status === 'pending' && (
           <span className="absolute left-1.5 top-1.5 rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-gray-900">
             já tem foto

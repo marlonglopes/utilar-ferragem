@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
+  collectFilesFromDataTransfer,
   resolveBySku,
   runPool,
   skuCandidates,
+  skuCandidatesForFile,
   skuFromFilename,
   uploadProductImage,
 } from '@/lib/adminBulkImagesApi'
@@ -57,6 +59,72 @@ describe('adminBulkImagesApi (mock)', () => {
     let last = 0
     await uploadProductImage('mock-6320', new File(['x'], '6320.jpg'), (p) => (last = p))
     expect(last).toBe(100)
+  })
+})
+
+describe('skuCandidatesForFile — casa pela PASTA (pasta = SKU), com fallback', () => {
+  it('pasta imediata é o SKU primário; nome do arquivo é fallback', () => {
+    expect(skuCandidatesForFile('6320/IMG_0001.jpg')).toEqual(['6320', 'IMG_0001', 'IMG'])
+  })
+  it('estrutura aninhada usa a pasta IMEDIATA como SKU', () => {
+    expect(skuCandidatesForFile('lote-julho/6320/foto.jpg')).toEqual(['6320', 'foto'])
+  })
+  it('arquivo solto (sem pasta) segue como antes', () => {
+    expect(skuCandidatesForFile('6320.jpg')).toEqual(['6320'])
+  })
+  it('pasta e arquivo com o mesmo SKU não duplicam', () => {
+    expect(skuCandidatesForFile('6320/6320.jpg')).toEqual(['6320'])
+  })
+})
+
+describe('collectFilesFromDataTransfer — desce em pastas (webkitGetAsEntry)', () => {
+  interface FakeEntry {
+    isFile: boolean
+    isDirectory: boolean
+    name: string
+    file?: (ok: (f: File) => void) => void
+    createReader?: () => { readEntries: (ok: (e: FakeEntry[]) => void) => void }
+  }
+  const fileEntry = (name: string): FakeEntry => ({
+    isFile: true,
+    isDirectory: false,
+    name,
+    file: (ok) => ok(new File(['x'], name, { type: 'image/jpeg' })),
+  })
+  const dirEntry = (name: string, children: FakeEntry[]): FakeEntry => ({
+    isFile: false,
+    isDirectory: true,
+    name,
+    createReader: () => {
+      let served = false
+      return {
+        readEntries: (ok) => {
+          if (served) return ok([])
+          served = true
+          ok(children)
+        },
+      }
+    },
+  })
+
+  it('expande a pasta e preserva o caminho (pasta/arquivo)', async () => {
+    const root = dirEntry('6320', [fileEntry('1.jpg'), fileEntry('2.jpg')])
+    const dt = {
+      items: [{ webkitGetAsEntry: () => root }],
+      files: [],
+    } as unknown as DataTransfer
+
+    const collected = await collectFilesFromDataTransfer(dt)
+    expect(collected.map((c) => c.path).sort()).toEqual(['6320/1.jpg', '6320/2.jpg'])
+  })
+
+  it('sem suporte a entries cai no comportamento antigo (só files, sem pasta)', async () => {
+    const dt = {
+      items: [],
+      files: [new File(['x'], '6320.jpg', { type: 'image/jpeg' })],
+    } as unknown as DataTransfer
+    const collected = await collectFilesFromDataTransfer(dt)
+    expect(collected).toEqual([{ file: expect.any(File), path: '6320.jpg' }])
   })
 })
 
