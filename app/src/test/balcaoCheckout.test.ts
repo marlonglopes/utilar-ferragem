@@ -96,7 +96,9 @@ describe('useBalcaoCheckout — payload do pedido', () => {
       })
     })
 
-    expect(orderPostWithJWT).toHaveBeenCalledTimes(1)
+    // Duas chamadas: cria o pedido E liquida a maquininha (fecha o furo — antes
+    // a venda externa nunca era persistida no backend).
+    expect(orderPostWithJWT).toHaveBeenCalledTimes(2)
     const [path, token, payload] = orderPostWithJWT.mock.calls[0] as [
       string,
       string,
@@ -117,6 +119,17 @@ describe('useBalcaoCheckout — payload do pedido', () => {
     expect(payload.customerDocument).toBe('11144477735')
     expect(payload.customerPhone).toBe('11988887777')
     expect(payload.customerId).toBe('cust-1')
+
+    // 2ª chamada: liquidação externa no order-service, com o NSU do comprovante.
+    const [settlePath, , settleBody] = orderPostWithJWT.mock.calls[1] as [
+      string,
+      string,
+      Record<string, unknown>,
+    ]
+    expect(settlePath).toBe('/api/v1/balcao/orders/ord-1/settle-external')
+    expect(settleBody.nsu).toBe('004512890')
+    // A venda ficou marcada como liquidada de verdade.
+    expect(result.current.outcome?.external?.settled).toBe(true)
   })
 
   it('cliente avulso (sem cadastro) vai sem customerId, só com o snapshot', async () => {
@@ -170,6 +183,35 @@ describe('useBalcaoCheckout — payload do pedido', () => {
       expect(result.current.outcome?.requiresApproval).toBe(true)
     })
     expect(result.current.outcome?.approvalStatus).toBe('pending')
+    // Pendente de aprovação NÃO liquida: só a criação do pedido tocou o backend.
+    // Não existe venda paga por maquininha antes do gerente aprovar.
+    expect(orderPostWithJWT).toHaveBeenCalledTimes(1)
+    expect(result.current.outcome?.external?.settled).toBe(false)
+  })
+
+  it('liquidação da maquininha falha → erro no caixa, sem falso "pago"', async () => {
+    orderPostWithJWT
+      .mockResolvedValueOnce({ id: 'ord-9', number: 'BAL-0009', approvalStatus: 'not_required' })
+      .mockRejectedValueOnce(new Error('este NSU já foi usado para liquidar outro pedido'))
+
+    const { result } = renderHook(() => useBalcaoCheckout())
+    const items = [item()]
+
+    await act(async () => {
+      await result.current.charge({
+        items,
+        pricing: pricingFor(items),
+        customer: CUSTOMER,
+        method: 'external',
+        nsu: '004512890',
+      })
+    })
+
+    await waitFor(() => {
+      expect(result.current.error).toMatch(/NSU já foi usado/i)
+    })
+    // charge devolve null e NÃO marca outcome pago — a venda não se concretizou.
+    expect(result.current.outcome).toBeNull()
   })
 
   it('bloqueia a cobrança abaixo do custo antes de tocar o backend', async () => {

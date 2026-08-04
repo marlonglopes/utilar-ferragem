@@ -14,21 +14,15 @@ import type { BalcaoCustomer, BalcaoItem, BalcaoPricing } from '@/store/balcaoSt
  */
 
 /**
- * `external` = maquininha de cartão / dinheiro — a transação acontece FORA do
- * sistema e o PDV só registra que foi paga, com o NSU do comprovante.
+ * `external` = maquininha da loja / dinheiro — a transação roda numa POS física
+ * (adquirente próprio, FORA da Appmax) e o PDV registra a liquidação com o NSU do
+ * comprovante via `POST /api/v1/balcao/orders/:id/settle-external`. O backend
+ * marca o pedido PAGO, troca o método para `external` (deixa de ser `card`), dá
+ * BAIXA no estoque e lança no LIVRO — tudo na mesma base do site.
  *
- * TODO(backend): o enum de métodos do payment-service é `pix | boleto | card`.
- * Não existe `external`, nem campo para NSU/autorização, nem um endpoint para
- * marcar um pedido como pago por meio externo. Hoje isso é registrado APENAS no
- * frontend — nada é persistido. Ver relatório: precisa de
- * `POST /api/v1/payments` aceitando `method=external` + `external_nsu`, com
- * status já `confirmed` (sem PSP, sem webhook), ou um endpoint dedicado
- * `POST /api/v1/orders/:id/settle-external`.
- *
- * Consequência no pedido: como `paymentMethod` é obrigatório e só aceita
- * `pix|boleto|card`, a venda na maquininha é gravada como `card`. O pedido fica
- * correto em valor e desconto, mas o MEIO de pagamento registrado não
- * corresponde ao que aconteceu no caixa.
+ * O pedido é criado com um método placeholder (`card`) e só vira `external` na
+ * liquidação: até o comprovante existir, a venda não foi paga por maquininha
+ * nenhuma. Venda acima do teto de desconto aguarda o gerente antes de liquidar.
  */
 export type BalcaoPaymentMethod = PaymentMethod | 'external'
 
@@ -38,8 +32,8 @@ export interface ExternalPaymentRecord {
   orderId: string
   amount: number
   recordedAt: string
-  /** Sempre true: nada foi enviado ao backend. */
-  localOnly: true
+  /** true quando o backend confirmou a liquidação (pago, estoque baixado, livro). */
+  settled: boolean
 }
 
 export interface BalcaoChargeInput {
@@ -231,6 +225,21 @@ export function useBalcaoCheckout() {
     [accessToken]
   )
 
+  /**
+   * Liquida a venda paga na maquininha: registra o NSU e marca o pedido pago no
+   * order-service, que dá baixa de estoque e lança no livro. Idempotente por NSU
+   * do lado do backend (retry seguro). Em mock (sem backend) é no-op.
+   */
+  const settleExternal = useCallback(
+    async (orderId: string, nsu: string): Promise<void> => {
+      if (!isOrderEnabled || !accessToken) return
+      await orderPostWithJWT(`/api/v1/balcao/orders/${orderId}/settle-external`, accessToken, {
+        nsu,
+      })
+    },
+    [accessToken]
+  )
+
   const charge = useCallback(
     async (input: BalcaoChargeInput): Promise<BalcaoChargeOutcome | null> => {
       if (input.pricing.blocked) {
@@ -262,19 +271,42 @@ export function useBalcaoCheckout() {
         }
 
         if (input.method === 'external') {
-          const external: ExternalPaymentRecord = {
-            method: 'external',
-            nsu: input.nsu!.trim(),
-            orderId: order.id,
-            amount: input.pricing.total,
-            recordedAt: new Date().toISOString(),
-            localOnly: true,
+          const nsu = input.nsu!.trim()
+          // Acima do teto de desconto: pedido criado, aguardando o gerente. NÃO
+          // liquida ainda — não existe venda paga por maquininha antes da aprovação.
+          if (settled.requiresApproval) {
+            const done: BalcaoChargeOutcome = {
+              orderId: order.id,
+              orderNumber: order.number,
+              method: 'external',
+              external: {
+                method: 'external',
+                nsu,
+                orderId: order.id,
+                amount: input.pricing.total,
+                recordedAt: new Date().toISOString(),
+                settled: false,
+              },
+              ...settled,
+            }
+            setOutcome(done)
+            return done
           }
+          // Liquidação de verdade: o backend marca pago, troca o método p/ external,
+          // baixa estoque e lança no livro (mesma base do site). Idempotente por NSU.
+          await settleExternal(order.id, nsu)
           const done: BalcaoChargeOutcome = {
             orderId: order.id,
             orderNumber: order.number,
             method: 'external',
-            external,
+            external: {
+              method: 'external',
+              nsu,
+              orderId: order.id,
+              amount: input.pricing.total,
+              recordedAt: new Date().toISOString(),
+              settled: true,
+            },
             ...settled,
           }
           setOutcome(done)
@@ -304,7 +336,7 @@ export function useBalcaoCheckout() {
         setSubmitting(false)
       }
     },
-    [createOrder, payment]
+    [createOrder, payment, settleExternal]
   )
 
   const reset = useCallback(() => {
