@@ -86,6 +86,30 @@ export function skuCandidatesForFile(path: string): string[] {
   return Array.from(new Set(out.filter(Boolean)))
 }
 
+/**
+ * Ordena as fotos para upload de forma que a CAPA seja determinística.
+ *
+ * O backend dá `sort_order 0` (a capa) para a PRIMEIRA foto que chega de cada
+ * produto. Se as fotos do mesmo produto subissem em paralelo, a capa viraria
+ * corrida (qual chega primeiro). Então agrupamos por produto e, dentro do grupo,
+ * ordenamos por nome de arquivo em ordem NATURAL (1, 2, 10 — não 1, 10, 2). O
+ * chamador sobe cada grupo EM SÉRIE (a 1ª foto vira capa) e grupos diferentes em
+ * paralelo. Assim "1.jpg" é sempre a capa, previsível para o lojista.
+ */
+export function planUploadOrder<T extends { productId: string; fileName: string }>(
+  items: T[]
+): T[][] {
+  const byProduct = new Map<string, T[]>()
+  for (const it of items) {
+    const arr = byProduct.get(it.productId) ?? []
+    arr.push(it)
+    byProduct.set(it.productId, arr)
+  }
+  return Array.from(byProduct.values()).map((g) =>
+    [...g].sort((a, b) => a.fileName.localeCompare(b.fileName, undefined, { numeric: true }))
+  )
+}
+
 /** Arquivo coletado com seu caminho relativo (preserva a pasta = SKU). */
 export interface CollectedFile {
   file: File

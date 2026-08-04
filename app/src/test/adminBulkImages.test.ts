@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
   collectFilesFromDataTransfer,
+  planUploadOrder,
   resolveBySku,
   runPool,
   skuCandidates,
@@ -74,6 +75,24 @@ describe('skuCandidatesForFile — casa pela PASTA (pasta = SKU), com fallback',
   })
   it('pasta e arquivo com o mesmo SKU não duplicam', () => {
     expect(skuCandidatesForFile('6320/6320.jpg')).toEqual(['6320'])
+  })
+})
+
+describe('planUploadOrder — capa determinística (por produto, ordem natural)', () => {
+  it('agrupa por produto e ordena natural (1,2,10 — não 1,10,2)', () => {
+    const items = [
+      { productId: 'A', fileName: '10.jpg' },
+      { productId: 'B', fileName: '1.jpg' },
+      { productId: 'A', fileName: '2.jpg' },
+      { productId: 'A', fileName: '1.jpg' },
+    ]
+    const groups = planUploadOrder(items)
+    expect(groups).toHaveLength(2)
+    const gA = groups.find((g) => g[0].productId === 'A')!
+    // 1.jpg primeiro → vira a CAPA; ordem natural, não lexicográfica.
+    expect(gA.map((x) => x.fileName)).toEqual(['1.jpg', '2.jpg', '10.jpg'])
+    const gB = groups.find((g) => g[0].productId === 'B')!
+    expect(gB.map((x) => x.fileName)).toEqual(['1.jpg'])
   })
 })
 

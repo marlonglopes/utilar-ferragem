@@ -89,6 +89,45 @@ describe('BulkImagesPage — solta uma pasta e casa por SKU', () => {
     expect(screen.getByText('SKU 6320')).toBeInTheDocument()
   })
 
+  it('CORREÇÃO: pasta e arquivo em produtos diferentes → NÃO sobe no errado (ambíguo)', async () => {
+    render(
+      <MemoryRouter>
+        <BulkImagesPage />
+      </MemoryRouter>
+    )
+    const zone = screen.getByRole('button', { name: /Arraste imagens/i })
+
+    // Pasta "6320" (produto) contendo "300.jpg" (também um produto, no mock).
+    // Ambos batem em produtos DIFERENTES → é ambíguo → tem de ficar sem produto.
+    const fileEntry = {
+      isFile: true,
+      isDirectory: false,
+      name: '300.jpg',
+      file: (ok: (f: File) => void) => ok(new File(['x'], '300.jpg', { type: 'image/jpeg' })),
+    }
+    const dirEntry = {
+      isFile: false,
+      isDirectory: true,
+      name: '6320',
+      createReader: () => {
+        let served = false
+        return {
+          readEntries: (ok: (e: unknown[]) => void) => {
+            if (served) return ok([])
+            served = true
+            ok([fileEntry])
+          },
+        }
+      },
+    }
+    fireEvent.drop(zone, { dataTransfer: { items: [{ webkitGetAsEntry: () => dirEntry }], files: [] } })
+
+    // Vai para "Sem produto", NUNCA casa (nem em 6320 nem em 300).
+    await waitFor(() => expect(screen.getByText('Sem produto')).toBeInTheDocument())
+    expect(screen.getByText('300.jpg')).toBeInTheDocument()
+    expect(screen.queryByText('Casados por SKU')).not.toBeInTheDocument()
+  })
+
   it('nenhuma imagem (só .txt) não cria itens', async () => {
     const { container } = render(
       <MemoryRouter>

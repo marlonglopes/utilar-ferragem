@@ -7,6 +7,7 @@ import { compressImage } from '@/lib/imageCompress'
 import {
   collectFilesFromDataTransfer,
   isBulkImagesEnabled,
+  planUploadOrder,
   resolveBySku,
   runPool,
   skuCandidatesForFile,
@@ -124,10 +125,19 @@ export default function BulkImagesPage() {
       setItems((prev) =>
         prev.map((it) => {
           if (it.status !== 'pending' || it.match) return it
-          const hit = it.candidates.find((c) => bySku.has(c))
-          return hit
-            ? { ...it, match: bySku.get(hit), sku: hit }
-            : { ...it, status: 'unmatched' as Status }
+          // CORREÇÃO: nunca subir no produto errado. Se a pasta e o nome do
+          // arquivo casam em produtos DIFERENTES, é ambíguo → deixa sem produto
+          // (o lojista confere) em vez de chutar o primeiro candidato.
+          const hits = it.candidates.map((c) => bySku.get(c)).filter((m): m is SkuMatch => !!m)
+          const distinct = new Map(hits.map((m) => [m.id, m]))
+          if (distinct.size === 1) {
+            const m = hits[0]
+            return { ...it, match: m, sku: m.sku }
+          }
+          if (distinct.size > 1) {
+            return { ...it, status: 'unmatched' as Status, error: 'ambíguo: pasta e arquivo' }
+          }
+          return { ...it, status: 'unmatched' as Status }
         })
       )
     } catch {
@@ -180,8 +190,19 @@ export default function BulkImagesPage() {
       (it) => it.match && (it.status === 'pending' || it.status === 'error')
     )
     if (fila.length === 0) return
+    // Capa determinística: agrupa por produto, ordem natural do nome; sobe cada
+    // grupo EM SÉRIE (1ª foto = capa) e grupos diferentes em paralelo.
+    const groups = planUploadOrder(
+      fila.map((it) => ({ productId: it.match!.id, fileName: it.file.name, it }))
+    )
     setUploading(true)
-    await runPool(fila, uploadOne, CONCURRENCY)
+    await runPool(
+      groups,
+      async (group) => {
+        for (const w of group) await uploadOne(w.it)
+      },
+      CONCURRENCY
+    )
     setUploading(false)
   }, [items, uploadOne])
 
