@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { QrCode, CreditCard, FileText, Terminal, Check } from 'lucide-react'
+import { QrCode, FileText, Terminal, Check } from 'lucide-react'
 import { Modal, Button, Input } from '@/components/ui'
 import { formatCurrency } from '@/lib/format'
 import { cn } from '@/lib/cn'
@@ -7,6 +7,10 @@ import type { BalcaoPaymentMethod } from '@/hooks/useBalcaoCheckout'
 import type { BalcaoPricing } from '@/store/balcaoStore'
 import type { PaymentResult } from '@/hooks/usePayment'
 
+// No caixa físico o cartão é a MAQUININHA (método `external`). "Cartão online"
+// foi removido de propósito: com a Appmax ele exige um token gerado no browser
+// (Appmax JS) que o balcão não produz — o botão daria erro 400. Quando a
+// tokenização entrar (contrato Appmax), reavaliar se faz sentido no balcão.
 const METHODS: Array<{
   id: BalcaoPaymentMethod
   label: string
@@ -15,7 +19,6 @@ const METHODS: Array<{
 }> = [
   { id: 'pix', label: 'Pix', hint: 'QR na tela', icon: QrCode },
   { id: 'external', label: 'Maquininha', hint: 'Cartão / dinheiro', icon: Terminal },
-  { id: 'card', label: 'Cartão online', hint: 'Link/checkout', icon: CreditCard },
   { id: 'boleto', label: 'Boleto', hint: 'Impresso', icon: FileText },
 ]
 

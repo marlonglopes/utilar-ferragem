@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { CheckCircle2, Printer, Plus, AlertTriangle } from 'lucide-react'
+import { CheckCircle2, Printer, Plus, AlertTriangle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { formatCurrency } from '@/lib/format'
 import { BalcaoTopBar } from '@/components/balcao/BalcaoTopBar'
@@ -31,14 +31,25 @@ export default function BalcaoSuccessPage() {
   const location = useLocation()
   const sale = (location.state ?? {}) as SaleSummary
 
+  // Não anunciar "concluída" uma venda que o servidor segurou para aprovação:
+  // o pedido ainda não valeu (e, na maquininha, ainda não foi liquidado). Dizer
+  // "concluída" faria o vendedor entregar a mercadoria de uma venda pendente.
+  const pending = sale.requiresApproval === true || sale.approvalStatus === 'pending'
+
   return (
     <div className="flex h-screen flex-col bg-gray-50">
       <BalcaoTopBar />
 
       <main className="flex flex-1 items-center justify-center overflow-y-auto p-6">
         <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
-          <CheckCircle2 className="mx-auto h-16 w-16 text-green-500" aria-hidden="true" />
-          <h1 className="mt-3 font-display text-2xl font-bold text-gray-900">Venda concluída</h1>
+          {pending ? (
+            <Clock className="mx-auto h-16 w-16 text-amber-500" aria-hidden="true" />
+          ) : (
+            <CheckCircle2 className="mx-auto h-16 w-16 text-green-500" aria-hidden="true" />
+          )}
+          <h1 className="mt-3 font-display text-2xl font-bold text-gray-900">
+            {pending ? 'Pendente de aprovação' : 'Venda concluída'}
+          </h1>
 
           {sale.total != null && (
             <p className="mt-1 font-display text-3xl font-bold text-brand-blue">
