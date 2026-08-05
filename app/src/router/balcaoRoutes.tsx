@@ -3,6 +3,7 @@ import { BalcaoRoute } from '@/components/balcao/BalcaoRoute'
 import BalcaoPage from '@/pages/balcao/BalcaoPage'
 import BalcaoSuccessPage from '@/pages/balcao/BalcaoSuccessPage'
 import BalcaoApprovalsPage from '@/pages/balcao/BalcaoApprovalsPage'
+import BalcaoCompletionPage from '@/pages/balcao/BalcaoCompletionPage'
 
 /**
  * Rotas do PDV de balcão, prontas para serem espalhadas no router raiz.
@@ -42,6 +43,17 @@ export const balcaoRoutes: RouteObject[] = [
     element: (
       <BalcaoRoute>
         <BalcaoApprovalsPage />
+      </BalcaoRoute>
+    ),
+  },
+  {
+    // Fila de CONCLUSÃO do operador: vendas aprovadas (desconto acima do teto)
+    // que ainda faltam cobrar. O guard é o mesmo do PDV; o escopo por loja é do
+    // backend (só vendas da loja do vínculo, aprovadas e não pagas).
+    path: '/balcao/concluir',
+    element: (
+      <BalcaoRoute>
+        <BalcaoCompletionPage />
       </BalcaoRoute>
     ),
   },

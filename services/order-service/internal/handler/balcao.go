@@ -266,6 +266,71 @@ func (h *OrderHandler) ListPendingApprovals(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": out})
 }
 
+// ListPendingCompletion GET /api/v1/balcao/pending-completion
+//
+// A fila do OPERADOR: vendas de balcão que o gerente já APROVOU mas ainda não
+// foram pagas (desconto acima do teto → aprovação → falta cobrar). É o que
+// permite concluir a cobrança depois da aprovação, sem perder a venda.
+//
+// Escopo idêntico ao das aprovações: a loja vem do VÍNCULO, nunca de query param
+// (o servidor escolhe a loja). Só pedidos de BALCÃO, aprovados e pendentes de
+// pagamento — pedido web nunca entra aqui.
+func (h *OrderHandler) ListPendingCompletion(c *gin.Context) {
+	actor := h.actorFromContext(c)
+
+	where := "channel = 'balcao' AND approval_status = 'approved' AND status = 'pending_payment' AND store_id = $1"
+	args := []any{actor.StoreID}
+	switch {
+	case actor.Role == balcao.RoleAdmin:
+		if storeID := c.Query("storeId"); storeID != "" {
+			args = []any{storeID}
+		} else {
+			where = "channel = 'balcao' AND approval_status = 'approved' AND status = 'pending_payment'"
+			args = []any{}
+		}
+	case actor.Role == balcao.RoleStoreOperator && actor.StoreID != "":
+		// ok — escopo da própria loja
+	default:
+		Forbidden(c, "store operator role required")
+		return
+	}
+
+	perPage := 50
+	if v, err := strconv.Atoi(c.DefaultQuery("per_page", "50")); err == nil && v > 0 && v <= 100 {
+		perPage = v
+	}
+
+	rows, err := h.db.Query("SELECT id FROM orders WHERE "+where+
+		" ORDER BY approved_at ASC NULLS LAST, created_at ASC LIMIT $"+strconv.Itoa(len(args)+1),
+		append(args, perPage)...)
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	defer rows.Close()
+
+	ids := make([]string, 0, perPage)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			DBError(c, err)
+			return
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		DBError(c, err)
+		return
+	}
+
+	out, err := h.loadOrders(ids)
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": out})
+}
+
 // Approve PATCH /api/v1/balcao/orders/:id/approve
 func (h *OrderHandler) Approve(c *gin.Context) { h.decideApproval(c, balcao.ApprovalApproved) }
 

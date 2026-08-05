@@ -63,6 +63,7 @@ func setupBalcaoRouter(db *sql.DB) *gin.Engine {
 
 	bal := r.Group("/api/v1/balcao", handler.RequireUser("test-secret", true))
 	bal.GET("/approvals", orderH.ListPendingApprovals)
+	bal.GET("/pending-completion", orderH.ListPendingCompletion)
 	bal.PATCH("/orders/:id/approve", orderH.Approve)
 	bal.PATCH("/orders/:id/reject", orderH.Reject)
 	return r
@@ -419,5 +420,76 @@ func TestRegression_DiscountLeavesAuditTrail(t *testing.T) {
 	}
 	if approver != "mgr-a" {
 		t.Errorf("aprovador auditado = %q, esperado mgr-a", approver)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Fila de conclusão: venda aprovada e ainda não paga aparece pro operador
+// ---------------------------------------------------------------------------
+
+func balcaoDataIDs(w *httptest.ResponseRecorder) []string {
+	var resp struct {
+		Data []map[string]any `json:"data"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	ids := make([]string, 0, len(resp.Data))
+	for _, o := range resp.Data {
+		if id, ok := o["id"].(string); ok {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func hasID(ids []string, id string) bool {
+	for _, x := range ids {
+		if x == id {
+			return true
+		}
+	}
+	return false
+}
+
+func TestBalcao_PendingCompletion_ListaAprovadasNaoPagas(t *testing.T) {
+	db := setupTestDB(t)
+	r := setupBalcaoRouter(db)
+
+	// Venda 30% (teto 12%) → nasce PENDENTE de aprovação.
+	created := doAs(r, http.MethodPost, "/api/v1/orders", operatorA, balcaoPayload(30))
+	if created.Code != http.StatusCreated {
+		t.Fatalf("criação falhou %d: %s", created.Code, created.Body.String())
+	}
+	orderID, _ := decodeOrder(t, created)["id"].(string)
+
+	// ANTES de aprovar: NÃO está na fila de conclusão (está na de aprovação).
+	before := doAs(r, http.MethodGet, "/api/v1/balcao/pending-completion", operatorA, nil)
+	if before.Code != http.StatusOK {
+		t.Fatalf("pending-completion falhou %d: %s", before.Code, before.Body.String())
+	}
+	if hasID(balcaoDataIDs(before), orderID) {
+		t.Fatalf("pedido pendente de aprovação não deve estar na fila de conclusão")
+	}
+
+	// Gerente aprova.
+	appr := doAs(r, http.MethodPatch, "/api/v1/balcao/orders/"+orderID+"/approve", managerA, nil)
+	if appr.Code != http.StatusOK {
+		t.Fatalf("aprovação falhou %d: %s", appr.Code, appr.Body.String())
+	}
+
+	// AGORA aparece na fila de conclusão do operador da loja (aprovada, não paga).
+	after := doAs(r, http.MethodGet, "/api/v1/balcao/pending-completion", operatorA, nil)
+	if !hasID(balcaoDataIDs(after), orderID) {
+		t.Fatalf("venda aprovada e não paga deveria aparecer na fila de conclusão; veio %v", balcaoDataIDs(after))
+	}
+
+	// Operador de OUTRA loja NÃO vê (escopo por loja).
+	other := doAs(r, http.MethodGet, "/api/v1/balcao/pending-completion", operatorB, nil)
+	if hasID(balcaoDataIDs(other), orderID) {
+		t.Fatalf("operador de outra loja não pode ver a venda da loja A")
+	}
+
+	// Cliente comum é barrado (papel de operador exigido).
+	if w := doAs(r, http.MethodGet, "/api/v1/balcao/pending-completion", plainUser, nil); w.Code != http.StatusForbidden {
+		t.Fatalf("cliente não pode ver a fila de conclusão, veio %d", w.Code)
 	}
 }

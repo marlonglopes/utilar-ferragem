@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { ClipboardCheck, Store, User as UserIcon } from 'lucide-react'
+import { CheckCircle2, ClipboardCheck, Store, User as UserIcon } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useBalcaoStore, type BalcaoLevel } from '@/store/balcaoStore'
 
@@ -24,6 +24,7 @@ export function BalcaoTopBar() {
   const location = useLocation()
 
   const onApprovals = location.pathname.startsWith('/balcao/aprovacoes')
+  const onCompletion = location.pathname.startsWith('/balcao/concluir')
 
   return (
     <header className="sticky top-0 z-30 bg-brand-blue text-white shadow-md">
@@ -45,6 +46,17 @@ export function BalcaoTopBar() {
           >
             <ClipboardCheck className="h-5 w-5" aria-hidden="true" />
             <span className="hidden sm:inline">Aprovações</span>
+          </Link>
+        )}
+
+        {/* Concluir vendas aprovadas — qualquer operador da loja (backend escopa). */}
+        {!onCompletion && (
+          <Link
+            to="/balcao/concluir"
+            className="flex h-12 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-white/90 hover:bg-white/10"
+          >
+            <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+            <span className="hidden sm:inline">Concluir</span>
           </Link>
         )}
 

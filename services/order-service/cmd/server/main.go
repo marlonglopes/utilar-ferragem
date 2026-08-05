@@ -186,6 +186,7 @@ func main() {
 	bal := r.Group("/api/v1/balcao", handler.RequireUser(cfg.JWTSecret, cfg.DevMode))
 	{
 		bal.GET("/approvals", orderH.ListPendingApprovals)
+		bal.GET("/pending-completion", orderH.ListPendingCompletion)
 		bal.PATCH("/orders/:id/approve", orderH.Approve)
 		bal.PATCH("/orders/:id/reject", orderH.Reject)
 
