@@ -237,8 +237,11 @@ reordenar (a primeira é a **capa**) e trocar a capa.
 **Formatos aceitos:** JPEG, PNG, WebP e **HEIC** (foto de iPhone). O HEIC é
 **convertido para JPEG automaticamente no navegador**, antes de subir — não
 precisa converter à mão nem mexer no ajuste "Mais compatível" do iPhone. Só
-fotografar e soltar. (A conversão roda no computador que está subindo; a
-primeira foto HEIC do lote demora ~1–2 s a mais enquanto o conversor carrega.)
+fotografar e soltar. **Custo:** a conversão roda no computador que está subindo
+e **cada** foto HEIC de 12 MP leva ~3 s (medido em chromium). Um lote grande só
+de HEIC é bem mais lento que JPEG — se for subir centenas de uma vez, JPEG
+("Mais compatível" no iPhone) ainda é mais rápido. Para dezenas, o HEIC direto
+é tranquilo.
 
 ### 6.2 Em lote por SKU — a forma rápida
 
