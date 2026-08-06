@@ -347,6 +347,20 @@ cruzamos campo a campo com o código. Fontes canônicas confirmadas:
    (PCI SAQ-A) ainda não está integrada no front — depende do contrato assinado +
    sandbox. O backend já aceita `card_token`; falta o passo do browser. Pix e
    boleto seguem 100% ponta a ponta.
+   - **Seam pronto (ponto único):** `app/src/lib/appmaxCard.ts` — `tokenizeCard()`
+     é o ÚNICO lugar a implementar, compartilhado por **checkout web** e
+     **balcão** (ambos usam o `CardPayment`). Hoje é **dormente** (sem
+     `VITE_APPMAX_PUBLIC_KEY`, o cartão usa Stripe em dev) e **fail-closed** (com
+     a chave mas sem o SDK, recusa — nunca manda PAN nem forja token). Já cobre
+     validação Luhn local e detecção de config, com testes
+     (`app/src/test/appmaxCard.test.ts`).
+   - **O que falta quando o contrato chegar:** (a) carregar o SDK Appmax JS com a
+     chave pública (análogo ao `loadStripe` em `src/lib/stripe.ts`) e chamar a
+     tokenização dentro de `tokenizeCard`; (b) um formulário de campos do cartão
+     que alimente `tokenizeCard`; (c) o ramo Appmax no `CardPayment` (que já tem o
+     comentário-âncora) para renderizar esse formulário quando `isAppmaxCardEnabled`;
+     (d) passar `card_token` + `installments` no `createPayment('card')` — o
+     backend já valida teto de 12x e cobra via `/v1/payments/credit-card`.
 5. **Endereço + UTM no customer** (`Address`/`Tracking` existem no struct e nunca
    são preenchidos) — melhora o antifraude.
 6. **Fluxo de instalação / geração de credencial de merchant** (`/app/authorize`,

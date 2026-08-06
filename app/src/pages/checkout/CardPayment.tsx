@@ -34,6 +34,13 @@ export default function CardPayment({
     )
   }
 
+  // Appmax path (FUTURO): quando o contrato/sandbox entrar e
+  // `isAppmaxCardEnabled` (VITE_APPMAX_PUBLIC_KEY) ligar, o cartão é tokenizado
+  // no browser via o ponto único `tokenizeCard` em src/lib/appmaxCard.ts e o
+  // `card_token` vai pro createPayment ANTES da cobrança — sem clientSecret nem
+  // redirect. Este componente é compartilhado com o balcão; ao ganhar o ramo
+  // Appmax aqui, o PDV herda. Hoje o seam é dormente/fail-closed.
+
   // Stripe path: usa Elements com clientSecret
   if (result.provider === 'stripe' && result.clientSecret && isStripeConfigured) {
     return (

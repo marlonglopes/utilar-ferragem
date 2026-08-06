@@ -329,6 +329,12 @@ export function useBalcaoCheckout() {
           return done
         }
 
+        // CARTÃO via Appmax: quando o contrato entrar, o passo que falta é
+        // tokenizar o cartão no browser ANTES daqui e passar `card_token` +
+        // `installments` nos extras abaixo. Esse passo é o ponto único
+        // `tokenizeCard` em src/lib/appmaxCard.ts (compartilhado com o checkout
+        // web). Hoje `isAppmaxCardEnabled` é false → segue o fluxo atual (Stripe
+        // em dev), sem token. Não reimplementar tokenização aqui.
         const result = await payment.createPayment(order.id, input.method, input.pricing.total, {
           payer_name: input.customer.name,
           payer_cpf: input.customer.document.replace(/\D/g, ''),
