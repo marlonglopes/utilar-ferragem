@@ -85,6 +85,41 @@ ephemeral_order_drop() {
     -c "DROP DATABASE IF EXISTS ${EPH_ORDER_DB};" >/dev/null 2>&1 || true
 }
 
+# ──────────────────────── isolação de banco (catalog) ────────────────────────
+# Mesmo padrão do order: clona catalog_service num banco efêmero e o NORMALIZA
+# para a fixture que os testes esperam — imune ao estado do dev (a limpeza pra
+# produção arquiva os curados e enche a lista de produtos reais SEM foto).
+#
+# A normalização (só no CLONE; o dev fica intacto):
+#   1. publica os curados/utl (CUR-/UTL-) — busca/get/related dependem deles;
+#   2. coloca os curados no TOPO (created_at) — a lista admin ordena por
+#      created_at DESC, então a página 1 passa a ter capa (TestList) em vez de
+#      ser dominada pelos milhares de produtos reais sem foto.
+EPH_CATALOG_DB="catalog_service_ephtest"
+ephemeral_catalog_up() {
+  command -v docker >/dev/null 2>&1 || return 1
+  docker ps --format '{{.Names}}' 2>/dev/null | grep -qx utilar_catalog_db || return 1
+  docker exec utilar_catalog_db psql -U utilar -d postgres -q \
+    -c "DROP DATABASE IF EXISTS ${EPH_CATALOG_DB};" \
+    -c "CREATE DATABASE ${EPH_CATALOG_DB};" >/dev/null 2>&1 || return 1
+  docker exec utilar_catalog_db bash -c \
+    "pg_dump -U utilar catalog_service | psql -U utilar -d ${EPH_CATALOG_DB} -q" >/dev/null 2>&1 || return 1
+  # Normalização (só no clone): arquiva o que NÃO é fixture (os produtos reais
+  # sem foto), publica os curados/utl e os põe no topo. Assim busca/related só
+  # enxergam a fixture COM capa (filtram published), e a página 1 da lista admin
+  # (que mostra todos os status, por created_at DESC) fica dominada pela fixture.
+  docker exec utilar_catalog_db psql -U utilar -d ${EPH_CATALOG_DB} -q \
+    -c "UPDATE products SET status='archived' WHERE sku NOT LIKE 'CUR-%' AND sku NOT LIKE 'UTL-%';" \
+    -c "UPDATE products SET status='published' WHERE sku LIKE 'CUR-%' OR sku LIKE 'UTL-%';" \
+    -c "UPDATE products SET created_at = now() + interval '1 hour' WHERE sku LIKE 'CUR-%' OR sku LIKE 'UTL-%';" >/dev/null 2>&1 || return 1
+  echo "postgres://utilar:utilar@localhost:5436/${EPH_CATALOG_DB}?sslmode=disable"
+}
+ephemeral_catalog_drop() {
+  command -v docker >/dev/null 2>&1 || return 0
+  docker exec utilar_catalog_db psql -U utilar -d postgres -q \
+    -c "DROP DATABASE IF EXISTS ${EPH_CATALOG_DB};" >/dev/null 2>&1 || true
+}
+
 # ───────────────────────────────── backend ───────────────────────────────────
 go_svc() { # serviço, dir
   run "backend: $1 (-race)" bash -c "cd '$2' && go test ./... -race 2>&1"
@@ -119,19 +154,39 @@ catalog_fixture_ensure() {
 # falha do catalog for essa, reexecutamos isolado e toleramos como flake — igual
 # ao tratamento do sweeper/order. Qualquer outra falha é regressão de verdade.
 CATALOG_FLAKY='TestUploadImagem_OrdenacaoECapa'
+CATALOG_EPH_DSN=""
+# Roda `go test` do catalog contra o banco EFÊMERO se ele existir; senão o
+# compartilhado (fallback sem Docker). Não seta CATALOG_DB_URL vazio de propósito
+# — vazio faria o config ignorar o default e não conectar.
+catalog_go_test() {
+  if [ -n "$CATALOG_EPH_DSN" ]; then
+    (cd services/catalog-service && CATALOG_DB_URL="$CATALOG_EPH_DSN" go test "$@")
+  else
+    (cd services/catalog-service && go test "$@")
+  fi
+}
 go_catalog() {
-  catalog_fixture_ensure
-  local out rc; out="$(cd services/catalog-service && go test ./... -race 2>&1)"; rc=$?
-  if [ $rc -eq 0 ]; then RESULTS+=("✅ backend: catalog (-race)"); return; fi
+  catalog_fixture_ensure                       # garante CUR- no dev (idempotente); o clone herda
+  CATALOG_EPH_DSN="$(ephemeral_catalog_up || true)"
+  if [ -n "$CATALOG_EPH_DSN" ]; then
+    echo "→ catalog: banco efêmero isolado (${EPH_CATALOG_DB}, fixture normalizada); dev intacto."
+  else
+    echo "⚠️  Sem Docker/container utilar_catalog_db — catalog no banco compartilhado (pode falhar por estado do dev)."
+  fi
+  local out rc; out="$(catalog_go_test ./... -race 2>&1)"; rc=$?
+  if [ $rc -eq 0 ]; then
+    RESULTS+=("✅ backend: catalog (-race, isolado)"); ephemeral_catalog_drop; return
+  fi
   local fails; fails="$(printf '%s\n' "$out" | grep -oE '^--- FAIL: [A-Za-z0-9_]+' | sed 's/^--- FAIL: //' | sort -u | tr '\n' ' ' | sed 's/ *$//')"
   if [ "$fails" = "$CATALOG_FLAKY" ] &&
-     (cd services/catalog-service && go test ./internal/handler/ -run "$CATALOG_FLAKY" -race -count=1 >/dev/null 2>&1); then
+     catalog_go_test ./internal/handler/ -run "$CATALOG_FLAKY" -race -count=1 >/dev/null 2>&1; then
     note "⚠️  backend: catalog — ${CATALOG_FLAKY} flakou no pacote mas passou isolado (async de upload sob -race; não é regressão)"
     RESULTS+=("✅ backend: catalog (-race, flake de upload tolerado)")
-    return
+    ephemeral_catalog_drop; return
   fi
   printf '%s\n' "$out" | grep -E '^(--- FAIL|FAIL)' | head -20
   RESULTS+=("❌ backend: catalog (-race)"); FAIL=1
+  ephemeral_catalog_drop
 }
 
 go_order() {

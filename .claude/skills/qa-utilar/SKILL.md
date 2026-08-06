@@ -1,72 +1,60 @@
 ---
 name: qa-utilar
-description: "QA PROFUNDA e confiável do Utilar Ferragem — roda a pirâmide inteira (test-utilar: backend Go -race, frontend, E2E, a11y, segurança/SAST/CVE/invariantes, pentest, quality, ingestão, Appmax, integrações) mas dentro de um ambiente PREPARADO, imune ao estado do banco de dev. Antes de rodar: para os serviços Go que atrapalham os testes de concorrência e PUBLICA a fixture do catalog (que a limpeza pra produção deixa arquivada), restaurando tudo no fim. Use quando o usuário pedir uma QA completa/profunda, 'testar tudo como um QA faria', ter certeza de que está tudo funcionando, validar antes de deploy/go-live, ou quando a test-utilar der falha no catalog por causa de estado do banco. É a versão robusta da test-utilar."
+description: "QA PROFUNDA do Utilar Ferragem (entrada de pré-deploy). Roda a pirâmide inteira via test-utilar — backend Go -race, frontend, E2E, a11y, segurança/SAST/CVE/invariantes, pentest, quality, ingestão, Appmax, integrações. A test-utilar já isola os bancos do catalog E do order (efêmeros, dev intocado), então a QA é confiável e imune ao estado do banco. Esta skill só para os serviços Go rodando (higiene) e delega. Use quando o usuário pedir uma QA completa/profunda, 'testar tudo como um QA faria', ter certeza de que está tudo funcionando, ou validar antes de deploy/go-live."
 ---
 
 # QA profunda do Utilar — `qa-utilar`
 
-Roda **toda** a pirâmide de testes (a mesma da `test-utilar`), mas dentro de um
-ambiente preparado pra o veredito **não mentir por causa do estado do banco de
-dev**. É a skill pra "tem CERTEZA que está tudo funcionando?".
+Entrada de **pré-deploy**: roda toda a pirâmide de testes num ambiente limpo e
+reporta se está tudo verde. É a skill pra "tem CERTEZA que está tudo funcionando?".
 
-## Por que ela existe (o que a `test-utilar` sozinha não resolve)
+## O que ela faz
 
-A `test-utilar` roda a pirâmide e isola o banco do **order** (efêmero). Mas dois
-fatores do ambiente ainda fazem o **catalog** falhar sem ser bug:
+1. **Para** os serviços Go nas portas 8090–8094 (mantém as DBs). Higiene — os
+   testes já rodam isolados, mas evita ruído de porta/log. Lista o que parou.
+2. **Delega** a pirâmide pra `.claude/skills/test-utilar/run-tests.sh`.
+3. Explica como ler o resultado.
 
-1. **Serviços Go rodando** — o sweeper de reservas do catalog (a cada 60s) e o
-   pool de conexões brigam com os testes de integração/concorrência.
-2. **Fixture do catalog arquivada** — os testes de busca/listagem/capa dependem
-   dos ~400 produtos curados (`CUR-`/`UTL-`) **publicados**. Quando a loja é
-   limpa pra produção (arquivar mocks, publicar os reais), eles ficam
-   `archived` e a busca não acha nada → falhas que **não são regressão**.
+## Por que é confiável (a diferença que importa)
 
-A `qa-utilar` conserta os dois antes de rodar e **restaura tudo no fim**.
+A `test-utilar` roda o **catalog** e o **order** contra bancos **EFÊMEROS**
+(clone + normalização; o dev fica intocado):
+
+- **order** — clona `order_service`, `TRUNCATE orders` (os testes criam os seus).
+- **catalog** — clona `catalog_service` e normaliza a fixture no clone: arquiva
+  os produtos reais (sem foto), publica os curados (`CUR-`/`UTL-`, com capa) e os
+  põe no topo da lista. Assim busca/listagem/related/capa passam sempre, sem
+  depender de a loja estar "suja" pra produção.
+
+Resultado: **uma falha não é mais poluição de estado do banco — é regressão de
+verdade.** (O antigo caveat do `TestList_DevolveCapaDoProduto` foi resolvido na
+raiz por essa isolação.)
 
 ## Como usar
 
 ```bash
-# tudo (recomendado)
-.claude/skills/qa-utilar/run-qa.sh
-
-# uma camada só (repassada pra test-utilar)
-.claude/skills/qa-utilar/run-qa.sh backend
-.claude/skills/qa-utilar/run-qa.sh frontend
-.claude/skills/qa-utilar/run-qa.sh security
+.claude/skills/qa-utilar/run-qa.sh            # tudo
+.claude/skills/qa-utilar/run-qa.sh backend    # uma camada (repassada pra test-utilar)
 ```
-
-O script:
-1. **Para** os serviços Go nas portas 8090–8094 (mantém as DBs). Lista o que
-   parou — religue com `make dev-full` depois.
-2. **Publica** a fixture do catalog (`CUR-`/`UTL-` que estavam `archived`),
-   guardando os ids pra **re-arquivar no fim** (trap EXIT, mesmo se der erro).
-3. **Delega** a pirâmide pra `.claude/skills/test-utilar/run-tests.sh`.
-4. **Restaura** a fixture e explica como ler o resultado.
+Ou, comigo, é só mandar **`/qa-utilar`**.
 
 ## Como interpretar o resultado
 
 - **Verde em tudo** → software são; pode seguir.
-- **Única falha = `TestList_DevolveCapaDoProduto`** ("0 de N produtos com capa"):
-  é o **caveat conhecido**, não bug. Esse teste verifica que a *página 1* da
-  lista admin tem capa; com o catálogo real (milhares de produtos ainda **sem
-  foto**) dominando a página 1, ele falha mesmo com a fixture publicada. É
-  acoplamento do teste à composição do catálogo.
-- **Qualquer outra falha do catalog** (com a fixture publicada) → investigar de
-  verdade: é regressão.
+- **Qualquer falha** → investigue de verdade (build, rode o teste, olhe a
+  lógica). Como os bancos são efêmeros, não dá mais pra atribuir a "estado do
+  dev". Distinga regressão de flake conhecido (o runner já tolera 1: o async de
+  upload do catalog sob -race).
+- **Débito informado** (prettier/gofmt/CVE de stdlib) **não trava** — é
+  informativo no resumo.
 
-## O que ela NÃO faz (limites honestos)
+## Limites honestos
 
-- **Não sobe** os serviços de volta — você religa (o script avisa quais parou).
-- **Não cria banco efêmero pro catalog** (só publica a fixture in-place com
-  restore). O fix de raiz do caveat do `TestList` — um banco só-fixture pro
-  catalog, como o order já tem, OU tornar o teste fixture-scoped — fica como
-  melhoria futura. Enquanto isso, "verde exceto TestList" = software são.
+- **Não religa** os serviços — você religa (o script avisa quais parou).
 - **Não roda DAST** (varredura ativa contra os serviços no ar) nem **Appmax
-  live** (só com creds no ambiente) — mesmos limites da `test-utilar`.
+  live** (só com creds no ambiente).
 
 ## Ao concluir
 
 Reporte o resumo por camada (✅/❌). Se houver falha, **verifique você mesmo** a
-causa (build, rode o teste, olhe a lógica) antes de chamar de regressão —
-vários bugs sérios já saíram de confiar em relatório sem conferir. Distinga
-sempre **regressão de código** de **poluição de estado do banco**.
+causa antes de chamar de regressão.
