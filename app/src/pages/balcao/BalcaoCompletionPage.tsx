@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, QrCode, RefreshCw, Terminal, WifiOff } from 'lucide-react'
+import {
+  ArrowLeft,
+  CheckCircle2,
+  CreditCard,
+  QrCode,
+  RefreshCw,
+  Terminal,
+  WifiOff,
+} from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { BalcaoTopBar } from '@/components/balcao/BalcaoTopBar'
+import CardPayment from '@/pages/checkout/CardPayment'
 import { isApiEnabled } from '@/lib/api'
-import { usePayment } from '@/hooks/usePayment'
+import { usePayment, type PaymentResult } from '@/hooks/usePayment'
 import {
   useBalcaoPendingCompletion,
   type UseBalcaoPendingCompletionResult,
@@ -17,39 +26,51 @@ import type { BalcaoApprovalOrder } from '@/hooks/useBalcaoApprovals'
  * Tela de CONCLUSÃO da venda de balcão aprovada.
  *
  * Fecha o ciclo da venda acima do teto: o gerente aprovou, agora o operador
- * cobra e finaliza. Dois caminhos:
+ * cobra e finaliza. Três caminhos — os MESMOS do balcão normal:
  *   - MAQUININHA — informa o NSU do comprovante (settle-external): o backend
  *     marca pago, baixa estoque e lança no livro.
+ *   - CARTÃO digitado — o mesmo CardPayment da web/PDV (o cliente escolheu cartão
+ *     e a venda dependia da aprovação; agora conclui digitando o cartão).
  *   - PIX — gera o QR (mesmo motor de pagamento do resto); a confirmação cai
  *     sozinha e a venda sai da fila.
  */
 
-type Mode = 'choose' | 'maquininha' | 'pix'
+type Mode = 'choose' | 'maquininha'
+
+/** Estado do pagamento online (Pix OU cartão) quando ESTA venda é a ativa. */
+interface PayState {
+  active: boolean
+  method?: string
+  status?: string
+  qrCodeBase64?: string
+  result: PaymentResult | null
+  amount: number
+  onCardConfirmed?: () => void
+  onSimulateConfirm?: () => void
+}
 
 function CompletionCard({
   order,
   settling,
   onSettle,
   onPix,
-  pix,
+  onCard,
+  pay,
 }: {
   order: BalcaoApprovalOrder
   settling: boolean
   onSettle: (nsu: string) => void
   onPix: () => void
-  /** Estado do Pix quando ESTA venda é a que está sendo paga por Pix. */
-  pix: {
-    active: boolean
-    qrCodeBase64?: string
-    status?: string
-    onSimulateConfirm?: () => void
-  }
+  onCard: () => void
+  pay: PayState
 }) {
   const [mode, setMode] = useState<Mode>('choose')
   const [nsu, setNsu] = useState('')
+  const [cardError, setCardError] = useState('')
 
-  const pixPending = pix.active && pix.status === 'pending'
-  const pixConfirmed = pix.active && pix.status === 'confirmed'
+  const payPending = pay.active && pay.status === 'pending'
+  const payConfirmed = pay.active && pay.status === 'confirmed'
+  const cardForm = pay.active && pay.method === 'card' && !payConfirmed && pay.result
 
   return (
     <li className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -75,21 +96,36 @@ function CompletionCard({
       </div>
 
       <div className="mt-3 border-t border-gray-100 pt-3">
-        {/* Pix em andamento nesta venda: QR + status. */}
-        {pix.active ? (
+        {/* Pagamento online em andamento nesta venda: cartão (form) ou Pix (QR). */}
+        {pay.active ? (
           <div className="flex flex-col items-center gap-2">
-            {pixConfirmed ? (
+            {payConfirmed ? (
               <p className="flex items-center gap-2 font-semibold text-emerald-700">
                 <CheckCircle2 className="h-5 w-5" aria-hidden="true" /> Pagamento confirmado
               </p>
+            ) : cardForm ? (
+              <div className="w-full">
+                <CardPayment
+                  result={pay.result!}
+                  amount={pay.amount}
+                  onConfirmed={() => pay.onCardConfirmed?.()}
+                  onFailed={setCardError}
+                  onSimulateConfirm={pay.onSimulateConfirm}
+                />
+                {cardError && (
+                  <p role="alert" className="mt-2 text-sm font-semibold text-red-600">
+                    {cardError}
+                  </p>
+                )}
+              </div>
             ) : (
               <>
-                {pixPending && pix.qrCodeBase64 && (
+                {payPending && pay.qrCodeBase64 && (
                   <img
                     src={
-                      pix.qrCodeBase64.startsWith('http')
-                        ? pix.qrCodeBase64
-                        : `data:image/png;base64,${pix.qrCodeBase64}`
+                      pay.qrCodeBase64.startsWith('http')
+                        ? pay.qrCodeBase64
+                        : `data:image/png;base64,${pay.qrCodeBase64}`
                     }
                     alt="QR Code do Pix"
                     className="h-44 w-44 rounded-lg border border-gray-200"
@@ -98,10 +134,10 @@ function CompletionCard({
                 <p className="text-center text-sm text-gray-600">
                   Mostre o QR ao cliente. A confirmação aparece sozinha.
                 </p>
-                {pix.onSimulateConfirm && (
+                {pay.onSimulateConfirm && (
                   <button
                     type="button"
-                    onClick={pix.onSimulateConfirm}
+                    onClick={pay.onSimulateConfirm}
                     className="text-xs font-semibold text-brand-blue hover:underline"
                   >
                     (demo) simular confirmação
@@ -145,6 +181,10 @@ function CompletionCard({
               <Terminal className="h-5 w-5" aria-hidden="true" />
               Maquininha
             </Button>
+            <Button size="lg" variant="secondary" onClick={onCard} className="h-11 flex-1">
+              <CreditCard className="h-5 w-5" aria-hidden="true" />
+              Cartão
+            </Button>
             <Button size="lg" variant="secondary" onClick={onPix} className={cn('h-11 flex-1')}>
               <QrCode className="h-5 w-5" aria-hidden="true" />
               Pix
@@ -159,26 +199,27 @@ function CompletionCard({
 export default function BalcaoCompletionPage() {
   const completion: UseBalcaoPendingCompletionResult = useBalcaoPendingCompletion()
   const payment = usePayment()
-  const [pixOrderId, setPixOrderId] = useState<string | null>(null)
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null)
 
-  // Pix confirmado → a venda saiu de "pendente de pagamento": recarrega a fila.
-  const pixStatus = payment.result?.status
+  // Pagamento confirmado → a venda saiu de "pendente de pagamento": recarrega a fila.
+  const payStatus = payment.result?.status
   useEffect(() => {
-    if (pixOrderId && pixStatus === 'confirmed') {
+    if (payingOrderId && payStatus === 'confirmed') {
       completion.refetch()
       const t = setTimeout(() => {
-        setPixOrderId(null)
+        setPayingOrderId(null)
         payment.stopPolling()
       }, 1500)
       return () => clearTimeout(t)
     }
     // completion/payment são estáveis o bastante; evitamos re-disparar por eles.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pixOrderId, pixStatus])
+  }, [payingOrderId, payStatus])
 
-  const payPix = (order: BalcaoApprovalOrder) => {
-    setPixOrderId(order.id)
-    void payment.createPayment(order.id, 'pix', order.total, {
+  // Cobra a venda aprovada por Pix ou cartão — mesmo motor de pagamento do resto.
+  const startPay = (order: BalcaoApprovalOrder, method: 'pix' | 'card') => {
+    setPayingOrderId(order.id)
+    void payment.createPayment(order.id, method, order.total, {
       payer_name: order.customerName,
       payer_cpf: (order.customerDocument ?? '').replace(/\D/g, ''),
       payer_phone: (order.customerPhone ?? '').replace(/\D/g, ''),
@@ -211,7 +252,8 @@ export default function BalcaoCompletionPage() {
 
           <h1 className="font-display text-2xl font-bold text-gray-900">Vendas aprovadas</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Descontos que o gerente homologou. Conclua a cobrança na maquininha ou no Pix.
+            Descontos que o gerente homologou. Conclua a cobrança na maquininha, no cartão ou no
+            Pix.
           </p>
 
           {(completion.actionError || payment.error) && (
@@ -241,11 +283,16 @@ export default function BalcaoCompletionPage() {
                     order={order}
                     settling={completion.settlingId === order.id}
                     onSettle={(nsu) => void completion.settle(order.id, nsu)}
-                    onPix={() => payPix(order)}
-                    pix={{
-                      active: pixOrderId === order.id,
-                      qrCodeBase64: payment.result?.qrCodeBase64,
+                    onPix={() => startPay(order, 'pix')}
+                    onCard={() => startPay(order, 'card')}
+                    pay={{
+                      active: payingOrderId === order.id,
+                      method: payment.result?.method,
                       status: payment.result?.status,
+                      qrCodeBase64: payment.result?.qrCodeBase64,
+                      result: payment.result,
+                      amount: order.total,
+                      onCardConfirmed: payment.markConfirmed,
                       onSimulateConfirm: !isApiEnabled ? payment.simulateConfirm : undefined,
                     }}
                   />
