@@ -1,16 +1,21 @@
 import { useState } from 'react'
-import { QrCode, FileText, Terminal, Check } from 'lucide-react'
+import { QrCode, FileText, Terminal, Check, CreditCard } from 'lucide-react'
 import { Modal, Button, Input } from '@/components/ui'
 import { formatCurrency } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import CardPayment from '@/pages/checkout/CardPayment'
 import type { BalcaoPaymentMethod } from '@/hooks/useBalcaoCheckout'
 import type { BalcaoPricing } from '@/store/balcaoStore'
 import type { PaymentResult } from '@/hooks/usePayment'
 
-// No caixa físico o cartão é a MAQUININHA (método `external`). "Cartão online"
-// foi removido de propósito: com a Appmax ele exige um token gerado no browser
-// (Appmax JS) que o balcão não produz — o botão daria erro 400. Quando a
-// tokenização entrar (contrato Appmax), reavaliar se faz sentido no balcão.
+// "Cartão" = cartão DIGITADO. O vendedor anda pelo corredor com o tablet, LONGE
+// da maquininha, e digita o cartão — igual ao checkout web. Reaproveita o MESMO
+// componente da web (CardPayment) e o mesmo pipeline usePayment→order→payment;
+// nada de pagamento é reimplementado aqui. Em dev/mock já funciona (Stripe test /
+// "simular confirmação"). Em produção com Appmax, o passo que falta é a
+// tokenização no browser (Appmax JS) — o MESMO bloqueio do checkout web; quando
+// entrar lá, o balcão herda sem mudança. "Maquininha" (external) segue existindo
+// para dinheiro / POS físico, que não passa pela Appmax.
 const METHODS: Array<{
   id: BalcaoPaymentMethod
   label: string
@@ -18,8 +23,9 @@ const METHODS: Array<{
   icon: typeof QrCode
 }> = [
   { id: 'pix', label: 'Pix', hint: 'QR na tela', icon: QrCode },
-  { id: 'external', label: 'Maquininha', hint: 'Cartão / dinheiro', icon: Terminal },
+  { id: 'card', label: 'Cartão', hint: 'Crédito — digitado', icon: CreditCard },
   { id: 'boleto', label: 'Boleto', hint: 'Impresso', icon: FileText },
+  { id: 'external', label: 'Maquininha', hint: 'Dinheiro / POS', icon: Terminal },
 ]
 
 export interface ChargeModalProps {
@@ -31,6 +37,10 @@ export interface ChargeModalProps {
   paymentResult: PaymentResult | null
   onConfirm: (method: BalcaoPaymentMethod, nsu?: string) => void
   onDone: () => void
+  /** Marca o pagamento de cartão como confirmado (chamado pelo CardPayment). */
+  onCardConfirmed?: () => void
+  /** Só em mock/demo: simula a confirmação do cartão (sem PSP real). */
+  onSimulateConfirm?: () => void
 }
 
 /**
@@ -49,12 +59,17 @@ export function ChargeModal({
   paymentResult,
   onConfirm,
   onDone,
+  onCardConfirmed,
+  onSimulateConfirm,
 }: ChargeModalProps) {
   const [method, setMethod] = useState<BalcaoPaymentMethod>('pix')
   const [nsu, setNsu] = useState('')
+  const [cardError, setCardError] = useState('')
 
   const confirmed = paymentResult?.status === 'confirmed'
   const pixPending = paymentResult?.method === 'pix' && paymentResult.status === 'pending'
+  // Cartão digitado: enquanto não confirma, mostramos o formulário (CardPayment).
+  const cardForm = paymentResult?.method === 'card' && !confirmed
 
   return (
     <Modal open={open} onClose={onClose} title="Cobrar" size="md">
@@ -140,25 +155,45 @@ export function ChargeModal({
 
         {paymentResult && (
           <div className="flex flex-col gap-3">
-            {pixPending && paymentResult.qrCodeBase64 && (
-              <img
-                src={
-                  paymentResult.qrCodeBase64.startsWith('http')
-                    ? paymentResult.qrCodeBase64
-                    : `data:image/png;base64,${paymentResult.qrCodeBase64}`
-                }
-                alt="QR Code do Pix"
-                className="mx-auto h-48 w-48 rounded-lg border border-gray-200"
+            {cardForm ? (
+              // Cartão digitado — MESMO componente da web (Stripe Elements em dev;
+              // "simular" em mock). O PAN nunca passa pelo nosso backend.
+              <CardPayment
+                result={paymentResult}
+                amount={pricing.total}
+                onConfirmed={() => onCardConfirmed?.()}
+                onFailed={setCardError}
+                onSimulateConfirm={onSimulateConfirm}
               />
+            ) : (
+              <>
+                {pixPending && paymentResult.qrCodeBase64 && (
+                  <img
+                    src={
+                      paymentResult.qrCodeBase64.startsWith('http')
+                        ? paymentResult.qrCodeBase64
+                        : `data:image/png;base64,${paymentResult.qrCodeBase64}`
+                    }
+                    alt="QR Code do Pix"
+                    className="mx-auto h-48 w-48 rounded-lg border border-gray-200"
+                  />
+                )}
+                {pixPending && (
+                  <p className="text-center text-sm text-gray-600">
+                    Mostre o QR ao cliente. A confirmação aparece sozinha.
+                  </p>
+                )}
+                {paymentResult.barCode && (
+                  <p className="break-all rounded-lg bg-gray-50 p-3 font-mono text-xs text-gray-700">
+                    {paymentResult.barCode}
+                  </p>
+                )}
+              </>
             )}
-            {pixPending && (
-              <p className="text-center text-sm text-gray-600">
-                Mostre o QR ao cliente. A confirmação aparece sozinha.
-              </p>
-            )}
-            {paymentResult.barCode && (
-              <p className="break-all rounded-lg bg-gray-50 p-3 font-mono text-xs text-gray-700">
-                {paymentResult.barCode}
+
+            {cardError && (
+              <p role="alert" className="text-sm font-semibold text-red-600">
+                {cardError}
               </p>
             )}
 
@@ -169,9 +204,13 @@ export function ChargeModal({
               </p>
             )}
 
-            <Button size="lg" fullWidth onClick={onDone} className="h-14">
-              {confirmed ? 'Concluir venda' : 'Concluir mesmo assim'}
-            </Button>
+            {/* Cartão em aberto NÃO oferece "concluir mesmo assim" — evita fechar a
+                venda sem o cartão ter sido aprovado. Pix/boleto seguem podendo. */}
+            {(confirmed || !cardForm) && (
+              <Button size="lg" fullWidth onClick={onDone} className="h-14">
+                {confirmed ? 'Concluir venda' : 'Concluir mesmo assim'}
+              </Button>
+            )}
           </div>
         )}
       </div>

@@ -212,6 +212,8 @@ export default function BalcaoPage() {
         paymentResult={checkout.paymentResult}
         onConfirm={handleConfirm}
         onDone={handleDone}
+        onCardConfirmed={checkout.markConfirmed}
+        onSimulateConfirm={checkout.simulateConfirm}
       />
     </div>
   )
