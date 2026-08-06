@@ -141,7 +141,7 @@ type RefundStatus string
 
 const (
 	RefundRequested RefundStatus = "requested" // aceito pelo PSP, aguardando confirmação
-	RefundDone      RefundStatus = "refunded"   // PSP confirmou na hora (síncrono)
+	RefundDone      RefundStatus = "refunded"  // PSP confirmou na hora (síncrono)
 )
 
 // RefundResult é o que a Gateway devolve após pedir o estorno.
