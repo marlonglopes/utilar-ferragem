@@ -230,21 +230,31 @@ princípio de `appmaxv1.isFinancialRoute`.
 
 ## 7. Pendências
 
-### 7.1 ⚠️ O estorno real no PSP não existe
+### 7.1 ✅ Estorno REAL no PSP — IMPLEMENTADO
 
-**Nada neste fluxo devolve dinheiro ao cartão/Pix do cliente.** O que existe é
-o **lançamento contábil**. Devolver de fato exige:
+O `/refund` agora **devolve dinheiro de verdade** ao cartão/Pix antes de lançar
+no livro (estorna-primeiro, lança-depois):
 
-- `psp.Gateway` ganhar `Refund(ctx, paymentID, amountCents)`;
-- implementação em `appmaxv1` (rota `/v1/payments/*` → **rota financeira, sem
-  retry**);
-- tratamento de estorno recusado pelo PSP (saldo insuficiente na conta Appmax é
-  o caso comum) — hoje não há estado para "estorno solicitado, aguardando PSP";
-- webhook `order_refund` / `order_partial_refund` já mapeado em
-  `docs/appmax-v1-appstore.md` § 204, ainda não ligado à devolução.
+- `psp.Gateway.Refund(ctx, RefundRequest)` nos 4 providers — **appmaxv1 real**
+  (`POST /v1/orders/refund-request`, rota financeira sem retry; assíncrono →
+  status "requested"), **stripe real** (síncrono), MP/appmax-v3 fail-closed.
+- **payment** `POST /internal/v1/refunds` (`RefundHandler`): acha o pagamento PSP
+  confirmado do pedido e chama o gateway. **Idempotente por `returnId`**
+  (`psp_refunds`, migration 007): reserva antes de chamar o PSP → retry/corrida
+  não disparam 2º estorno; falha do PSP desfaz a reserva.
+- **order** `/refund`: chama `RequestRefund` ANTES do livro. Se o PSP falha de
+  verdade, **NÃO** marca refunded e **NÃO** lança (o dinheiro não saiu → o
+  operador vê o erro e retenta). Sem PSP a estornar (dinheiro/maquininha/externo,
+  ou dev) → segue só para o livro.
+- **Estado**: o modelo é síncrono-otimista — o retorno vai para `refunded` assim
+  que o PSP ACEITA a solicitação (não há status "aguardando PSP" separado).
 
-Hoje, na prática, o operador estorna **pelo painel da Appmax** e usa
-`/refund` para registrar o fato no sistema e no livro.
+**Ainda aberto (de propósito):** o webhook `order_refund` **não** lança no livro,
+para não contar o estorno em dobro (o caminho do order já lança, keyed por
+`returnId`, fonte única). Ligar o webhook exigiria a Appmax ecoar o `returnId` no
+evento — só dá para desenhar com o sandbox Appmax. Consequência: um estorno feito
+**direto no painel da Appmax** (fora do sistema) não cai no livro. Ver
+`docs/appmax-v1-appstore.md`.
 
 ### 7.2 ✅ Reposição de estoque (`POST /api/v1/internal/restock`) — IMPLEMENTADO
 
