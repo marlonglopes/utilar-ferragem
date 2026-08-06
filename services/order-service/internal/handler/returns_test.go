@@ -39,6 +39,10 @@ type stubRefundLedger struct {
 	mu    sync.Mutex
 	posts []paymentclient.ReturnRefund
 	err   error
+	// Estorno no PSP: refundErr simula uma resposta do payment; refundReqs captura
+	// o que o handler pediu. Nil = estorno solicitado com sucesso.
+	refundErr  error
+	refundReqs []paymentclient.RefundRequest
 }
 
 func (s *stubRefundLedger) PostReturnRefund(_ context.Context, in paymentclient.ReturnRefund) error {
@@ -51,10 +55,26 @@ func (s *stubRefundLedger) PostReturnRefund(_ context.Context, in paymentclient.
 	return nil
 }
 
+func (s *stubRefundLedger) RequestRefund(_ context.Context, in paymentclient.RefundRequest) (paymentclient.RefundOutcome, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.refundErr != nil {
+		return paymentclient.RefundOutcome{}, s.refundErr
+	}
+	s.refundReqs = append(s.refundReqs, in)
+	return paymentclient.RefundOutcome{Status: "requested"}, nil
+}
+
 func (s *stubRefundLedger) count() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.posts)
+}
+
+func (s *stubRefundLedger) refundCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.refundReqs)
 }
 
 // stubRestocker registra as reposições de estoque.
@@ -241,7 +261,7 @@ func TestRegression_DinheiroSoSaiDepoisDoRecebimento(t *testing.T) {
 	rid := returnIDOf(t, w)
 
 	// Estorno ANTES do recebimento: recusado pela máquina de estados.
-	w = doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/refund", "op-1", "operator", nil)
+	w = doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/refund", "gerente-1", "admin", nil)
 	if w.Code != http.StatusConflict {
 		t.Fatalf("estorno antes do recebimento: status = %d (esperado 409) — "+
 			"produto E dinheiro iriam para a mesma pessoa", w.Code)
@@ -254,7 +274,7 @@ func TestRegression_DinheiroSoSaiDepoisDoRecebimento(t *testing.T) {
 	if w := doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/receive", "op-1", "operator", nil); w.Code != http.StatusOK {
 		t.Fatalf("receber: status = %d, %s", w.Code, w.Body.String())
 	}
-	if w := doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/refund", "op-1", "operator", nil); w.Code != http.StatusOK {
+	if w := doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/refund", "gerente-1", "admin", nil); w.Code != http.StatusOK {
 		t.Fatalf("estornar: status = %d, %s", w.Code, w.Body.String())
 	}
 	if led.count() != 1 {
@@ -288,8 +308,8 @@ func TestRegression_EstornoNaoSaiDuasVezes(t *testing.T) {
 	rid := returnIDOf(t, w)
 	doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/receive", "op-1", "operator", nil)
 
-	first := doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/refund", "op-1", "operator", nil)
-	second := doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/refund", "op-1", "operator", nil)
+	first := doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/refund", "gerente-1", "admin", nil)
+	second := doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/refund", "gerente-1", "admin", nil)
 
 	if first.Code != http.StatusOK || second.Code != http.StatusOK {
 		t.Fatalf("status = %d / %d, esperado 200 nos dois (o segundo é retry idempotente)",
@@ -409,6 +429,87 @@ func TestDevolucaoParcialEstornaSoOItemDevolvido(t *testing.T) {
 
 // TestTrilhaDeAuditoriaGravaPessoaEValor — estorno é dinheiro saindo por
 // decisão humana; sem rastro até a pessoa não pode acontecer.
+// TestRefund_ChamaEstornoRealNoPSP — o caminho feliz pede o ESTORNO REAL ao PSP
+// UMA vez, com o returnID e o valor em centavos, e lança no livro.
+func TestRefund_ChamaEstornoRealNoPSP(t *testing.T) {
+	db := setupTestDB(t)
+	led := &stubRefundLedger{}
+	r := returnsRouter(db, led, &stubRestocker{})
+
+	orderID, itemA, _ := seedReturnableOrder(t, db, "cli-psp-ok")
+	w := doReturnReq(t, r, "POST", "/api/v1/orders/"+orderID+"/returns", "cli-psp-ok", "customer",
+		map[string]any{"items": []map[string]any{{"orderItemId": itemA, "quantity": 1}}})
+	rid := returnIDOf(t, w)
+	doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/receive", "op-1", "operator", nil)
+
+	ref := doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/refund", "gerente-1", "admin", nil)
+	if ref.Code != http.StatusOK {
+		t.Fatalf("estorno: status = %d, %s", ref.Code, ref.Body.String())
+	}
+	if led.refundCount() != 1 {
+		t.Fatalf("PSP chamado %d vezes, esperado 1", led.refundCount())
+	}
+	if got := led.refundReqs[0].ReturnID; got != rid {
+		t.Fatalf("returnID ao PSP = %q, esperado %q", got, rid)
+	}
+	if got := led.refundReqs[0].AmountCents; got != 3000 {
+		t.Fatalf("valor ao PSP = %d centavos, esperado 3000 (R$30,00 = 1×30,00)", got)
+	}
+}
+
+// TestRegression_EstornoAbortaSePSPFalha — se o estorno REAL no PSP FALHA, a
+// devolução NÃO é marcada refunded e NADA vai ao livro. O dinheiro não saiu:
+// marcar refunded ou lançar o estorno seria mentir sobre o caixa.
+func TestRegression_EstornoAbortaSePSPFalha(t *testing.T) {
+	db := setupTestDB(t)
+	led := &stubRefundLedger{refundErr: paymentclient.ErrUpstream} // recusa do PSP
+	r := returnsRouter(db, led, &stubRestocker{})
+
+	orderID, itemA, _ := seedReturnableOrder(t, db, "cli-psp-falha")
+	w := doReturnReq(t, r, "POST", "/api/v1/orders/"+orderID+"/returns", "cli-psp-falha", "customer",
+		map[string]any{"items": []map[string]any{{"orderItemId": itemA, "quantity": 1}}})
+	rid := returnIDOf(t, w)
+	doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/receive", "op-1", "operator", nil)
+
+	ref := doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/refund", "gerente-1", "admin", nil)
+	if ref.Code != http.StatusConflict {
+		t.Fatalf("estorno com PSP falho: status = %d, esperado 409 (abortado)", ref.Code)
+	}
+	if led.count() != 0 {
+		t.Fatalf("livro lançou %d apesar da falha do PSP — dinheiro que não saiu", led.count())
+	}
+	var status string
+	if err := db.QueryRow(`SELECT status FROM order_returns WHERE id=$1`, rid).Scan(&status); err != nil {
+		t.Fatalf("ler status: %v", err)
+	}
+	if status != "received" {
+		t.Fatalf("status = %q, esperado 'received' — não pode marcar refunded se o PSP falhou", status)
+	}
+}
+
+// TestRefund_SemPSPSegueSoParaLivro — pedido sem pagamento PSP (dinheiro/
+// maquininha/externo, ou dev sem PSP): não há o que estornar no PSP; a
+// devolução segue e lança no livro normalmente (200, refunded).
+func TestRefund_SemPSPSegueSoParaLivro(t *testing.T) {
+	db := setupTestDB(t)
+	led := &stubRefundLedger{refundErr: paymentclient.ErrNoPSPPayment}
+	r := returnsRouter(db, led, &stubRestocker{})
+
+	orderID, itemA, _ := seedReturnableOrder(t, db, "cli-sem-psp")
+	w := doReturnReq(t, r, "POST", "/api/v1/orders/"+orderID+"/returns", "cli-sem-psp", "customer",
+		map[string]any{"items": []map[string]any{{"orderItemId": itemA, "quantity": 1}}})
+	rid := returnIDOf(t, w)
+	doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/receive", "op-1", "operator", nil)
+
+	ref := doReturnReq(t, r, "PATCH", "/api/v1/admin/returns/"+rid+"/refund", "gerente-1", "admin", nil)
+	if ref.Code != http.StatusOK {
+		t.Fatalf("estorno sem PSP: status = %d, %s (deveria seguir só para o livro)", ref.Code, ref.Body.String())
+	}
+	if led.count() != 1 {
+		t.Fatalf("livro devia lançar 1 (estorno segue mesmo sem PSP), veio %d", led.count())
+	}
+}
+
 func TestTrilhaDeAuditoriaGravaPessoaEValor(t *testing.T) {
 	db := setupTestDB(t)
 	r := returnsRouter(db, &stubRefundLedger{}, &stubRestocker{})

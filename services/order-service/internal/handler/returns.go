@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"math"
 	"net/http"
 	"time"
 
@@ -46,6 +47,10 @@ import (
 // explícita, não silenciosa. Mesmo desenho de LedgerPoster.
 type RefundPoster interface {
 	PostReturnRefund(ctx context.Context, in paymentclient.ReturnRefund) error
+	// RequestRefund pede o ESTORNO REAL no PSP (dinheiro saindo). Ver
+	// paymentclient.RequestRefund para a semântica dos erros (não-aplicável ×
+	// falha real).
+	RequestRefund(ctx context.Context, in paymentclient.RefundRequest) (paymentclient.RefundOutcome, error)
 }
 
 // StockRestorer devolve mercadoria ao estoque do catalog-service.
@@ -497,6 +502,9 @@ func (h *ReturnHandler) Refund(c *gin.Context) {
 		return
 	}
 
+	// 1) Valida sob lock e lê o necessário; SOLTA o lock antes de qualquer HTTP
+	//    ao PSP — não segurar o registro travado durante uma chamada de rede
+	//    (mesmo princípio de postRefundToLedger).
 	tx, err := h.db.Begin()
 	if err != nil {
 		DBError(c, err)
@@ -515,9 +523,8 @@ func (h *ReturnHandler) Refund(c *gin.Context) {
 	}
 
 	// DEFESA 3 — UMA VEZ. Devolução já estornada é retry: retenta só o
-	// lançamento contábil (que é idempotente do outro lado pelo returnID) e
-	// devolve o registro como está. Sem segunda linha de auditoria de estorno e
-	// sem segunda saída de dinheiro.
+	// lançamento contábil (idempotente do outro lado pelo returnID) e devolve o
+	// registro como está. Sem 2ª saída de dinheiro — nem no PSP, nem no livro.
 	if returns.Status(cur.Status) == returns.StatusRefunded {
 		_ = tx.Rollback()
 		h.postRefundToLedger(c, cur)
@@ -533,8 +540,40 @@ func (h *ReturnHandler) Refund(c *gin.Context) {
 		Conflict(c, "devolução sem valor a estornar")
 		return
 	}
+	_ = tx.Rollback() // validado; solta o lock antes do HTTP do PSP
 
-	if _, err := tx.Exec(`
+	// 2) ESTORNA PRIMEIRO no PSP (fora de transação). Idempotente por returnID no
+	//    payment (nunca em dobro). Se falhar de verdade, requestPSPRefund já
+	//    respondeu erro e devolve false → NÃO marcamos refunded (o dinheiro não
+	//    saiu). Casos "não aplicável" (sem PSP / dev / provider sem estorno)
+	//    devolvem true e seguimos só para o livro.
+	if !h.requestPSPRefund(c, cur) {
+		return
+	}
+
+	// 3) LANÇA DEPOIS: re-trava, re-checa (corrida com outro admin), marca
+	//    refunded + trilha na MESMA transação (fail-closed), commita.
+	tx2, err := h.db.Begin()
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	defer tx2.Rollback() //nolint:errcheck
+
+	cur, err = lockReturn(tx2, returnID)
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	if returns.Status(cur.Status) == returns.StatusRefunded {
+		// Outro admin concluiu no meio: não marca de novo, só garante o livro.
+		_ = tx2.Rollback()
+		h.postRefundToLedger(c, cur)
+		h.respondReturn(c, returnID, http.StatusOK)
+		return
+	}
+
+	if _, err := tx2.Exec(`
 		UPDATE order_returns SET status = 'refunded', refunded_at = now() WHERE id = $1
 	`, returnID); err != nil {
 		DBError(c, err)
@@ -545,7 +584,7 @@ func (h *ReturnHandler) Refund(c *gin.Context) {
 	// saindo por decisão humana: quem aprovou, quando e quanto é exatamente o
 	// registro que não pode faltar. Se a trilha não grava, o estorno não
 	// acontece. Mesmo princípio da liquidação externa.
-	if err := auditReturnTx(tx, c, returnEvent{
+	if err := auditReturnTx(tx2, c, returnEvent{
 		ReturnID: &returnID, OrderID: &cur.OrderID, Action: "return.refunded",
 		Amount:   &cur.RefundTotal,
 		OldValue: map[string]any{"status": cur.Status},
@@ -560,7 +599,7 @@ func (h *ReturnHandler) Refund(c *gin.Context) {
 		return
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx2.Commit(); err != nil {
 		DBError(c, err)
 		return
 	}
@@ -572,6 +611,59 @@ func (h *ReturnHandler) Refund(c *gin.Context) {
 
 	h.postRefundToLedger(c, cur)
 	h.respondReturn(c, returnID, http.StatusOK)
+}
+
+// requestPSPRefund pede o ESTORNO REAL ao PSP (dinheiro saindo). Devolve true se
+// dá para seguir e marcar refunded — seja porque o estorno foi solicitado/feito,
+// seja porque NÃO é aplicável (pedido sem PSP / dev / provider sem estorno), em
+// que se segue só para o livro. Devolve false (e já respondeu erro) só quando o
+// PSP FALHOU de verdade: aí não se marca refunded, porque o dinheiro não saiu.
+func (h *ReturnHandler) requestPSPRefund(c *gin.Context, r returnRow) bool {
+	requestID := c.GetString("request_id")
+
+	if h.ledger == nil {
+		// payment-service não configurado (dev): sem estorno real; segue pro livro
+		// (que também detecta a ausência e audita). Não é falha do fluxo.
+		slog.Warn("ESTORNO no PSP pulado: payment-service não configurado",
+			"return_id", r.ID, "order_id", r.OrderID, "request_id", requestID)
+		return true
+	}
+
+	ctx, cancel := context.WithTimeout(
+		paymentclient.WithRequestID(context.Background(), requestID), 8*time.Second)
+	defer cancel()
+
+	out, err := h.ledger.RequestRefund(ctx, paymentclient.RefundRequest{
+		ReturnID:    r.ID,
+		OrderID:     r.OrderID,
+		AmountCents: int64(math.Round(r.RefundTotal * 100)),
+		Total:       r.FullReturn,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, paymentclient.ErrNoPSPPayment),
+			errors.Is(err, paymentclient.ErrRefundUnsupported),
+			errors.Is(err, paymentclient.ErrNotConfigured):
+			// Sem PSP a estornar (dinheiro/maquininha/externo), provider sem
+			// estorno, ou cliente não configurado: segue só para o livro. Audita.
+			slog.Info("ESTORNO no PSP não aplicável — segue só para o livro",
+				"reason", err.Error(), "return_id", r.ID, "order_id", r.OrderID, "request_id", requestID)
+			h.auditReturnFailure(c, r.ID, "return.psp_refund_skipped", err.Error())
+			return true
+		default:
+			// Falha REAL (recusa do PSP, upstream): aborta. NÃO marca refunded.
+			slog.Error("ESTORNO no PSP FALHOU — devolução NÃO estornada",
+				"error", err.Error(), "return_id", r.ID, "order_id", r.OrderID, "request_id", requestID)
+			h.auditReturnFailure(c, r.ID, "return.psp_refund_failed", err.Error())
+			Conflict(c, "estorno no PSP falhou — a devolução não foi estornada. Tente de novo.")
+			return false
+		}
+	}
+
+	slog.Info("ESTORNO solicitado ao PSP",
+		"return_id", r.ID, "order_id", r.OrderID, "status", out.Status,
+		"psp_refund_id", out.PSPRefundID, "duplicate", out.Duplicate, "request_id", requestID)
+	return true
 }
 
 // postRefundToLedger lança o estorno no livro do payment-service.

@@ -217,6 +217,12 @@ func main() {
 		// de quem aprovou); aqui só cai a partida dobrada.
 		refH := handler.NewReturnRefundHandler(poster)
 		internal.POST("/ledger/return-refund", refH.Post)
+
+		// Estorno REAL no PSP (order → payment → gateway.Refund). Idempotente por
+		// returnID (tabela psp_refunds); NÃO toca o livro (isso é o return-refund
+		// acima, fonte única). Precisa do gateway + banco.
+		pspRefH := handler.NewRefundHandler(database, gateway)
+		internal.POST("/refunds", pspRefH.Post)
 	} else {
 		slog.Warn("SERVICE_JWT_SECRET não configurado — /internal DESABILITADO; " +
 			"liquidação externa de balcão e estorno de devolução não serão " +

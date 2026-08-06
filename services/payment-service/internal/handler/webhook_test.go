@@ -46,10 +46,21 @@ type mockGateway struct {
 	parseErr    error
 	getResult   *psp.GetResult
 	getErr      error
+	// Estorno: configurável + contador de chamadas (idempotência).
+	refundResult *psp.RefundResult
+	refundErr    error
+	refundCalls  int
 }
 
 func (m *mockGateway) Name() string { return m.name }
 func (m *mockGateway) Refund(context.Context, psp.RefundRequest) (*psp.RefundResult, error) {
+	m.refundCalls++
+	if m.refundErr != nil {
+		return nil, m.refundErr
+	}
+	if m.refundResult != nil {
+		return m.refundResult, nil
+	}
 	return nil, psp.ErrNotSupported
 }
 
