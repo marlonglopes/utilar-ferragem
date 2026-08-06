@@ -122,9 +122,9 @@ describe('uploadProductImage — caminho real (XHR)', () => {
       xhr.responseText = JSON.stringify({ error: 'arquivo corrompido' })
       xhr.onload?.()
     }
-    await expect(
-      uploadProductImage('p', new File(['x'], '6320.jpg'), () => {})
-    ).rejects.toThrow('arquivo corrompido')
+    await expect(uploadProductImage('p', new File(['x'], '6320.jpg'), () => {})).rejects.toThrow(
+      'arquivo corrompido'
+    )
   })
 
   it('erro sem corpo JSON: lança "HTTP <status>"', async () => {
@@ -134,9 +134,9 @@ describe('uploadProductImage — caminho real (XHR)', () => {
       xhr.responseText = '<html>bad gateway</html>'
       xhr.onload?.()
     }
-    await expect(
-      uploadProductImage('p', new File(['x'], '6320.jpg'), () => {})
-    ).rejects.toThrow('HTTP 502')
+    await expect(uploadProductImage('p', new File(['x'], '6320.jpg'), () => {})).rejects.toThrow(
+      'HTTP 502'
+    )
   })
 
   it('cancelar em voo (AbortSignal) rejeita com AbortError', async () => {
@@ -189,7 +189,9 @@ describe('resolveBySku — caminho real (HTTP)', () => {
       const skusParam = decodeURIComponent(path.split('skus=')[1] ?? '')
       const first = skusParam.split(',')[0]
       // um match sintético por lote → dá pra contar lotes pelo tamanho do merge
-      return Promise.resolve({ data: [{ sku: first, id: `p-${first}`, name: 'X', hasImage: false }] })
+      return Promise.resolve({
+        data: [{ sku: first, id: `p-${first}`, name: 'X', hasImage: false }],
+      })
     })
     vi.doMock('@/lib/adminApi', () => ({ adminGet }))
     vi.doMock('@/lib/api', () => ({ refreshAccessToken: vi.fn() }))

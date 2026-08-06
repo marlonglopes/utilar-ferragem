@@ -28,12 +28,15 @@ export async function runPool<T>(
   concurrency: number
 ): Promise<void> {
   let idx = 0
-  const runners = Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, async () => {
-    while (idx < items.length) {
-      const i = idx++
-      await worker(items[i])
+  const runners = Array.from(
+    { length: Math.min(Math.max(1, concurrency), items.length) },
+    async () => {
+      while (idx < items.length) {
+        const i = idx++
+        await worker(items[i])
+      }
     }
-  })
+  )
   await Promise.all(runners)
 }
 

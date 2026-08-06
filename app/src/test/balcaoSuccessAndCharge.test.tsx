@@ -15,7 +15,12 @@ function renderSuccess(state: Record<string, unknown>) {
 
 describe('BalcaoSuccessPage — não anuncia "concluída" o que está pendente', () => {
   it('venda pendente de aprovação: header honesto, não "Venda concluída"', () => {
-    renderSuccess({ total: 100, requiresApproval: true, approvalStatus: 'pending', method: 'external' })
+    renderSuccess({
+      total: 100,
+      requiresApproval: true,
+      approvalStatus: 'pending',
+      method: 'external',
+    })
     expect(screen.getByText('Pendente de aprovação')).toBeInTheDocument()
     expect(screen.queryByText('Venda concluída')).not.toBeInTheDocument()
   })

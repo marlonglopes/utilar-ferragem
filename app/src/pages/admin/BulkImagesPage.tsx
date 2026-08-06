@@ -339,7 +339,10 @@ export default function BulkImagesPage() {
             aria-live="polite"
           >
             {reading && (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand-orange" aria-hidden="true" />
+              <Loader2
+                className="h-4 w-4 shrink-0 animate-spin text-brand-orange"
+                aria-hidden="true"
+              />
             )}
             {reading ? 'Lendo pastas…' : notice}
           </p>

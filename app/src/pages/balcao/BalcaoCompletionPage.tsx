@@ -145,12 +145,7 @@ function CompletionCard({
               <Terminal className="h-5 w-5" aria-hidden="true" />
               Maquininha
             </Button>
-            <Button
-              size="lg"
-              variant="secondary"
-              onClick={onPix}
-              className={cn('h-11 flex-1')}
-            >
+            <Button size="lg" variant="secondary" onClick={onPix} className={cn('h-11 flex-1')}>
               <QrCode className="h-5 w-5" aria-hidden="true" />
               Pix
             </Button>

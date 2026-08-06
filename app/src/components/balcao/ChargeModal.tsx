@@ -113,9 +113,9 @@ export function ChargeModal({
                   placeholder="Ex: 004512890"
                   className="h-12 text-base"
                 />
-                  <p className="mt-1 text-xs text-gray-500">
-                  Passe o cartão/receba o dinheiro na maquininha e informe o NSU do
-                  comprovante. A venda é marcada como paga, baixa o estoque e entra no livro.
+                <p className="mt-1 text-xs text-gray-500">
+                  Passe o cartão/receba o dinheiro na maquininha e informe o NSU do comprovante. A
+                  venda é marcada como paga, baixa o estoque e entra no livro.
                 </p>
               </div>
             )}

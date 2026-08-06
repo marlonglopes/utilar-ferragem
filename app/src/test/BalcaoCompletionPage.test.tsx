@@ -44,14 +44,10 @@ describe('BalcaoCompletionPage — conclui venda aprovada', () => {
 
     // Escolhe Pix → mostra o QR / instrução.
     fireEvent.click(screen.getByRole('button', { name: /^Pix$/i }))
-    await waitFor(() =>
-      expect(screen.getByText(/Mostre o QR ao cliente/i)).toBeInTheDocument()
-    )
+    await waitFor(() => expect(screen.getByText(/Mostre o QR ao cliente/i)).toBeInTheDocument())
 
     // Em mock, dá pra simular a confirmação → "Pagamento confirmado".
     fireEvent.click(screen.getByText(/simular confirmação/i))
-    await waitFor(() =>
-      expect(screen.getByText(/Pagamento confirmado/i)).toBeInTheDocument()
-    )
+    await waitFor(() => expect(screen.getByText(/Pagamento confirmado/i)).toBeInTheDocument())
   })
 })

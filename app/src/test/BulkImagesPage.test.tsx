@@ -120,7 +120,9 @@ describe('BulkImagesPage — solta uma pasta e casa por SKU', () => {
         }
       },
     }
-    fireEvent.drop(zone, { dataTransfer: { items: [{ webkitGetAsEntry: () => dirEntry }], files: [] } })
+    fireEvent.drop(zone, {
+      dataTransfer: { items: [{ webkitGetAsEntry: () => dirEntry }], files: [] },
+    })
 
     // Vai para "Sem produto", NUNCA casa (nem em 6320 nem em 300).
     await waitFor(() => expect(screen.getByText('Sem produto')).toBeInTheDocument())
