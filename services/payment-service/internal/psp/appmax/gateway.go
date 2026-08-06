@@ -145,6 +145,12 @@ func (g *Gateway) GetPayment(ctx context.Context, pspID string) (*psp.GetResult,
 // VerifyWebhook — a Appmax não assina postbacks. A integridade real vem da
 // re-consulta via GetPayment no handler (audit C3). Se um secret compartilhado
 // estiver configurado, exigimos o header X-Appmax-Token (defesa em profundidade).
+// Refund — não implementado na Appmax v3 (admin). O estorno de produção é a
+// Appmax v1 (AppStore); v3 é fail-closed. Ver docs/appmax-v1-appstore.md.
+func (g *Gateway) Refund(_ context.Context, _ psp.RefundRequest) (*psp.RefundResult, error) {
+	return nil, psp.ErrNotSupported
+}
+
 func (g *Gateway) VerifyWebhook(body []byte, headers http.Header) error {
 	if g.webhookSecret == "" {
 		return nil

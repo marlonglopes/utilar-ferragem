@@ -49,6 +49,10 @@ type mockGateway struct {
 }
 
 func (m *mockGateway) Name() string { return m.name }
+func (m *mockGateway) Refund(context.Context, psp.RefundRequest) (*psp.RefundResult, error) {
+	return nil, psp.ErrNotSupported
+}
+
 func (m *mockGateway) CreatePayment(ctx context.Context, r psp.CreateRequest) (*psp.CreateResult, error) {
 	return nil, errors.New("not implemented")
 }

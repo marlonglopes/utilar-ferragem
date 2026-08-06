@@ -141,6 +141,12 @@ const maxClockSkew = 5 * time.Minute
 // no config.Load fail-closed).
 //
 // Refs: https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks
+// Refund — não implementado no Mercado Pago (não é o PSP de produção nem de
+// dev). Fail-closed: melhor recusar claramente que fingir estorno.
+func (g *Gateway) Refund(_ context.Context, _ psp.RefundRequest) (*psp.RefundResult, error) {
+	return nil, psp.ErrNotSupported
+}
+
 func (g *Gateway) VerifyWebhook(body []byte, headers http.Header) error {
 	if g.webhookSecret == "" {
 		return nil

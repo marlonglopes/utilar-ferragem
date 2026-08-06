@@ -20,6 +20,10 @@ func (g gwFake) Name() string { return g.nome }
 func (g gwFake) GetPayment(context.Context, string) (*psp.GetResult, error) {
 	return nil, g.err
 }
+func (g gwFake) Refund(context.Context, psp.RefundRequest) (*psp.RefundResult, error) {
+	return nil, psp.ErrNotSupported
+}
+
 func (g gwFake) CreatePayment(context.Context, psp.CreateRequest) (*psp.CreateResult, error) {
 	return nil, nil
 }

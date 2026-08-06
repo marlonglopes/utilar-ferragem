@@ -27,6 +27,10 @@ type fakeGateway struct {
 }
 
 func (f *fakeGateway) Name() string { return "fake" }
+func (f *fakeGateway) Refund(context.Context, psp.RefundRequest) (*psp.RefundResult, error) {
+	return nil, psp.ErrNotSupported
+}
+
 func (f *fakeGateway) CreatePayment(context.Context, psp.CreateRequest) (*psp.CreateResult, error) {
 	return nil, errors.New("não usado")
 }

@@ -124,6 +124,33 @@ type GetResult struct {
 	RawPayload json.RawMessage // resposta crua — útil pra comparar com o que temos
 }
 
+// RefundRequest — pedido de ESTORNO ao PSP. Valores em CENTAVOS (int64), como o
+// resto do dinheiro que fala com PSP (nunca float na borda financeira).
+type RefundRequest struct {
+	PSPID       string // id do pagamento no PSP (o mesmo de CreateResult.PSPID)
+	AmountCents int64  // valor a estornar; obrigatório quando Total=false (parcial)
+	Total       bool   // true = estorno TOTAL; false = PARCIAL (exige AmountCents>0)
+	Reason      string // opcional, rastreio/auditoria
+}
+
+// RefundStatus normaliza o estado do estorno entre PSPs. Vários PSPs (Appmax
+// inclusive) processam o estorno de forma ASSÍNCRONA: a chamada devolve
+// "solicitado" e a confirmação vem por webhook depois — por isso o estado
+// intermediário existe e não deve ser confundido com "dinheiro já devolvido".
+type RefundStatus string
+
+const (
+	RefundRequested RefundStatus = "requested" // aceito pelo PSP, aguardando confirmação
+	RefundDone      RefundStatus = "refunded"   // PSP confirmou na hora (síncrono)
+)
+
+// RefundResult é o que a Gateway devolve após pedir o estorno.
+type RefundResult struct {
+	PSPRefundID string          // id do estorno no PSP, se houver — rastreio/idempotência
+	Status      RefundStatus    // requested (assíncrono) | refunded (síncrono)
+	RawPayload  json.RawMessage // resposta crua do PSP
+}
+
 // WebhookEvent é o evento extraído de um webhook payload, já normalizado.
 // A verificação de assinatura (HMAC/JWK) é responsabilidade da Gateway.
 type WebhookEvent struct {
@@ -141,6 +168,10 @@ var (
 	ErrInvalidRequest   = errors.New("psp: invalid request")
 	ErrUpstream         = errors.New("psp: upstream error")
 	ErrInvalidSignature = errors.New("psp: invalid webhook signature")
+	// ErrNotSupported — o PSP não implementa a operação (ex.: estorno num
+	// provider que não usamos em produção). Fail-closed: o handler devolve erro
+	// claro em vez de fingir que estornou.
+	ErrNotSupported = errors.New("psp: operation not supported")
 )
 
 // Gateway is the contract every PSP implementation must satisfy.
@@ -165,4 +196,11 @@ type Gateway interface {
 	// VerifyWebhook ter passado. Retorna (nil, nil) se o evento não for
 	// relevante pra nós (ex: ping, teste) — handler skipa e responde 200.
 	ParseWebhookEvent(body []byte) (*WebhookEvent, error)
+
+	// Refund pede o ESTORNO ao PSP (total ou parcial). NÃO mexe no nosso livro
+	// contábil — isso é do handler/order (que lança na CONFIRMAÇÃO, keyed por
+	// returnID, para nunca contar duas vezes). Rota financeira: sem retry
+	// automático (efeito duplicado = estornar duas vezes). Retorna ErrNotSupported
+	// se o provider não implementa.
+	Refund(ctx context.Context, req RefundRequest) (*RefundResult, error)
 }

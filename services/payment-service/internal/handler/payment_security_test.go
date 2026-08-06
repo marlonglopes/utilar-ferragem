@@ -29,6 +29,10 @@ import (
 type stubGateway struct{}
 
 func (s *stubGateway) Name() string { return "stripe" }
+func (s *stubGateway) Refund(context.Context, psp.RefundRequest) (*psp.RefundResult, error) {
+	return nil, psp.ErrNotSupported
+}
+
 func (s *stubGateway) CreatePayment(ctx context.Context, r psp.CreateRequest) (*psp.CreateResult, error) {
 	// Captura o amount efetivamente enviado ao PSP via field do struct (não usado
 	// aqui — usamos o stubGatewayCapture pra inspecionar). O test default não
@@ -53,6 +57,10 @@ func (s *stubGateway) ParseWebhookEvent(b []byte) (*psp.WebhookEvent, error) {
 type stubGatewayCapture struct {
 	*stubGateway
 	lastReq psp.CreateRequest
+}
+
+func (s *stubGatewayCapture) Refund(context.Context, psp.RefundRequest) (*psp.RefundResult, error) {
+	return nil, psp.ErrNotSupported
 }
 
 func (s *stubGatewayCapture) CreatePayment(ctx context.Context, r psp.CreateRequest) (*psp.CreateResult, error) {

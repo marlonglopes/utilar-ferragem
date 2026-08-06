@@ -191,6 +191,31 @@ func (g *Gateway) GetPayment(ctx context.Context, pspID string) (*psp.GetResult,
 // A integridade real vem da re-consulta GET /v1/orders/{id} feita pelo handler
 // (audit C3). Se APPMAX_WEBHOOK_SECRET estiver configurado, exigimos o header
 // X-Appmax-Token igual (fail-closed opcional, defesa em profundidade).
+// Refund pede o estorno à Appmax v1 (POST /v1/orders/refund-request). O pspID é
+// o id do PEDIDO Appmax (o mesmo de CreateResult.PSPID). ASSÍNCRONO: a Appmax
+// aceita a solicitação e confirma por webhook `order_refund` depois — por isso o
+// status normalizado é "requested", nunca "refunded" aqui.
+//
+// A trava de split (só estorno TOTAL em pedido com Payment Split) vive no
+// order-service, na SOLICITAÇÃO (returns.ErrSplitPartialRefund): falhar aqui
+// deixaria produto devolvido + estoque reposto + dinheiro preso. Este método só
+// repassa o que foi pedido.
+func (g *Gateway) Refund(ctx context.Context, req psp.RefundRequest) (*psp.RefundResult, error) {
+	orderID, err := strconv.ParseInt(req.PSPID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("%w: pspID inválido para Appmax (%q)", psp.ErrInvalidRequest, req.PSPID)
+	}
+	refundType, value := "total", int64(0)
+	if !req.Total {
+		refundType, value = "partial", req.AmountCents // client valida value>0
+	}
+	raw, err := g.client.RefundRequest(ctx, orderID, refundType, value)
+	if err != nil {
+		return nil, err
+	}
+	return &psp.RefundResult{Status: psp.RefundRequested, RawPayload: raw}, nil
+}
+
 func (g *Gateway) VerifyWebhook(_ []byte, headers http.Header) error {
 	if g.webhookSecret == "" {
 		return nil

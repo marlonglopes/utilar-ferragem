@@ -33,6 +33,7 @@ import (
 
 	"github.com/stripe/stripe-go/v79"
 	"github.com/stripe/stripe-go/v79/paymentintent"
+	"github.com/stripe/stripe-go/v79/refund"
 	"github.com/stripe/stripe-go/v79/webhook"
 	"github.com/utilar/payment-service/internal/psp"
 )
@@ -188,6 +189,31 @@ func (g *Gateway) GetPayment(ctx context.Context, pspID string) (*psp.GetResult,
 // e assinatura em uma call só.
 //
 // Em dev com webhookSecret="", pulamos validação (ver audit C5).
+// Refund estorna um PaymentIntent no Stripe (pspID = pi_...). SÍNCRONO: o Stripe
+// devolve o refund já "succeeded" na maioria dos métodos (cartão), então
+// normalizamos para "refunded"; se vier "pending" (alguns métodos), é "requested".
+// É o caminho testável em DEV (PSP=stripe), enquanto a Appmax não entra.
+func (g *Gateway) Refund(ctx context.Context, req psp.RefundRequest) (*psp.RefundResult, error) {
+	params := &stripe.RefundParams{PaymentIntent: stripe.String(req.PSPID)}
+	params.Context = ctx
+	if !req.Total {
+		if req.AmountCents <= 0 {
+			return nil, fmt.Errorf("%w: estorno parcial exige AmountCents>0", psp.ErrInvalidRequest)
+		}
+		params.Amount = stripe.Int64(req.AmountCents)
+	}
+	r, err := refund.New(params)
+	if err != nil {
+		return nil, fmt.Errorf("%w: stripe refund: %v", psp.ErrUpstream, err)
+	}
+	status := psp.RefundDone
+	if r.Status == stripe.RefundStatusPending {
+		status = psp.RefundRequested
+	}
+	raw, _ := json.Marshal(r)
+	return &psp.RefundResult{PSPRefundID: r.ID, Status: status, RawPayload: raw}, nil
+}
+
 func (g *Gateway) VerifyWebhook(body []byte, headers http.Header) error {
 	if g.webhookSecret == "" {
 		return nil
