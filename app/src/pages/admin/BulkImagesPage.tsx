@@ -12,6 +12,7 @@ import { AdminShell } from '@/components/admin/AdminShell'
 import { Section } from '@/components/admin/primitives'
 import { cn } from '@/lib/cn'
 import { compressImage } from '@/lib/imageCompress'
+import { isHeic } from '@/lib/heic'
 import {
   collectFilesFromDataTransfer,
   isBulkImagesEnabled,
@@ -103,11 +104,14 @@ export default function BulkImagesPage() {
   }, [])
 
   const addCollected = useCallback(async (collected: CollectedFile[]) => {
-    const imgs = collected.filter((c) => c.file.type.startsWith('image/'))
+    // HEIC (foto de iPhone) entra pela extensão: no drag de pasta o navegador
+    // manda esses arquivos com `type` vazio, então `startsWith('image/')`
+    // sozinho os descartaria. A conversão pra JPEG acontece no envio.
+    const imgs = collected.filter((c) => c.file.type.startsWith('image/') || isHeic(c.file))
     if (imgs.length === 0) {
       setNotice(
         collected.length > 0
-          ? `Li ${collected.length} arquivo(s), mas nenhum é imagem (use jpg/png/webp).`
+          ? `Li ${collected.length} arquivo(s), mas nenhum é imagem (use jpg/png/webp/heic).`
           : 'Nada foi lido. Arraste pastas ou arquivos de imagem.'
       )
       return
@@ -116,8 +120,11 @@ export default function BulkImagesPage() {
     const novos: Item[] = imgs.map(({ file, path }) => {
       const candidates = skuCandidatesForFile(path)
       // Preview só até o teto — o resto é enviado sem preview (não trava a aba).
+      // HEIC também fica sem preview: <img> não renderiza HEIC fora do Safari, e
+      // um object URL viraria "imagem quebrada". O card mostra o SKU; a foto é
+      // convertida e enviada normalmente.
       let previewUrl = ''
-      if (previewCount.current < PREVIEW_CAP) {
+      if (!isHeic(file) && previewCount.current < PREVIEW_CAP) {
         previewUrl = URL.createObjectURL(file)
         previewCount.current++
       }
@@ -295,7 +302,8 @@ export default function BulkImagesPage() {
           </p>
           <p className="text-xs text-gray-500">
             Nomeie o arquivo pelo SKU (<span className="font-mono">6320.jpg</span>) ou crie{' '}
-            <strong>1 pasta por SKU</strong> (<span className="font-mono">6320/foto.jpg</span>).
+            <strong>1 pasta por SKU</strong> (<span className="font-mono">6320/foto.jpg</span>). Foto
+            de iPhone (HEIC) é convertida automaticamente.
           </p>
           <button
             type="button"
@@ -310,7 +318,9 @@ export default function BulkImagesPage() {
           <input
             ref={inputRef}
             type="file"
-            accept="image/*"
+            // .heic/.heif explícitos: alguns seletores desktop filtram HEIC do
+            // "image/*" (o SO não sabe classificar) e a foto de iPhone sumiria.
+            accept="image/*,.heic,.heif"
             multiple
             className="hidden"
             onChange={(e) => {

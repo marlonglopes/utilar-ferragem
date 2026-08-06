@@ -130,6 +130,28 @@ describe('BulkImagesPage — solta uma pasta e casa por SKU', () => {
     expect(screen.queryByText('Casados por SKU')).not.toBeInTheDocument()
   })
 
+  it('aceita HEIC de iPhone (type vazio, extensão .HEIC): casa por SKU, sem preview quebrado', async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <BulkImagesPage />
+      </MemoryRouter>
+    )
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+
+    // Zera o contador do mock (testes anteriores no arquivo já o chamaram).
+    vi.mocked(URL.createObjectURL).mockClear()
+
+    // Como o navegador entrega no drag de pasta: nome = SKU, type VAZIO, .HEIC.
+    // O filtro antigo (só startsWith('image/')) descartaria isto.
+    const heic = new File(['x'], '6320.HEIC', { type: '' })
+    fireEvent.change(input, { target: { files: [heic] } })
+
+    await waitFor(() => expect(screen.getByText('Casados por SKU')).toBeInTheDocument())
+    expect(screen.getByText('SKU 6320')).toBeInTheDocument()
+    // HEIC não gera object URL (evita broken image) → nenhum createObjectURL.
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+  })
+
   it('nenhuma imagem (só .txt) não cria itens', async () => {
     const { container } = render(
       <MemoryRouter>

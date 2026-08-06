@@ -234,9 +234,11 @@ Três formas, da mais simples à mais poderosa.
 `/admin/produtos` → abre o produto → **Imagens** → arrasta a foto. Dá para
 reordenar (a primeira é a **capa**) e trocar a capa.
 
-**Formatos aceitos:** JPEG, PNG, WebP.
-**Não aceito:** **HEIC** (o iPhone fotografa em HEIC por padrão — converta para
-JPEG antes, ou ajuste o iPhone para "Mais compatível").
+**Formatos aceitos:** JPEG, PNG, WebP e **HEIC** (foto de iPhone). O HEIC é
+**convertido para JPEG automaticamente no navegador**, antes de subir — não
+precisa converter à mão nem mexer no ajuste "Mais compatível" do iPhone. Só
+fotografar e soltar. (A conversão roda no computador que está subindo; a
+primeira foto HEIC do lote demora ~1–2 s a mais enquanto o conversor carrega.)
 
 ### 6.2 Em lote por SKU — a forma rápida
 

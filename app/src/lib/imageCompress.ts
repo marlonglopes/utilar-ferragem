@@ -11,12 +11,26 @@
 // ORIENTADO (`imageOrientation: 'from-image'`) e desenhamos ele — a orientação
 // entra nos pixels e o EXIF vira dispensável.
 
+import { isHeic, heicToJpeg } from './heic'
+
 const MAX_SIDE = 2000
 const QUALITY = 0.85
 // Abaixo disto (e já dentro do limite de tamanho), não vale reencodar.
 const SKIP_UNDER_BYTES = 1_200_000
 
 export async function compressImage(file: File): Promise<File> {
+  // Foto de iPhone vem em HEIC — o canvas e o backend não decodificam. Converte
+  // pra JPEG ANTES (import dinâmico do decodificador). Se a conversão falhar,
+  // devolvemos o HEIC cru: o backend recusa com mensagem clara — melhor um erro
+  // visível que um travamento silencioso.
+  if (isHeic(file)) {
+    try {
+      file = await heicToJpeg(file)
+    } catch {
+      return file
+    }
+  }
+
   // Só raster comum. GIF (animação) e SVG passam intactos.
   if (
     !file.type.startsWith('image/') ||
