@@ -246,17 +246,24 @@ o **lançamento contábil**. Devolver de fato exige:
 Hoje, na prática, o operador estorna **pelo painel da Appmax** e usa
 `/refund` para registrar o fato no sistema e no livro.
 
-### 7.2 ⚠️ Reposição de estoque depende do catalog-service
+### 7.2 ✅ Reposição de estoque (`POST /api/v1/internal/restock`) — IMPLEMENTADO
 
-`POST /api/v1/internal/restock` **não existe** no catalog-service — ele expõe
-apenas `/reservations`, `/commit` e `/release`.
+`POST /api/v1/internal/restock` **agora existe** no catalog-service
+(`internal/handler/restock.go`, migration `019_stock_restocks`). É o **espelho
+invertido da baixa**: `stock = stock + qty`, com um `stock_movements` por item
+(`reason='customer_return'`, o almoxarife vê a devolução no histórico) e
+**idempotência por `returnId`** (tabela `stock_restocks`, PK `return_id`). Numa
+mesma transação: guarda de idempotência + incrementos; retry colide no PK e vira
+no-op; produto inexistente → rollback total (nunca superestima). Testado em
+`restock_test.go` (incremento, idempotência, returnIds diferentes somam,
+rollback all-or-nothing, concorrência repõe uma vez).
 
 `Release` **não serve**: ele cancela uma *reserva* de pedido não pago. Numa
 devolução a baixa já aconteceu (produto pago, separado, entregue, devolvido), e
 o que se precisa é **incremento** de saldo. Chamar `Release` não faria nada e o
 erro seria silencioso.
 
-Contrato esperado:
+Contrato:
 
 ```jsonc
 POST /api/v1/internal/restock     // role=service
@@ -268,9 +275,9 @@ POST /api/v1/internal/restock     // role=service
 }
 ```
 
-**Enquanto não existir:** o recebimento é registrado normalmente,
-`stock_returned` fica `false`, e `return.stock_restore_failed` entra na trilha.
-O saldo fica **subestimado** (venda perdida, detectável pelo índice
+**Se a chamada falhar** (rede, produto inexistente): o recebimento é registrado
+normalmente, `stock_returned` fica `false`, e `return.stock_restore_failed` entra
+na trilha. O saldo fica **subestimado** (venda perdida, detectável pelo índice
 `idx_returns_pendencias`) e nunca superestimado (venda do que não existe).
 
 ### 7.3 Menores

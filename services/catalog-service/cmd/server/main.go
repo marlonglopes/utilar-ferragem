@@ -295,6 +295,9 @@ func main() {
 		internal.POST("/reservations", reservationH.Reserve)
 		internal.POST("/reservations/:orderId/commit", reservationH.Commit)
 		internal.POST("/reservations/:orderId/release", reservationH.Release)
+		// Reposição de estoque por devolução recebida (espelho invertido da baixa).
+		// O cliente no order-service (catalogclient/restock.go) já chamava isto.
+		internal.POST("/restock", reservationH.Restock)
 	}
 
 	// Rotas do BALCÃO — leitura autenticada que o PDV faz. Aceita
