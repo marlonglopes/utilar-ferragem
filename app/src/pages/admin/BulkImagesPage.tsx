@@ -302,8 +302,8 @@ export default function BulkImagesPage() {
           </p>
           <p className="text-xs text-gray-500">
             Nomeie o arquivo pelo SKU (<span className="font-mono">6320.jpg</span>) ou crie{' '}
-            <strong>1 pasta por SKU</strong> (<span className="font-mono">6320/foto.jpg</span>). Foto
-            de iPhone (HEIC) é convertida automaticamente.
+            <strong>1 pasta por SKU</strong> (<span className="font-mono">6320/foto.jpg</span>).
+            Foto de iPhone (HEIC) é convertida automaticamente.
           </p>
           <button
             type="button"
