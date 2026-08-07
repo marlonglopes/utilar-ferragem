@@ -30,6 +30,9 @@ type Config struct {
 	// assinar `role=service` ou `role=admin` e reescrever o catálogo. Ver
 	// pkg/servicetoken.
 	ServiceJWTSecret string
+	// ServiceVerifier verifica os tokens role=service (Ed25519 e/ou HS256). É o
+	// que os middlewares internos usam — o catalog só VERIFICA, nunca emite.
+	ServiceVerifier *servicetoken.Verifier
 
 	// MetricsToken protege /metrics (fail-closed: vazio = 404, ver
 	// pkg/metrics.Handler) E é o token com que o agregador de observabilidade
@@ -89,6 +92,12 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Verificador de token de serviço: aceita Ed25519 (SERVICE_JWT_PUBLIC_KEY) e/ou
+	// HS256 legado. Um verificador comprometido só tem a PÚBLICA — não emite token.
+	verifier, err := servicetoken.VerifierFromEnv(devMode, jwt)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		Port:             env("PORT", "8091"),
@@ -98,6 +107,7 @@ func Load() (*Config, error) {
 		JWTSecret:        jwt,
 		DevMode:          devMode,
 		ServiceJWTSecret: serviceSecret,
+		ServiceVerifier:  verifier,
 
 		MetricsToken:      os.Getenv("METRICS_TOKEN"),
 		AuthServiceURL:    env("AUTH_SERVICE_URL", "http://localhost:8093"),

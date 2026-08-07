@@ -31,7 +31,12 @@ func externalSettlementRouter(serviceSecret string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(handler.RequestID())
-	g := r.Group("/internal/v1", handler.RequireService(serviceSecret))
+	// Segredo vazio → verifier nil, para exercitar o fail-closed do RequireService.
+	var v *servicetoken.Verifier
+	if serviceSecret != "" {
+		v = servicetoken.NewHMACVerifier(serviceSecret)
+	}
+	g := r.Group("/internal/v1", handler.RequireService(v))
 	// Handler trivial: o que está sob teste é o portão, não o lançamento.
 	g.POST("/ledger/external-settlement", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true, "caller": c.GetString("caller_service")})

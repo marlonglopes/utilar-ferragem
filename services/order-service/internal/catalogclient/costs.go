@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/utilar/pkg/servicetoken"
 )
 
 // ============================================================================
@@ -52,7 +50,7 @@ func (c *Client) Costs(ctx context.Context, productIDs []string) (map[string]flo
 	if len(productIDs) == 0 {
 		return out, nil
 	}
-	if c.serviceSecret == "" {
+	if c.signer == nil {
 		return nil, fmt.Errorf("%w: SERVICE_JWT_SECRET não configurado para consulta de custo", ErrUpstream)
 	}
 
@@ -66,7 +64,7 @@ func (c *Client) Costs(ctx context.Context, productIDs []string) (map[string]flo
 	if err != nil {
 		return nil, fmt.Errorf("%w: build request: %v", ErrUpstream, err)
 	}
-	token, err := servicetoken.Issue(c.serviceSecret, "order-service")
+	token, err := c.signer.Issue("order-service")
 	if err != nil {
 		return nil, fmt.Errorf("%w: service token: %v", ErrUpstream, err)
 	}

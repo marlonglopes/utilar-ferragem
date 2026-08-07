@@ -34,7 +34,7 @@ func TestLancamentoViajaComTokenDeServico(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := paymentclient.New(srv.URL, segredoServico).
+	if err := paymentclient.New(srv.URL, servicetoken.NewHMACSigner(segredoServico)).
 		PostExternalSettlement(context.Background(), fato()); err != nil {
 		t.Fatalf("post: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestDuplicataDoOutroLadoEhSucesso(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(status)
 		}))
-		if err := paymentclient.New(srv.URL, segredoServico).
+		if err := paymentclient.New(srv.URL, servicetoken.NewHMACSigner(segredoServico)).
 			PostExternalSettlement(context.Background(), fato()); err != nil {
 			t.Errorf("status %d deveria ser sucesso: %v", status, err)
 		}
@@ -83,7 +83,7 @@ func TestErrosSaoTipados(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(tc.status)
 		}))
-		err := paymentclient.New(srv.URL, segredoServico).
+		err := paymentclient.New(srv.URL, servicetoken.NewHMACSigner(segredoServico)).
 			PostExternalSettlement(context.Background(), fato())
 		if !errors.Is(err, tc.quer) {
 			t.Errorf("status %d: err = %v, esperado %v", tc.status, err, tc.quer)
@@ -96,11 +96,11 @@ func TestErrosSaoTipados(t *testing.T) {
 // finge que deu certo. O handler precisa saber que o lançamento não saiu para
 // gravar o rastro de reprocessamento.
 func TestSemSegredoOuURLFalhaExplicito(t *testing.T) {
-	if err := paymentclient.New("http://x", "").
+	if err := paymentclient.New("http://x", nil).
 		PostExternalSettlement(context.Background(), fato()); !errors.Is(err, paymentclient.ErrNotConfigured) {
 		t.Errorf("sem segredo: err = %v", err)
 	}
-	if err := paymentclient.New("", segredoServico).
+	if err := paymentclient.New("", servicetoken.NewHMACSigner(segredoServico)).
 		PostExternalSettlement(context.Background(), fato()); !errors.Is(err, paymentclient.ErrNotConfigured) {
 		t.Errorf("sem URL: err = %v", err)
 	}
@@ -118,7 +118,7 @@ func TestRequestIDEhPropagado(t *testing.T) {
 	defer srv.Close()
 
 	ctx := paymentclient.WithRequestID(context.Background(), "req-abc")
-	if err := paymentclient.New(srv.URL, segredoServico).PostExternalSettlement(ctx, fato()); err != nil {
+	if err := paymentclient.New(srv.URL, servicetoken.NewHMACSigner(segredoServico)).PostExternalSettlement(ctx, fato()); err != nil {
 		t.Fatalf("post: %v", err)
 	}
 	if got != "req-abc" {

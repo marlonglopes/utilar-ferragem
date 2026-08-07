@@ -27,7 +27,7 @@ import (
 // role — e o JWTAuth acima recusa a claim de saída. Como o assistant-service
 // (Alice), que é público e o mais exposto, não recebe o SERVICE_JWT_SECRET,
 // comprometê-lo não abre mais estas rotas.
-func InternalAuth(userSecret, serviceSecret string, denyList *AccessTokenDenyList) gin.HandlerFunc {
+func InternalAuth(userSecret string, verifier *servicetoken.Verifier, denyList *AccessTokenDenyList) gin.HandlerFunc {
 	userAuth := JWTAuth(userSecret, denyList)
 
 	return func(c *gin.Context) {
@@ -40,7 +40,7 @@ func InternalAuth(userSecret, serviceSecret string, denyList *AccessTokenDenyLis
 		raw := strings.TrimPrefix(h, "Bearer ")
 
 		// 1) Token de serviço.
-		if sub, err := servicetoken.Parse(raw, serviceSecret); err == nil {
+		if sub, err := verifier.Parse(raw); err == nil {
 			c.Set("user_id", sub)
 			c.Set("user_role", servicetoken.Role)
 			c.Next()

@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/utilar/pkg/servicetoken"
 )
 
 // Estas duas NÃO são falhas: sinalizam que não há estorno de PSP a fazer, e o
@@ -50,7 +48,7 @@ type RefundOutcome struct {
 // aqui — é dinheiro; o retry é decisão humana (chamar o endpoint de novo). Mesmo
 // princípio de PostReturnRefund.
 func (c *Client) RequestRefund(ctx context.Context, in RefundRequest) (RefundOutcome, error) {
-	if c.baseURL == "" || c.serviceSecret == "" {
+	if c.baseURL == "" || c.signer == nil {
 		return RefundOutcome{}, ErrNotConfigured
 	}
 
@@ -63,7 +61,7 @@ func (c *Client) RequestRefund(ctx context.Context, in RefundRequest) (RefundOut
 	if err != nil {
 		return RefundOutcome{}, err
 	}
-	tok, err := servicetoken.Issue(c.serviceSecret, "order-service")
+	tok, err := c.signer.Issue("order-service")
 	if err != nil {
 		return RefundOutcome{}, fmt.Errorf("%w: %v", ErrNotConfigured, err)
 	}

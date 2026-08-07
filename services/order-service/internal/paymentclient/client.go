@@ -38,21 +38,21 @@ var (
 )
 
 type Client struct {
-	baseURL       string
-	http          *http.Client
-	serviceSecret string
+	baseURL string
+	http    *http.Client
+	signer  *servicetoken.Signer
 }
 
-// New cria o cliente. serviceSecret é o SERVICE_JWT_SECRET — nunca o
-// JWT_SECRET de usuário (A1, auditoria 2026-07-18).
-func New(baseURL, serviceSecret string) *Client {
+// New cria o cliente. signer assina o token role=service (Ed25519 em produção,
+// HS256 no legado) — nunca o JWT_SECRET de usuário (A1, auditoria 2026-07-18).
+func New(baseURL string, signer *servicetoken.Signer) *Client {
 	return &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		// Timeout curto: o operador está com o cliente no caixa. Se o
 		// payment-service demorar, o pedido já foi liquidado no order-service
 		// e o lançamento é replicável depois — melhor devolver a tela rápido.
-		http:          &http.Client{Timeout: 5 * time.Second},
-		serviceSecret: serviceSecret,
+		http:   &http.Client{Timeout: 5 * time.Second},
+		signer: signer,
 	}
 }
 
@@ -78,7 +78,7 @@ type ExternalSettlement struct {
 // liquidação pode reprocessar um pedido já liquidado sem medo de dobrar
 // receita.
 func (c *Client) PostExternalSettlement(ctx context.Context, in ExternalSettlement) error {
-	if c.baseURL == "" || c.serviceSecret == "" {
+	if c.baseURL == "" || c.signer == nil {
 		return ErrNotConfigured
 	}
 
@@ -91,7 +91,7 @@ func (c *Client) PostExternalSettlement(ctx context.Context, in ExternalSettleme
 	if err != nil {
 		return err
 	}
-	tok, err := servicetoken.Issue(c.serviceSecret, "order-service")
+	tok, err := c.signer.Issue("order-service")
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrNotConfigured, err)
 	}

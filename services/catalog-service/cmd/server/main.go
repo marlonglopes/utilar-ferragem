@@ -290,7 +290,7 @@ func main() {
 	// SERVICE_JWT_SECRET) ou role=admin (operação manual/debug, token de
 	// usuário). A1 (auditoria 2026-07-18): são segredos DIFERENTES — token de
 	// usuário com a claim role=service não passa por aqui.
-	internal := r.Group("/api/v1/internal", handler.RequireInternal(cfg.JWTSecret, cfg.ServiceJWTSecret, cfg.DevMode))
+	internal := r.Group("/api/v1/internal", handler.RequireInternal(cfg.JWTSecret, cfg.ServiceVerifier, cfg.DevMode))
 	{
 		internal.POST("/reservations", reservationH.Reserve)
 		internal.POST("/reservations/:orderId/commit", reservationH.Commit)
@@ -308,7 +308,7 @@ func main() {
 	// (preço, importação de planilha). Operador de balcão precisa VER o custo
 	// pra negociar desconto; não pode mudar preço de produto. Grupo próprio
 	// mantém a superfície do operador do tamanho da necessidade dele.
-	store := r.Group("/api/v1/store", handler.RequireStore(cfg.JWTSecret, cfg.ServiceJWTSecret, cfg.DevMode))
+	store := r.Group("/api/v1/store", handler.RequireStore(cfg.JWTSecret, cfg.ServiceVerifier, cfg.DevMode))
 	{
 		// Em lote de propósito: o carrinho de balcão tem vários itens e uma
 		// chamada por item seria N+1 no caminho mais quente da loja.

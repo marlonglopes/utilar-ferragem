@@ -31,7 +31,7 @@ func rotaInterna(devMode bool) *gin.Engine {
 	r := gin.New()
 	r.Use(handler.RequestID())
 	g := r.Group("/api/v1/internal",
-		handler.RequireInternal(segredoUsuario, segredoServico, devMode))
+		handler.RequireInternal(segredoUsuario, servicetoken.NewHMACVerifier(segredoServico), devMode))
 	g.POST("/reservations", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"role": c.GetString("user_role"), "sub": c.GetString("user_id")})
 	})

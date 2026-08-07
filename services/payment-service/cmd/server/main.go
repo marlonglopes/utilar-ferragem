@@ -207,9 +207,9 @@ func main() {
 	// FAIL-CLOSED: sem SERVICE_JWT_SECRET o grupo NÃO é registrado. A rota
 	// lança receita no livro sem que dinheiro nenhum tenha passado pelo nosso
 	// PSP — ela não pode existir aceitando token de usuário.
-	if cfg.ServiceJWTSecret != "" {
+	if cfg.ServiceVerifier != nil {
 		extH := handler.NewExternalSettlementHandler(poster)
-		internal := r.Group("/internal/v1", handler.RequireService(cfg.ServiceJWTSecret))
+		internal := r.Group("/internal/v1", handler.RequireService(cfg.ServiceVerifier))
 		internal.POST("/ledger/external-settlement", extH.Post)
 
 		// Estorno de devolução (CDC). Mesma fronteira de confiança: a decisão

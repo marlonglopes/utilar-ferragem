@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/utilar/pkg/devguard"
+	"github.com/utilar/pkg/servicetoken"
 )
 
 type Config struct {
@@ -31,6 +32,9 @@ type Config struct {
 	// Vazio = grupo /internal não é registrado (fail-closed): melhor a rota não
 	// existir do que existir aceitando token assinado com o segredo de usuário.
 	ServiceJWTSecret string
+	// ServiceVerifier verifica os tokens role=service das rotas /internal
+	// (Ed25519 e/ou HS256). nil = /internal desabilitada. payment só VERIFICA.
+	ServiceVerifier *servicetoken.Verifier
 
 	// PSP selector — qual provider usar.
 	// Valores: "stripe" (recomendado em dev + test mode robusto)
@@ -107,6 +111,23 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	// Verificador de token de serviço: aceita Ed25519 (SERVICE_JWT_PUBLIC_KEY) e/ou
+	// HS256 legado (SERVICE_JWT_SECRET). Best-effort: sem NENHUMA chave o verifier
+	// fica nil e o grupo /internal não é registrado (fail-closed no main.go) —
+	// preserva o boot atual do payment (sobe mesmo sem token de serviço). NUNCA
+	// cai no JWT_SECRET de usuário: aceitar isso recriaria o furo do A1.
+	serviceSecret := os.Getenv("SERVICE_JWT_SECRET")
+	var serviceVerifier *servicetoken.Verifier
+	if pubB64 := os.Getenv(servicetoken.EnvPublicKey); pubB64 != "" {
+		pub, err := servicetoken.ParsePublicKey(pubB64)
+		if err != nil {
+			return nil, fmt.Errorf("%w (%s)", err, servicetoken.EnvPublicKey)
+		}
+		serviceVerifier = servicetoken.NewVerifier(pub, serviceSecret)
+	} else if serviceSecret != "" {
+		serviceVerifier = servicetoken.NewHMACVerifier(serviceSecret)
+	}
+
 	cfg := &Config{
 		Port:            env("PORT", "8090"),
 		DatabaseURL:     dbURL,
@@ -141,7 +162,8 @@ func Load() (*Config, error) {
 		// Lido cru, sem fallback para o JWT_SECRET: aceitar o segredo de
 		// usuário aqui recriaria exatamente o problema que a A1 mitigou —
 		// qualquer serviço com o JWT_SECRET voltaria a poder lançar receita.
-		ServiceJWTSecret: os.Getenv("SERVICE_JWT_SECRET"),
+		ServiceJWTSecret: serviceSecret,
+		ServiceVerifier:  serviceVerifier,
 	}
 
 	// Valida credenciais do provider escolhido + webhook secret fail-closed em prod (audit C5).

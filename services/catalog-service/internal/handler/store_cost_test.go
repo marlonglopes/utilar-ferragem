@@ -35,7 +35,7 @@ func storeRouter(db *sql.DB, devMode bool) *gin.Engine {
 
 	h := handler.NewStoreCostHandler(db)
 	g := r.Group("/api/v1/store",
-		handler.RequireStore(segredoUsuario, segredoServico, devMode))
+		handler.RequireStore(segredoUsuario, servicetoken.NewHMACVerifier(segredoServico), devMode))
 	g.GET("/products/costs", h.Costs)
 	g.POST("/products/costs", h.CostsBatch)
 	return r

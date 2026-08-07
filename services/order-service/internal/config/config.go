@@ -21,7 +21,12 @@ type Config struct {
 	// A1 (auditoria 2026-07-18): separado do JWTSecret de propósito. O poder de
 	// EMITIR identidade de serviço fica restrito a quem realmente precisa dele —
 	// o assistant-service, que é o mais exposto, não recebe esta variável.
-	ServiceJWTSecret  string
+	ServiceJWTSecret string
+	// ServiceSigner é o emissor de token de serviço. Ed25519 (assimétrico, A1
+	// definitivo) se SERVICE_JWT_PRIVATE_KEY estiver setado; senão HS256 legado.
+	// É o que os clients usam para assinar — a chave PRIVADA vive só aqui, no
+	// único emissor do sistema.
+	ServiceSigner     *servicetoken.Signer
 	AllowedOrigins    []string
 	CatalogServiceURL string // base URL do catalog-service pra validação de price (O2-H5)
 	// AuthServiceURL — de onde vem o contexto autoritativo do operador de
@@ -82,12 +87,20 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Emissor: prefere Ed25519 (SERVICE_JWT_PRIVATE_KEY); senão HS256 legado. Mesmo
+	// fail-closed. Quando a migração terminar (só Ed25519), o serviceSecret acima
+	// deixa de ser necessário e o SecretFromEnv pode sair.
+	signer, err := servicetoken.SignerFromEnv(devMode, jwt)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		Port:              env("PORT", "8092"),
 		DatabaseURL:       env("ORDER_DB_URL", "postgres://utilar:utilar@localhost:5437/order_service?sslmode=disable"),
 		JWTSecret:         jwt,
 		ServiceJWTSecret:  serviceSecret,
+		ServiceSigner:     signer,
 		DevMode:           devMode,
 		AllowedOrigins:    parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		CatalogServiceURL: env("CATALOG_SERVICE_URL", "http://localhost:8091"),

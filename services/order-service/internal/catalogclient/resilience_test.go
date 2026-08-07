@@ -10,6 +10,7 @@ import (
 
 	"github.com/utilar/order-service/internal/catalogclient"
 	"github.com/utilar/pkg/circuitbreaker"
+	"github.com/utilar/pkg/servicetoken"
 )
 
 // ============================================================================
@@ -28,7 +29,7 @@ func resilientClient(t *testing.T, h http.HandlerFunc) (*catalogclient.Client, *
 	t.Cleanup(srv.Close)
 
 	res := catalogclient.NewResilience(nil, func(string) { atomic.AddInt32(&rejected, 1) })
-	c := catalogclient.NewWithSecret(srv.URL, "segredo-de-servico-de-teste").WithResilience(res)
+	c := catalogclient.NewWithSigner(srv.URL, servicetoken.NewHMACSigner("segredo-de-servico-de-teste")).WithResilience(res)
 	return c, res, &rejected
 }
 

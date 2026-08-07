@@ -64,19 +64,19 @@ func main() {
 	// WithResilience: disjuntor + retry. Sem isso, uma lentidão momentânea do
 	// catálogo empilha requisições de checkout até derrubar o serviço inteiro
 	// (auditoria arquitetural 2026-07-18). Ver internal/catalogclient/resilience.go.
-	catalog := catalogclient.NewWithSecret(cfg.CatalogServiceURL, cfg.ServiceJWTSecret).
+	catalog := catalogclient.NewWithSigner(cfg.CatalogServiceURL, cfg.ServiceSigner).
 		WithResilience(catalogclient.NewResilience(cbMetrics.Instrument, cbMetrics.Rejected))
 	rates := shipping.NewStore(database)
 
 	// authclient: de onde sai o TETO DE DESCONTO autoritativo do operador de
 	// balcão. Sem ele o balcão opera fail-closed (teto 0 → todo desconto vai
 	// para a fila do gerente), nunca fail-open.
-	authc := authclient.New(cfg.AuthServiceURL, cfg.ServiceJWTSecret)
+	authc := authclient.New(cfg.AuthServiceURL, cfg.ServiceSigner)
 
 	// paymentclient: por onde a liquidação externa (venda de balcão paga na
 	// maquininha da loja) chega ao livro contábil, que vive no payment-service.
 	// Ver docs/external-settlement.md.
-	paymentc := paymentclient.New(cfg.PaymentServiceURL, cfg.ServiceJWTSecret)
+	paymentc := paymentclient.New(cfg.PaymentServiceURL, cfg.ServiceSigner)
 
 	orderH := handler.NewOrderHandler(database, catalog, cfg.DevMode).
 		WithStock(catalog).

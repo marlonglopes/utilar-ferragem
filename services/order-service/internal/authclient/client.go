@@ -44,7 +44,7 @@ type Client struct {
 	http    *http.Client
 	// serviceSecret é o SERVICE_JWT_SECRET, distinto do JWT_SECRET de usuário
 	// (A1, auditoria 2026-07-18) — ver serviceToken() abaixo.
-	serviceSecret string
+	signer *servicetoken.Signer
 
 	// Cache curto. 30s é o compromisso: elimina a chamada HTTP repetida quando
 	// o operador registra três vendas seguidas, e mantém um rebaixamento
@@ -60,15 +60,15 @@ type cacheEntry struct {
 	exp time.Time
 }
 
-// New cria o cliente. serviceSecret é o SERVICE_JWT_SECRET — nunca o
-// JWT_SECRET de usuário.
-func New(baseURL, serviceSecret string) *Client {
+// New cria o cliente. signer assina o token role=service (Ed25519 em produção,
+// HS256 no legado) — nunca o JWT_SECRET de usuário.
+func New(baseURL string, signer *servicetoken.Signer) *Client {
 	return &Client{
-		baseURL:       strings.TrimRight(baseURL, "/"),
-		http:          &http.Client{Timeout: 5 * time.Second},
-		serviceSecret: serviceSecret,
-		cache:         make(map[string]cacheEntry),
-		ttl:           30 * time.Second,
+		baseURL: strings.TrimRight(baseURL, "/"),
+		http:    &http.Client{Timeout: 5 * time.Second},
+		signer:  signer,
+		cache:   make(map[string]cacheEntry),
+		ttl:     30 * time.Second,
 	}
 }
 
@@ -147,8 +147,8 @@ func (c *Client) store(userID string, op *Operator) {
 // conseguia EMITIR identidade de serviço e de admin. Vida curta mantida: se o
 // token vazar num log, expira antes de servir para algo.
 func (c *Client) serviceToken() (string, error) {
-	if c.serviceSecret == "" {
+	if c.signer == nil {
 		return "", errors.New("authclient: SERVICE_JWT_SECRET not configured for service calls")
 	}
-	return servicetoken.Issue(c.serviceSecret, "order-service")
+	return c.signer.Issue("order-service")
 }

@@ -29,7 +29,7 @@ func TestReserveAssinaComOSegredoDeServico(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := catalogclient.NewWithSecret(srv.URL, segredoServico)
+	c := catalogclient.NewWithSigner(srv.URL, servicetoken.NewHMACSigner(segredoServico))
 	err := c.Reserve(context.Background(), "pedido-1",
 		[]catalogclient.ReservationItem{{ProductID: "p1", Quantity: 1}}, 0)
 	if err != nil {

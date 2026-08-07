@@ -30,6 +30,9 @@ type Config struct {
 	// auth-service EMITE identidade de usuário; a identidade de SERVIÇO vive
 	// noutro segredo, para que ter um não implique poder forjar o outro.
 	ServiceJWTSecret string
+	// ServiceVerifier verifica os tokens role=service (Ed25519 e/ou HS256) das
+	// rotas /internal. O auth só VERIFICA serviço; nunca emite.
+	ServiceVerifier *servicetoken.Verifier
 }
 
 // devSecret só é aceito em DEV_MODE=true. Em prod, JWT_SECRET é obrigatório
@@ -76,12 +79,19 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Verificador de token de serviço (Ed25519 e/ou HS256). O auth só VERIFICA
+	// token de serviço (embora EMITA token de usuário) — não emite serviço.
+	verifier, err := servicetoken.VerifierFromEnv(devMode, jwt)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		Port:             env("PORT", "8093"),
 		DatabaseURL:      env("AUTH_DB_URL", "postgres://utilar:utilar@localhost:5438/auth_service?sslmode=disable"),
 		JWTSecret:        jwt,
 		ServiceJWTSecret: serviceSecret,
+		ServiceVerifier:  verifier,
 		DevMode:          devMode,
 		AllowedOrigins:   parseOrigins(os.Getenv("ALLOWED_ORIGINS")),
 		AccessTokenTTL:   15 * time.Minute,

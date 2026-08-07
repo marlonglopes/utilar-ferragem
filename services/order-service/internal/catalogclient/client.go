@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/utilar/pkg/httpclient"
+	"github.com/utilar/pkg/servicetoken"
 )
 
 // Product é o subset de Product do catalog-service que o order-service
@@ -45,10 +46,10 @@ var (
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
-	// serviceSecret assina o token role=service das rotas /internal.
-	// A1: é o SERVICE_JWT_SECRET, distinto do JWT_SECRET de usuário — ver
+	// signer assina o token role=service das rotas /internal (Ed25519 em
+	// produção, HS256 no legado). A1: distinto do JWT_SECRET de usuário — ver
 	// reservation.go e pkg/servicetoken.
-	serviceSecret string
+	signer *servicetoken.Signer
 	// res é o disjuntor + retry. nil = comportamento original (chamada direta).
 	// Ver resilience.go.
 	res *Resilience
@@ -67,11 +68,11 @@ func New(baseURL string) *Client {
 	}
 }
 
-// NewWithSecret cria um cliente capaz de chamar as rotas internas de reserva.
-// serviceSecret é o SERVICE_JWT_SECRET — nunca o JWT_SECRET de usuário.
-func NewWithSecret(baseURL, serviceSecret string) *Client {
+// NewWithSigner cria um cliente capaz de chamar as rotas internas de reserva.
+// signer assina o token role=service — nunca o JWT_SECRET de usuário.
+func NewWithSigner(baseURL string, signer *servicetoken.Signer) *Client {
 	c := New(baseURL)
-	c.serviceSecret = serviceSecret
+	c.signer = signer
 	return c
 }
 

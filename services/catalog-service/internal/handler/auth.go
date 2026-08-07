@@ -158,8 +158,8 @@ func RequireRole(jwtSecret string, devMode bool, roles ...string) gin.HandlerFun
 // Em DevMode o fallback de header continua, igual ao RequireRole, para rodar
 // teste e smoke sem subir o order-service. Isso é seguro porque o pkg/devguard
 // recusa DEV_MODE em qualquer ambiente com sinal de produção.
-func RequireInternal(jwtSecret, serviceSecret string, devMode bool) gin.HandlerFunc {
-	return requireServiceOrRoles(jwtSecret, serviceSecret, devMode, "admin")
+func RequireInternal(jwtSecret string, verifier *servicetoken.Verifier, devMode bool) gin.HandlerFunc {
+	return requireServiceOrRoles(jwtSecret, verifier, devMode, "admin")
 }
 
 // RequireStore protege as rotas /api/v1/store — a leitura autenticada que o PDV
@@ -179,8 +179,8 @@ func RequireInternal(jwtSecret, serviceSecret string, devMode bool) gin.HandlerF
 // `role=service` também passa (mesma checagem de segredo separado do
 // RequireInternal) porque o order-service precisa do custo pra registrar o CMV
 // do pedido de balcão sem fazer SELECT no banco do catálogo.
-func RequireStore(jwtSecret, serviceSecret string, devMode bool) gin.HandlerFunc {
-	return requireServiceOrRoles(jwtSecret, serviceSecret, devMode, "store_operator", "admin")
+func RequireStore(jwtSecret string, verifier *servicetoken.Verifier, devMode bool) gin.HandlerFunc {
+	return requireServiceOrRoles(jwtSecret, verifier, devMode, "store_operator", "admin")
 }
 
 // requireServiceOrRoles é o tronco comum de RequireInternal e RequireStore:
@@ -191,7 +191,7 @@ func RequireStore(jwtSecret, serviceSecret string, devMode bool) gin.HandlerFunc
 // separação de segredos com outra lista de papéis. Duplicar o middleware seria
 // convite a divergir na próxima mudança de segurança — e é justamente aqui que
 // divergir custa caro.
-func requireServiceOrRoles(jwtSecret, serviceSecret string, devMode bool, roles ...string) gin.HandlerFunc {
+func requireServiceOrRoles(jwtSecret string, verifier *servicetoken.Verifier, devMode bool, roles ...string) gin.HandlerFunc {
 	allowed := make(map[string]struct{}, len(roles))
 	for _, r := range roles {
 		allowed[r] = struct{}{}
@@ -202,8 +202,8 @@ func requireServiceOrRoles(jwtSecret, serviceSecret string, devMode bool, roles 
 		if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
 			raw := strings.TrimPrefix(auth, "Bearer ")
 
-			// 1) Token de serviço — assinado com o segredo de SERVIÇO.
-			if sub, err := servicetoken.Parse(raw, serviceSecret); err == nil {
+			// 1) Token de serviço — Ed25519 (chave pública) ou HS256 legado.
+			if sub, err := verifier.Parse(raw); err == nil {
 				c.Set("user_id", sub)
 				c.Set("user_role", servicetoken.Role)
 				c.Next()

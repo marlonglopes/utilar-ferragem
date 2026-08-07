@@ -248,6 +248,27 @@ func SecretFromEnv(devMode bool, userSecret string) (string, error) {
 // distribui as chaves aos verificadores primeiro, o emissor troca depois.
 // ============================================================================
 
+// Construtores diretos — para a fiação nos serviços e para os testes. O caminho
+// de produção usa SignerFromEnv/VerifierFromEnv (fail-closed).
+
+// NewHMACSigner cria um emissor HS256 (dev/legado).
+func NewHMACSigner(secret string) *Signer { return &Signer{hmac: secret} }
+
+// NewEd25519Signer cria um emissor assimétrico (produção).
+func NewEd25519Signer(priv ed25519.PrivateKey) *Signer { return &Signer{priv: priv} }
+
+// NewHMACVerifier cria um verificador que só aceita HS256 (legado).
+func NewHMACVerifier(secret string) *Verifier { return &Verifier{hmac: secret} }
+
+// NewEd25519Verifier cria um verificador que só aceita Ed25519.
+func NewEd25519Verifier(pub ed25519.PublicKey) *Verifier { return &Verifier{pub: pub} }
+
+// NewVerifier cria um verificador DUAL (aceita Ed25519 e/ou HS256). Passe zero
+// value onde não houver chave.
+func NewVerifier(pub ed25519.PublicKey, hmacSecret string) *Verifier {
+	return &Verifier{pub: pub, hmac: hmacSecret}
+}
+
 // GenerateKeyPair gera um par Ed25519 e devolve (pública, privada) em base64,
 // prontos para SERVICE_JWT_PUBLIC_KEY / SERVICE_JWT_PRIVATE_KEY. Para setup/CLI
 // e testes — a geração de chave de produção é feita uma vez, fora do processo.

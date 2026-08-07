@@ -8,8 +8,6 @@ import (
 	"io"
 	"net/http"
 	"time"
-
-	"github.com/utilar/pkg/servicetoken"
 )
 
 // ============================================================================
@@ -77,7 +75,7 @@ type ReturnRefund struct {
 // humana no meio. Mesmo princípio de appmaxv1.isFinancialRoute e de
 // pkg/retry.NonIdempotent.
 func (c *Client) PostReturnRefund(ctx context.Context, in ReturnRefund) error {
-	if c.baseURL == "" || c.serviceSecret == "" {
+	if c.baseURL == "" || c.signer == nil {
 		return ErrNotConfigured
 	}
 
@@ -90,7 +88,7 @@ func (c *Client) PostReturnRefund(ctx context.Context, in ReturnRefund) error {
 	if err != nil {
 		return err
 	}
-	tok, err := servicetoken.Issue(c.serviceSecret, "order-service")
+	tok, err := c.signer.Issue("order-service")
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrNotConfigured, err)
 	}

@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
-	"github.com/utilar/pkg/servicetoken"
 )
 
 // ============================================================================
@@ -62,10 +60,10 @@ type ReservationItem struct {
 // serviceToken assina um JWT HS256 com role=service válido por 2 minutos,
 // usando o segredo de SERVIÇO (ver pkg/servicetoken).
 func (c *Client) serviceToken() (string, error) {
-	if c.serviceSecret == "" {
+	if c.signer == nil {
 		return "", errors.New("catalogclient: SERVICE_JWT_SECRET not configured for service calls")
 	}
-	return servicetoken.Issue(c.serviceSecret, "order-service")
+	return c.signer.Issue("order-service")
 }
 
 // Reserve reserva os itens de um pedido. All-or-nothing do lado do catalog.

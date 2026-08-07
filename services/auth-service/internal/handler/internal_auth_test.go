@@ -27,7 +27,7 @@ func rotaInternaAuth() *gin.Engine {
 	r := gin.New()
 	r.Use(handler.RequestID())
 	g := r.Group("/api/v1/internal",
-		handler.InternalAuth(internoSegredoUsuario, internoSegredoServico, nil),
+		handler.InternalAuth(internoSegredoUsuario, servicetoken.NewHMACVerifier(internoSegredoServico), nil),
 		handler.RequireRole("service", "admin"))
 	g.GET("/operators/:userId", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"role": c.GetString("user_role")})

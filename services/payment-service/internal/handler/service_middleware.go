@@ -26,10 +26,10 @@ import (
 // FAIL-CLOSED: sem segredo configurado o grupo inteiro não é registrado (ver
 // cmd/server/main.go). Aqui, por garantia, segredo vazio recusa tudo — HS256
 // aceita chave vazia normalmente, e "sem segredo" viraria "qualquer um assina".
-func RequireService(serviceSecret string) gin.HandlerFunc {
+func RequireService(verifier *servicetoken.Verifier) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if serviceSecret == "" {
-			slog.Error("rota interna sem SERVICE_JWT_SECRET — recusando (fail-closed)",
+		if verifier == nil {
+			slog.Error("rota interna sem verificador de serviço — recusando (fail-closed)",
 				"path", c.FullPath(), "request_id", c.GetString("request_id"))
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
@@ -39,7 +39,7 @@ func RequireService(serviceSecret string) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing token"})
 			return
 		}
-		subject, err := servicetoken.Parse(strings.TrimPrefix(hdr, "Bearer "), serviceSecret)
+		subject, err := verifier.Parse(strings.TrimPrefix(hdr, "Bearer "))
 		if err != nil {
 			slog.Warn("token de serviço recusado",
 				"error", err.Error(), "path", c.FullPath(),
