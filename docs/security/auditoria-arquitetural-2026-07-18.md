@@ -14,7 +14,19 @@ aquilo que foi desenhado; o desenho é que concentra risco demais num ponto.
 
 ---
 
-## A1 — CRÍTICO · 🟡 MITIGADO em 19/07/2026 · O segredo JWT compartilhado
+## A1 — CRÍTICO · 🟢 DEFINITIVO IMPLEMENTADO (dormente até as chaves) · O segredo JWT compartilhado
+
+> **ATUALIZAÇÃO:** a solução definitiva (assinatura assimétrica Ed25519) está
+> **implementada e ligada** em `pkg/servicetoken` (`Signer`/`Verifier`) e nos 5
+> serviços. **Topologia real:** o **order-service é o único emissor**; catalog,
+> auth **e payment** são verificadores (a tabela abaixo dizia "payment não" — era
+> erro; payment VERIFICA). O `Verifier` é **dual** (Ed25519 + HS256 legado), então
+> a migração é sem downtime. **Ativar:** gere um par (`GenerateKeyPair`), PRIVADA
+> só no order (`SERVICE_JWT_PRIVATE_KEY`), PÚBLICA nos verificadores
+> (`SERVICE_JWT_PUBLIC_KEY`). Sem as chaves, roda em HS256 como antes. A partir
+> daqui, um verificador comprometido NÃO emite mais token de serviço — a classe do
+> A1 está fechada. O texto original abaixo fica como registro histórico.
+
 ## transforma qualquer serviço comprometido em administrador de todo o sistema
 
 > **Estado: mitigado, não fechado.** A recomendação (1) — segredo separado para
