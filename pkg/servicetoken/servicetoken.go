@@ -43,6 +43,9 @@
 package servicetoken
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -65,8 +68,19 @@ const (
 	// chamada HTTP entre serviços. Se vazar num log, expira antes de ser útil.
 	DefaultTTL = 2 * time.Minute
 
-	// EnvVar é o nome da variável que carrega o segredo de serviço.
+	// EnvVar é o nome da variável que carrega o segredo de serviço (HS256 legado).
 	EnvVar = "SERVICE_JWT_SECRET"
+
+	// EnvPrivateKey / EnvPublicKey — chaves Ed25519 (assimétrico, A1 definitivo),
+	// base64 padrão. O order-service (único emissor) recebe a PRIVADA; catalog,
+	// auth e payment (verificadores) recebem só a PÚBLICA — ficam incapazes de
+	// EMITIR token de serviço. É o que fecha a classe do A1: comprometer um
+	// verificador não dá mais poder de forjar identidade de serviço.
+	EnvPrivateKey = "SERVICE_JWT_PRIVATE_KEY"
+	EnvPublicKey  = "SERVICE_JWT_PUBLIC_KEY"
+
+	// algEdDSA é o nome do algoritmo assimétrico (Ed25519) no header JWT.
+	algEdDSA = "EdDSA"
 
 	// minSecretLen — mesmo piso aplicado ao JWT_SECRET nos configs.
 	minSecretLen = 32
@@ -98,6 +112,20 @@ var (
 	// ErrWeakServiceSecret — segredo curto demais em modo não-dev.
 	ErrWeakServiceSecret = errors.New(
 		"config: " + EnvVar + " deve ter ao menos 32 caracteres")
+
+	// ErrBadKey — chave Ed25519 mal formada no ambiente.
+	ErrBadKey = errors.New("servicetoken: chave Ed25519 inválida")
+
+	// ErrUnexpectedAlg — algoritmo do token não bate com a chave disponível.
+	// Barra confusão de algoritmo (ex.: HS256 tentando usar a chave pública como
+	// segredo HMAC) e alg:none.
+	ErrUnexpectedAlg = errors.New("servicetoken: algoritmo inesperado")
+
+	// ErrNoVerifyKey — verificador sem NENHUMA chave (nem pública nem HS256).
+	ErrNoVerifyKey = errors.New(
+		"config: verificador de token de serviço precisa de " + EnvPublicKey +
+			" (Ed25519) ou " + EnvVar + " (HS256) — fora de DEV_MODE, sem nenhum " +
+			"o serviço não sobe (auditoria A1)")
 )
 
 // Issue assina um token de serviço HS256 válido por DefaultTTL.
@@ -208,4 +236,204 @@ func SecretFromEnv(devMode bool, userSecret string) (string, error) {
 		return "", ErrWeakServiceSecret
 	}
 	return secret, nil
+}
+
+// ============================================================================
+// Assinatura ASSIMÉTRICA (Ed25519) — A1 definitivo
+// ----------------------------------------------------------------------------
+// O order-service (único emissor) assina com a chave PRIVADA; catalog, auth e
+// payment verificam com a PÚBLICA. Um verificador comprometido não emite mais
+// token de serviço — ele nem tem com o quê. Durante a transição, o Verifier
+// aceita AMBOS (Ed25519 novo e HS256 legado), então dá pra migrar sem downtime:
+// distribui as chaves aos verificadores primeiro, o emissor troca depois.
+// ============================================================================
+
+// GenerateKeyPair gera um par Ed25519 e devolve (pública, privada) em base64,
+// prontos para SERVICE_JWT_PUBLIC_KEY / SERVICE_JWT_PRIVATE_KEY. Para setup/CLI
+// e testes — a geração de chave de produção é feita uma vez, fora do processo.
+func GenerateKeyPair() (pub, priv string, err error) {
+	pk, sk, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return "", "", err
+	}
+	return base64.StdEncoding.EncodeToString(pk),
+		base64.StdEncoding.EncodeToString(sk), nil
+}
+
+// ParsePublicKey decodifica uma chave pública Ed25519 em base64.
+func ParsePublicKey(b64 string) (ed25519.PublicKey, error) {
+	raw, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil || len(raw) != ed25519.PublicKeySize {
+		return nil, ErrBadKey
+	}
+	return ed25519.PublicKey(raw), nil
+}
+
+// ParsePrivateKey decodifica uma chave privada Ed25519 em base64. Aceita a chave
+// completa (64 bytes) ou só a semente (32 bytes) — a semente é o formato mais
+// compacto para guardar no cofre.
+func ParsePrivateKey(b64 string) (ed25519.PrivateKey, error) {
+	raw, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return nil, ErrBadKey
+	}
+	switch len(raw) {
+	case ed25519.PrivateKeySize: // 64
+		return ed25519.PrivateKey(raw), nil
+	case ed25519.SeedSize: // 32
+		return ed25519.NewKeyFromSeed(raw), nil
+	default:
+		return nil, ErrBadKey
+	}
+}
+
+// Signer emite tokens de serviço. Se tiver chave privada Ed25519, assina EdDSA;
+// senão cai no HS256 (dev/legado). O order-service constrói um destes.
+type Signer struct {
+	priv ed25519.PrivateKey
+	hmac string
+}
+
+// Issue assina um token de serviço válido por DefaultTTL.
+func (s *Signer) Issue(subject string) (string, error) {
+	return s.IssueWithTTL(subject, DefaultTTL)
+}
+
+// IssueWithTTL é o Issue com validade explícita (testes).
+func (s *Signer) IssueWithTTL(subject string, ttl time.Duration) (string, error) {
+	if subject == "" {
+		return "", errors.New("servicetoken: subject vazio")
+	}
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"sub": subject, "role": Role, "iss": Issuer,
+		"iat": now.Unix(), "exp": now.Add(ttl).Unix(),
+	}
+	if s.priv != nil {
+		return jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims).SignedString(s.priv)
+	}
+	if s.hmac != "" {
+		return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(s.hmac))
+	}
+	return "", ErrNoSecret
+}
+
+// Verifier verifica tokens de serviço, aceitando Ed25519 (chave pública) E/OU
+// HS256 (segredo legado). catalog, auth e payment constroem um destes.
+type Verifier struct {
+	pub  ed25519.PublicKey
+	hmac string
+}
+
+// Parse verifica o token e devolve o `sub`. Aceita só os algoritmos para os
+// quais HÁ chave — e resolve a chave POR algoritmo, nunca deixando a pública
+// virar segredo HMAC (confusão de algoritmo). alg:none é recusado.
+func (v *Verifier) Parse(tokenStr string) (string, error) {
+	var methods []string
+	if v.pub != nil {
+		methods = append(methods, algEdDSA)
+	}
+	if v.hmac != "" {
+		methods = append(methods, jwt.SigningMethodHS256.Alg())
+	}
+	if len(methods) == 0 {
+		return "", ErrNoVerifyKey
+	}
+
+	token, err := jwt.Parse(tokenStr,
+		func(t *jwt.Token) (any, error) {
+			switch t.Method.Alg() {
+			case algEdDSA:
+				if v.pub == nil {
+					return nil, ErrUnexpectedAlg
+				}
+				return v.pub, nil
+			case jwt.SigningMethodHS256.Alg():
+				if v.hmac == "" {
+					return nil, ErrUnexpectedAlg
+				}
+				return []byte(v.hmac), nil
+			default:
+				return nil, ErrUnexpectedAlg
+			}
+		},
+		jwt.WithValidMethods(methods),
+		jwt.WithIssuer(Issuer),
+		jwt.WithExpirationRequired(),
+	)
+	if err != nil {
+		return "", fmt.Errorf("servicetoken: %w", err)
+	}
+	if !token.Valid {
+		return "", errors.New("servicetoken: token inválido")
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("servicetoken: claims inválidas")
+	}
+	if role, _ := claims["role"].(string); role != Role {
+		return "", ErrNotServiceToken
+	}
+	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		return "", errors.New("servicetoken: claim sub ausente")
+	}
+	return sub, nil
+}
+
+// IsService diz se o token é de serviço, sem expor o erro.
+func (v *Verifier) IsService(tokenStr string) bool {
+	_, err := v.Parse(tokenStr)
+	return err == nil
+}
+
+// SignerFromEnv monta o emissor a partir do ambiente, fail-closed. Preferência
+// para Ed25519 (SERVICE_JWT_PRIVATE_KEY); na ausência, cai no HS256 legado
+// (SERVICE_JWT_SECRET) via SecretFromEnv (mesma política de boot). Só o
+// order-service chama isto.
+func SignerFromEnv(devMode bool, userSecret string) (*Signer, error) {
+	if pk := os.Getenv(EnvPrivateKey); pk != "" {
+		priv, err := ParsePrivateKey(pk)
+		if err != nil {
+			return nil, fmt.Errorf("%w (%s)", err, EnvPrivateKey)
+		}
+		return &Signer{priv: priv}, nil
+	}
+	secret, err := SecretFromEnv(devMode, userSecret)
+	if err != nil {
+		return nil, err
+	}
+	return &Signer{hmac: secret}, nil
+}
+
+// VerifierFromEnv monta o verificador a partir do ambiente, fail-closed. Carrega
+// a chave PÚBLICA (SERVICE_JWT_PUBLIC_KEY) e/ou o segredo HS256 legado, aceitando
+// ambos na transição. Fora de DEV_MODE, sem NENHUMA chave o serviço não sobe.
+// catalog, auth e payment chamam isto.
+func VerifierFromEnv(devMode bool, userSecret string) (*Verifier, error) {
+	v := &Verifier{}
+	if pub := os.Getenv(EnvPublicKey); pub != "" {
+		pk, err := ParsePublicKey(pub)
+		if err != nil {
+			return nil, fmt.Errorf("%w (%s)", err, EnvPublicKey)
+		}
+		v.pub = pk
+	}
+
+	// HS256 legado: reaproveita a política do SecretFromEnv, MAS só é obrigatório
+	// se não houver chave pública. Com a pública presente, a ausência do HS256 é
+	// o estado final desejado (verificador só-assimétrico).
+	secret, secErr := SecretFromEnv(devMode, userSecret)
+	if secErr == nil {
+		v.hmac = secret
+	} else if v.pub == nil {
+		// Sem pública E sem HS256 válido: fail-closed (fora de dev).
+		if !devMode {
+			return nil, ErrNoVerifyKey
+		}
+		// Em dev sem nada declarado, SecretFromEnv já teria caído no userSecret;
+		// só chega aqui se o erro for de configuração explícita (ex.: iguais).
+		return nil, secErr
+	}
+	return v, nil
 }
