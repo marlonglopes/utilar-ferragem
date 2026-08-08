@@ -48,6 +48,7 @@ const ReturnsPage = lazy(() => import('@/pages/admin/ReturnsPage'))
 const ReviewsPage = lazy(() => import('@/pages/admin/ReviewsPage'))
 const ShippingPage = lazy(() => import('@/pages/admin/ShippingPage'))
 const CouponsPage = lazy(() => import('@/pages/admin/CouponsPage'))
+const StoreSettingsPage = lazy(() => import('@/pages/admin/StoreSettingsPage'))
 const PaymentConfigPage = lazy(() => import('@/pages/admin/PaymentConfigPage'))
 const BulkImagesPage = lazy(() => import('@/pages/admin/BulkImagesPage'))
 
@@ -128,6 +129,12 @@ export const adminRoutes: RouteObject[] = [
     // Cupons: descontos do site (dinheiro/marketing → só admin).
     path: '/admin/cupons',
     element: adminPage(<CouponsPage />),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // Config da loja: o aviso da vitrine (dono edita sem deploy).
+    path: '/admin/loja',
+    element: adminPage(<StoreSettingsPage />),
     errorElement: <RouteErrorBoundary />,
   },
   {

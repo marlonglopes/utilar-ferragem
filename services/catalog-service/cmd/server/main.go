@@ -21,6 +21,7 @@ import (
 	"github.com/utilar/catalog-service/internal/storage"
 	"github.com/utilar/pkg/metrics"
 	"github.com/utilar/pkg/ratelimit"
+	"github.com/utilar/pkg/roles"
 )
 
 func main() {
@@ -64,6 +65,7 @@ func main() {
 	reservationH := handler.NewReservationHandler(database)
 	importH := handler.NewImportHandler(database)
 	storeCostH := handler.NewStoreCostHandler(database)
+	storeSettingsH := handler.NewStoreSettingsHandler(database)
 	productImageH := handler.NewProductImageHandler(database, mediaStore)
 	reviewH := handler.NewReviewHandler(database, cfg.ServiceJWTSecret)
 	recoH := handler.NewRecommendationHandler(database).WithMedia(mediaStore)
@@ -140,6 +142,10 @@ func main() {
 		// técnica (rótulo, tipo, unidade). Sem dado sensível — é o que o
 		// frontend precisa pra montar os filtros técnicos.
 		api.GET("/categories/:id/attributes", listCache, catalogAdminH.CategoryAttributes)
+		// Aviso da vitrine (config da loja) — público, sem dado sensível. A home
+		// lê pra desenhar o banner. `listCache` (1 min) é folgado: o dono não
+		// espera que o aviso apareça no mesmo segundo em que ligou.
+		api.GET("/store/settings", listCache, storeSettingsH.Get)
 	}
 
 	// Escrita de avaliação — cliente autenticado. A autorização REAL desta rota
@@ -283,6 +289,14 @@ func main() {
 	stockWrite := r.Group("/api/v1/admin", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, handler.StockWriteRoles...))
 	{
 		stockWrite.POST("/stock/:id/adjust", stockH.Adjust)
+	}
+
+	// Config da loja (aviso da vitrine) — ADMIN-ONLY, não admin+vendas: é a voz
+	// institucional da loja com o cliente. Quem mantém catálogo (`vendas`) não
+	// muda o banner da home. Ver docs/backoffice-personas.md.
+	storeAdmin := r.Group("/api/v1/admin", handler.RequireRole(cfg.JWTSecret, cfg.DevMode, roles.Admin))
+	{
+		storeAdmin.PUT("/store/settings", storeSettingsH.Update)
 	}
 
 	// Rotas internas de reserva de estoque — chamadas pelo order-service, não

@@ -34,6 +34,7 @@ export const ADMIN_SECTIONS: ReadonlyArray<{ path: string; roles: readonly Staff
   { path: '/admin/vendedores', roles: ['admin'] },
   { path: '/admin/frete', roles: ['admin'] }, // o que o cliente paga → só dono
   { path: '/admin/cupons', roles: ['admin'] }, // desconto/marketing → só dono
+  { path: '/admin/loja', roles: ['admin'] }, // aviso da vitrine (voz da loja) → só dono
   { path: '/admin/produtos', roles: ['admin', 'vendas'] }, // tem custo
   { path: '/admin/categorias', roles: ['admin', 'vendas'] },
   { path: '/admin/importar', roles: ['admin', 'vendas'] },
