@@ -82,6 +82,14 @@ export interface OrderPanelProps {
   onCharge: () => void
   /** O teto de desconto exibido foi confirmado por `GET /api/v1/store/me`. */
   ceilingFromBackend?: boolean
+  /**
+   * `flow` = layout de FLUXO NATURAL (usado na gaveta do celular): o painel cresce
+   * com o conteúdo e quem rola é o container da gaveta. O padrão (false) é o
+   * layout de ALTURA FIXA do painel lateral do tablet — a lista de itens rola por
+   * dentro e o Cobrar fica ancorado no rodapé. No celular o layout fixo espremia
+   * a lista de itens até altura 0 (os itens sumiam); `flow` resolve isso.
+   */
+  flow?: boolean
 }
 
 /**
@@ -100,12 +108,13 @@ export function OrderPanel({
   onCustomerChange,
   onCharge,
   ceilingFromBackend = true,
+  flow = false,
 }: OrderPanelProps) {
   const empty = comanda.items.length === 0
   const canCharge = !empty && !pricing.blocked && comanda.customer !== null
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white">
+    <div className={cn('flex flex-col bg-white', flow ? 'min-h-full' : 'h-full min-h-0')}>
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
         <h2 className="flex items-center gap-2 font-display text-base font-bold text-gray-900">
           <ShoppingCart className="h-5 w-5 text-brand-blue" aria-hidden="true" />
@@ -118,7 +127,8 @@ export function OrderPanel({
 
       <CustomerBlock customer={comanda.customer} onChange={onCustomerChange} />
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* flow: cresce com o conteúdo (a gaveta rola); fixo: rola por dentro. */}
+      <div className={cn(flow ? '' : 'min-h-0 flex-1 overflow-y-auto')}>
         {empty ? (
           <div className="flex h-full min-h-[140px] flex-col items-center justify-center px-6 text-center">
             <p className="text-sm font-semibold text-gray-700">Nenhum item</p>

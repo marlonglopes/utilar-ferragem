@@ -155,19 +155,20 @@ export default function BalcaoPage() {
     })
   }, [checkout.outcome, clearComanda, navigate, pricing.total, comanda.customer])
 
-  const orderPanel = (
-    <OrderPanel
-      comanda={comanda}
-      pricing={pricing}
-      onIncrement={incrementItem}
-      onDecrement={decrementItem}
-      onRemove={removeItem}
-      onDiscountChange={setDiscountPct}
-      onCustomerChange={setCustomer}
-      onCharge={openCharge}
-      ceilingFromBackend={operator.fromBackend}
-    />
-  )
+  // Mesmas props nos dois lugares; muda só o layout: painel lateral (tablet) tem
+  // altura fixa com rolagem interna; a gaveta (celular) usa `flow` — cresce com o
+  // conteúdo e quem rola é a própria gaveta, senão a lista de itens colapsava.
+  const orderPanelProps = {
+    comanda,
+    pricing,
+    onIncrement: incrementItem,
+    onDecrement: decrementItem,
+    onRemove: removeItem,
+    onDiscountChange: setDiscountPct,
+    onCustomerChange: setCustomer,
+    onCharge: openCharge,
+    ceilingFromBackend: operator.fromBackend,
+  }
 
   // h-[100svh] (não h-screen/100vh): no celular o 100vh inclui a área atrás das
   // barras do navegador, e a barra inferior "Ver pedido/Cobrar" escorregava pra
@@ -197,7 +198,7 @@ export default function BalcaoPage() {
 
         {/* Painel fixo — tablet landscape / desktop */}
         <aside className="hidden w-[380px] shrink-0 border-l border-gray-200 lg:block xl:w-[420px]">
-          {orderPanel}
+          <OrderPanel {...orderPanelProps} />
         </aside>
       </div>
 
@@ -243,10 +244,10 @@ export default function BalcaoPage() {
         title="Pedido do balcão"
         className="lg:hidden"
       >
-        {/* Alta (85svh): a comanda inteira precisa caber pra editar/remover item
-            por item. A lista de itens rola dentro do painel (flex-1), então todos
-            ficam alcançáveis; a altura maior evita a janelinha apertada de antes. */}
-        <div className="h-[85svh]">{orderPanel}</div>
+        {/* flow: o painel cresce com o conteúdo e a PRÓPRIA gaveta rola (a Drawer
+            já é overflow-y-auto). Sem isso, a lista de itens colapsava pra altura
+            0 no celular e os itens não apareciam. */}
+        <OrderPanel {...orderPanelProps} flow />
       </Drawer>
 
       <ChargeModal
