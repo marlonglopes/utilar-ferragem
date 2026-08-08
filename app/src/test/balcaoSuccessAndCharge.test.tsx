@@ -78,12 +78,15 @@ describe('ChargeModal — métodos de cobrança no balcão', () => {
     initPoint: '#',
   }
 
-  it('oferece Pix, Cartão (digitado), Boleto e Maquininha', () => {
+  // Venda de balcão é presencial e à vista: Pix, Cartão (digitado) e Maquininha
+  // (dinheiro/POS). NÃO oferece boleto — boleto é "pagar depois", não cabe no
+  // caixa (entregaria a mercadoria antes de o pagamento cair).
+  it('oferece Pix, Cartão (digitado) e Maquininha — e NÃO oferece Boleto', () => {
     renderModal({})
     expect(screen.getByText('Pix')).toBeInTheDocument()
     expect(screen.getByText('Cartão')).toBeInTheDocument()
-    expect(screen.getByText('Boleto')).toBeInTheDocument()
     expect(screen.getByText('Maquininha')).toBeInTheDocument()
+    expect(screen.queryByText('Boleto')).not.toBeInTheDocument()
   })
 
   it('cartão digitado: com resultado de cartão, mostra o formulário e permite simular (mock)', () => {

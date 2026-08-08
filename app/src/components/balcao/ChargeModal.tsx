@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { QrCode, FileText, Terminal, Check, CreditCard } from 'lucide-react'
+import { QrCode, Terminal, Check, CreditCard } from 'lucide-react'
 import { Modal, Button, Input } from '@/components/ui'
 import { formatCurrency } from '@/lib/format'
 import { cn } from '@/lib/cn'
@@ -16,6 +16,11 @@ import type { PaymentResult } from '@/hooks/usePayment'
 // tokenização no browser (Appmax JS) — o MESMO bloqueio do checkout web; quando
 // entrar lá, o balcão herda sem mudança. "Maquininha" (external) segue existindo
 // para dinheiro / POS físico, que não passa pela Appmax.
+//
+// SEM boleto: venda de balcão é presencial e à vista — boleto é "pagar depois",
+// não faz sentido no caixa (entregaria a mercadoria antes de o pagamento cair).
+// O tipo BalcaoPaymentMethod ainda aceita 'boleto' (herdado da web), mas o PDV
+// simplesmente não o oferece.
 const METHODS: Array<{
   id: BalcaoPaymentMethod
   label: string
@@ -24,7 +29,6 @@ const METHODS: Array<{
 }> = [
   { id: 'pix', label: 'Pix', hint: 'QR na tela', icon: QrCode },
   { id: 'card', label: 'Cartão', hint: 'Crédito — digitado', icon: CreditCard },
-  { id: 'boleto', label: 'Boleto', hint: 'Impresso', icon: FileText },
   { id: 'external', label: 'Maquininha', hint: 'Dinheiro / POS', icon: Terminal },
 ]
 
@@ -205,7 +209,7 @@ export function ChargeModal({
             )}
 
             {/* Cartão em aberto NÃO oferece "concluir mesmo assim" — evita fechar a
-                venda sem o cartão ter sido aprovado. Pix/boleto seguem podendo. */}
+                venda sem o cartão ter sido aprovado. Pix/maquininha seguem podendo. */}
             {(confirmed || !cardForm) && (
               <Button size="lg" fullWidth onClick={onDone} className="h-14">
                 {confirmed ? 'Concluir venda' : 'Concluir mesmo assim'}
