@@ -148,6 +148,14 @@ export interface AdminProductDetail extends AdminProductRow {
   sellerId?: string
   seller?: string
   images?: ProductImageRecord[]
+  /** Faixas de atacado ("a partir de N unidades, sai por X"). Ver PriceTiersManager. */
+  priceTiers?: PriceTier[]
+}
+
+/** Faixa de preço por quantidade — "comprando minQty ou mais, o unitário é price". */
+export interface PriceTier {
+  minQty: number
+  price: number
 }
 
 /**

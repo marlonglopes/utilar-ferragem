@@ -5,6 +5,7 @@ import { AdminShell } from '@/components/admin/AdminShell'
 import { ErrorState, LoadingRows } from '@/components/admin/primitives'
 import { ProductForm } from '@/components/admin/products/ProductForm'
 import { ProductImageManager } from '@/components/admin/products/ProductImageManager'
+import { PriceTiersManager } from '@/components/admin/products/PriceTiersManager'
 import { StatusPill } from '@/components/admin/products/productPrimitives'
 import { useAdminProduct, useSaveProduct } from '@/hooks/useAdminProducts'
 import type { ProductInput } from '@/lib/adminProductTypes'
@@ -91,6 +92,12 @@ export default function AdminProductEditPage() {
           />
 
           <ProductImageManager productId={data.id} />
+
+          <PriceTiersManager
+            key={data.id + ':tiers'}
+            productId={data.id}
+            initialTiers={data.priceTiers}
+          />
         </div>
       )}
     </AdminShell>

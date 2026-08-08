@@ -22,6 +22,7 @@ import type {
   ProductImageRecord,
   ProductInput,
   ProductStatus,
+  PriceTier,
 } from '@/lib/adminProductTypes'
 
 /**
@@ -253,6 +254,20 @@ export async function patchAdminProduct(
   return send<AdminProductDetail>(`${BASE}/by-id/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     ...json(input),
+  })
+}
+
+/**
+ * Substitui o CONJUNTO de faixas de atacado do produto (PUT, não merge — a
+ * tabela de preço é negociada inteira). O backend valida (faixa maior não pode
+ * ser mais cara, sem min_qty duplicado) e responde com o "a partir de" já
+ * resolvido. Em mock, no-op de sucesso.
+ */
+export async function setPriceTiers(id: string, tiers: PriceTier[]): Promise<void> {
+  if (!isProductAdminEnabled) return
+  await send<unknown>(`${BASE}/by-id/${encodeURIComponent(id)}/price-tiers`, {
+    method: 'PUT',
+    ...json({ tiers }),
   })
 }
 
