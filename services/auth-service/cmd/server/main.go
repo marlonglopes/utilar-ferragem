@@ -102,12 +102,21 @@ func main() {
 		pub.POST("/auth/forgot-password", withRL(forgotRL, authH.ForgotPassword)...)
 		pub.POST("/auth/reset-password", withRL(resetRL, authH.ResetPassword)...)
 		pub.POST("/auth/verify-email", withRL(verifyRL, authH.VerifyEmail)...)
+		// 2º passo do login MFA: troca o challenge (prova de senha) + código TOTP
+		// pelos tokens. Público porque o challenge É a credencial; mesmo rate-limit
+		// de login para não virar oráculo de força-bruta do código.
+		pub.POST("/auth/login/verify-totp", withRL(loginRL, authH.VerifyTOTP)...)
 	}
 
 	priv := r.Group("/api/v1", handler.JWTAuth(cfg.JWTSecret, authH.AccessTokenDenyList()))
 	{
 		priv.GET("/me", authH.Me)
 		priv.POST("/auth/logout", authH.Logout)
+		// Enrollment de MFA (2º fator) — autenticado: quem já entrou ativa o TOTP
+		// da própria conta. Ver internal/handler/mfa.go.
+		priv.GET("/auth/mfa/status", authH.MFAStatus)
+		priv.POST("/auth/mfa/enroll", authH.EnrollMFA)
+		priv.POST("/auth/mfa/confirm", authH.ConfirmMFA)
 		priv.GET("/addresses", addrH.List)
 		priv.POST("/addresses", addrH.Create)
 		priv.DELETE("/addresses/:id", addrH.Delete)

@@ -102,3 +102,57 @@ func ParseAccessToken(tokenStr, secret string) (*Claims, error) {
 	}
 	return claims, nil
 }
+
+// ── MFA challenge (2º fator) ────────────────────────────────────────────────
+//
+// Depois que a SENHA confere mas o usuário tem MFA, o servidor NÃO emite os
+// tokens ainda: devolve um challenge de vida curta que prova "a senha já foi
+// verificada". O 2º passo (código TOTP) troca esse challenge pelos tokens. Assim
+// o código TOTP nunca é pedido antes da senha, e o challenge sozinho não abre
+// nada (não é access token — tem purpose próprio e 5 min de vida).
+
+const mfaChallengeTTL = 5 * time.Minute
+const mfaChallengePurpose = "mfa_challenge"
+
+// GenerateMFAChallenge assina um challenge HS256 curto para o userID.
+func GenerateMFAChallenge(secret, userID string) (string, error) {
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"sub":     userID,
+		"purpose": mfaChallengePurpose,
+		"iat":     now.Unix(),
+		"exp":     now.Add(mfaChallengeTTL).Unix(),
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
+}
+
+// ParseMFAChallenge valida o challenge e devolve o userID. Recusa qualquer token
+// que não seja exatamente um challenge de MFA (purpose), fechando o uso de um
+// access token no lugar do challenge e vice-versa.
+func ParseMFAChallenge(tokenStr, secret string) (string, error) {
+	token, err := jwt.Parse(tokenStr,
+		func(t *jwt.Token) (any, error) {
+			if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+				return nil, errors.New("unexpected signing method")
+			}
+			return []byte(secret), nil
+		},
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithExpirationRequired(),
+	)
+	if err != nil {
+		return "", err
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return "", errors.New("invalid challenge")
+	}
+	if p, _ := claims["purpose"].(string); p != mfaChallengePurpose {
+		return "", errors.New("not an mfa challenge")
+	}
+	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		return "", errors.New("challenge without subject")
+	}
+	return sub, nil
+}

@@ -133,10 +133,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	var name string
 	var failedAttempts int
 	var lockedUntil sql.NullTime
+	var mfaEnabled bool
 	err := h.db.QueryRow(`
-		SELECT id, password_hash, name, role, failed_login_attempts, locked_until
+		SELECT id, password_hash, name, role, failed_login_attempts, locked_until, mfa_enabled
 		FROM users WHERE email = $1
-	`, email).Scan(&userID, &hash, &name, &role, &failedAttempts, &lockedUntil)
+	`, email).Scan(&userID, &hash, &name, &role, &failedAttempts, &lockedUntil, &mfaEnabled)
 	if err == sql.ErrNoRows {
 		// Mensagem genérica — não revelar se o email existe.
 		// L-AUTH-1: registramos failure mesmo sem userID pra detectar enum/bruteforce.
@@ -182,6 +183,19 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		if _, e := h.db.Exec(`UPDATE users SET failed_login_attempts=0, locked_until=NULL WHERE id=$1`, userID); e != nil {
 			slog.Error("lockout: falha ao resetar contador no login ok", "user_id", userID, "error", e.Error())
 		}
+	}
+
+	// MFA: senha OK, mas a conta exige 2º fator → NÃO emite tokens ainda. Devolve
+	// um challenge curto; o /login/verify-totp troca o código TOTP pelos tokens.
+	if mfaEnabled {
+		challenge, err := auth.GenerateMFAChallenge(h.cfg.JWTSecret, userID)
+		if err != nil {
+			InternalError(c, "could not start mfa")
+			return
+		}
+		logAuthEvent(c.Request.Context(), h.db, c, EventLoginSuccess, userID, map[string]any{"stage": "mfa_required"})
+		c.JSON(http.StatusOK, gin.H{"mfaRequired": true, "challenge": challenge})
+		return
 	}
 
 	u, err := h.loadUser(userID)
