@@ -4,6 +4,7 @@ import {
   User,
   MapPin,
   CreditCard,
+  Lock,
   LogOut,
   Plus,
   Pencil,
@@ -353,9 +354,19 @@ export default function AccountPage() {
       {tab === 'profile' && <ProfileTab />}
       {tab === 'addresses' && <AddressesTab />}
       {tab === 'payment' && (
-        <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-400">
-          <CreditCard className="h-10 w-10" />
-          <p className="text-sm">{t('account.paymentStub')}</p>
+        // Intencional, não "buraco": a funcionalidade de cartões salvos depende
+        // da tokenização do PSP (nunca guardamos número de cartão — PCI). Até lá,
+        // deixamos claro que é uma melhoria vindoura E reforçamos a segurança do
+        // fluxo atual, em vez de um "em breve" apagado que parece inacabado.
+        <div className="mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-6 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-blue-light">
+            <CreditCard className="h-6 w-6 text-brand-blue" aria-hidden="true" />
+          </div>
+          <p className="mt-3 font-semibold text-gray-900">{t('account.paymentStub')}</p>
+          <p className="mt-1.5 flex items-center justify-center gap-1.5 text-sm text-gray-500">
+            <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {t('account.paymentStubNote')}
+          </p>
         </div>
       )}
     </div>

@@ -35,7 +35,8 @@
     "city": "Cidade",
     "state": "Estado",
     "cepNotFound": "CEP não encontrado.",
-    "paymentStub": "Formas de pagamento salvas estarão disponíveis em breve.",
+    "paymentStub": "Salve seus cartões para comprar mais rápido — em breve.",
+    "paymentStubNote": "Por enquanto, os dados do cartão são pedidos com segurança a cada compra e nunca ficam guardados aqui.",
     "noAddresses": "Nenhum endereço cadastrado.",
     "saveAddress": "Salvar endereço",
     "cancel": "Cancelar"

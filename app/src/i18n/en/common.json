@@ -35,7 +35,8 @@
     "city": "City",
     "state": "State",
     "cepNotFound": "ZIP code not found.",
-    "paymentStub": "Saved payment methods will be available soon.",
+    "paymentStub": "Save your cards for faster checkout — coming soon.",
+    "paymentStubNote": "For now, card details are requested securely at each purchase and are never stored here.",
     "noAddresses": "No addresses on file.",
     "saveAddress": "Save address",
     "cancel": "Cancel"
