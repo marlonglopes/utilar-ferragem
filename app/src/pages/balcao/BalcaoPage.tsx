@@ -169,8 +169,12 @@ export default function BalcaoPage() {
     />
   )
 
+  // h-[100dvh] (não h-screen/100vh): no celular o 100vh inclui a área atrás das
+  // barras do navegador, e a barra inferior "Ver pedido/Cobrar" escorregava pra
+  // fora da tela (sumia em landscape). dvh = altura VISÍVEL real; h-screen fica
+  // de fallback pra navegador antigo que não entende dvh.
   return (
-    <div className="flex h-screen flex-col bg-gray-50">
+    <div className="flex h-screen h-[100dvh] flex-col bg-gray-50">
       <BalcaoTopBar />
 
       <ComandaTabs
@@ -237,7 +241,7 @@ export default function BalcaoPage() {
         title="Pedido do balcão"
         className="lg:hidden"
       >
-        <div className="h-[75vh]">{orderPanel}</div>
+        <div className="h-[75dvh]">{orderPanel}</div>
       </Drawer>
 
       <ChargeModal
