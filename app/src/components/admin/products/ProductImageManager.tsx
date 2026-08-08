@@ -8,6 +8,7 @@ import {
   Star,
   Trash2,
   Upload,
+  Crop,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Section } from '@/components/admin/primitives'
@@ -21,6 +22,7 @@ import {
   rejectLabel,
 } from '@/lib/adminProductFormat'
 import { useProductImages } from '@/hooks/useAdminProducts'
+import { ImageEditorModal } from '@/components/admin/products/ImageEditorModal'
 import type { ProductImageRecord } from '@/lib/adminProductTypes'
 
 /**
@@ -207,6 +209,8 @@ function ImageCard({
 export function ProductImageManager({ productId }: { productId: string }) {
   const g = useProductImages(productId)
   const inputRef = useRef<HTMLInputElement>(null)
+  const editInputRef = useRef<HTMLInputElement>(null)
+  const [editingFile, setEditingFile] = useState<File | null>(null)
   const [over, setOver] = useState(false)
   const dragFrom = useRef<number | null>(null)
   const dropTarget = useRef<number | null>(null)
@@ -239,19 +243,30 @@ export function ProductImageManager({ productId }: { productId: string }) {
       title="Imagens"
       description="A primeira imagem é a capa da vitrine. Arraste para reordenar."
       actions={
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-md bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:cursor-not-allowed disabled:bg-gray-300"
-        >
-          {g.uploading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-          ) : (
-            <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-          )}
-          {g.uploading ? 'Enviando…' : 'Escolher imagens'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => editInputRef.current?.click()}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Crop className="h-3.5 w-3.5" aria-hidden="true" />
+            Ajustar
+          </button>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            {g.uploading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            {g.uploading ? 'Enviando…' : 'Escolher imagens'}
+          </button>
+        </div>
       }
     >
       <div className="space-y-3 p-3 sm:p-4">
@@ -263,6 +278,30 @@ export function ProductImageManager({ productId }: { productId: string }) {
           className="sr-only"
           aria-label="Escolher imagens do produto"
           onChange={(e) => pick(e.target.files)}
+        />
+
+        {/* Input dedicado do "Ajustar" — 1 imagem por vez, abre o editor. */}
+        <input
+          ref={editInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="sr-only"
+          aria-label="Escolher imagem para ajustar"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) setEditingFile(f)
+            if (editInputRef.current) editInputRef.current.value = ''
+          }}
+        />
+
+        <ImageEditorModal
+          file={editingFile}
+          open={editingFile !== null}
+          onCancel={() => setEditingFile(null)}
+          onApply={(edited) => {
+            setEditingFile(null)
+            void g.upload([edited])
+          }}
         />
 
         {/* Área de soltar arquivos --------------------------------------- */}
