@@ -131,9 +131,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	var userID, hash, role string
 	var name string
+	var failedAttempts int
+	var lockedUntil sql.NullTime
 	err := h.db.QueryRow(`
-		SELECT id, password_hash, name, role FROM users WHERE email = $1
-	`, email).Scan(&userID, &hash, &name, &role)
+		SELECT id, password_hash, name, role, failed_login_attempts, locked_until
+		FROM users WHERE email = $1
+	`, email).Scan(&userID, &hash, &name, &role, &failedAttempts, &lockedUntil)
 	if err == sql.ErrNoRows {
 		// Mensagem genérica — não revelar se o email existe.
 		// L-AUTH-1: registramos failure mesmo sem userID pra detectar enum/bruteforce.
@@ -146,11 +149,39 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// LOCKOUT por conta (anti brute-force independente de IP). Checa ANTES de
+	// gastar tempo verificando a senha. 429 não confirma se a senha estava certa —
+	// só diz que houve tentativas demais.
+	now := time.Now()
+	if lockedUntil.Valid {
+		if lockedUntil.Time.After(now) {
+			logAuthEvent(c.Request.Context(), h.db, c, EventLoginFailure, userID, map[string]any{"reason": "account_locked"})
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error": "muitas tentativas de login; tente novamente mais tarde",
+				"code":  "account_locked",
+			})
+			return
+		}
+		// Lock expirou: recomeça a janela (limpa contador + lock) antes de seguir.
+		if _, e := h.db.Exec(`UPDATE users SET failed_login_attempts=0, locked_until=NULL WHERE id=$1`, userID); e != nil {
+			slog.Error("lockout: falha ao limpar lock expirado", "user_id", userID, "error", e.Error())
+		}
+		failedAttempts = 0
+	}
+
 	ok, err := auth.VerifyPassword(req.Password, hash)
 	if err != nil || !ok {
+		h.registerFailedLogin(c, userID)
 		logAuthEvent(c.Request.Context(), h.db, c, EventLoginFailure, userID, map[string]any{"reason": "wrong_password"})
 		Unauthorized(c, "invalid credentials")
 		return
+	}
+
+	// Sucesso: zera o contador de falhas (se havia). Best-effort — não bloqueia o login.
+	if failedAttempts > 0 {
+		if _, e := h.db.Exec(`UPDATE users SET failed_login_attempts=0, locked_until=NULL WHERE id=$1`, userID); e != nil {
+			slog.Error("lockout: falha ao resetar contador no login ok", "user_id", userID, "error", e.Error())
+		}
 	}
 
 	u, err := h.loadUser(userID)
@@ -166,6 +197,42 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	logAuthEvent(c.Request.Context(), h.db, c, EventLoginSuccess, u.ID, nil)
 	c.JSON(http.StatusOK, model.AuthResponse{User: *u, AccessToken: access, RefreshToken: refresh})
+}
+
+// Parâmetros do lockout por conta. 5 tentativas cobre erro humano de digitação
+// com folga; 15min é longo o bastante pra estragar um brute-force (5 tentativas
+// a cada 15min = ~480/dia, inviável contra argon2id) e curto pra não virar
+// negação de serviço contra o próprio dono.
+const (
+	maxFailedLogins = 5
+	lockoutDuration = 15 * time.Minute
+)
+
+// registerFailedLogin incrementa o contador de falhas da conta e, ao atingir o
+// teto, bloqueia por lockoutDuration. Incremento ATÔMICO (UPDATE ... RETURNING)
+// para não perder contagem sob tentativas concorrentes. Best-effort: um erro de
+// banco aqui não pode derrubar o fluxo de login (que já vai responder 401).
+func (h *AuthHandler) registerFailedLogin(c *gin.Context, userID string) {
+	var attempts int
+	if err := h.db.QueryRow(`
+		UPDATE users
+		SET failed_login_attempts = failed_login_attempts + 1,
+		    last_failed_login_at = now()
+		WHERE id = $1
+		RETURNING failed_login_attempts`, userID).Scan(&attempts); err != nil {
+		slog.Error("lockout: falha ao incrementar tentativas", "user_id", userID, "error", err.Error())
+		return
+	}
+	if attempts >= maxFailedLogins {
+		if _, err := h.db.Exec(`UPDATE users SET locked_until = $2 WHERE id = $1`,
+			userID, time.Now().Add(lockoutDuration)); err != nil {
+			slog.Error("lockout: falha ao bloquear conta", "user_id", userID, "error", err.Error())
+			return
+		}
+		slog.Warn("SEGURANÇA: conta bloqueada por excesso de tentativas de login",
+			"user_id", userID, "attempts", attempts, "minutes", int(lockoutDuration.Minutes()),
+			"request_id", c.GetString("request_id"))
+	}
 }
 
 // -- refresh ----------------------------------------------------------------
