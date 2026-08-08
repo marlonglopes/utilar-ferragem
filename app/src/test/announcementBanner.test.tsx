@@ -4,7 +4,7 @@ import { AnnouncementBanner } from '@/components/layout/AnnouncementBanner'
 import type { StoreSettings } from '@/lib/storeSettingsApi'
 
 // Mocka o hook: o banner é lógica de apresentação pura sobre o settings.
-const mockData = vi.fn<[], { data: StoreSettings | undefined }>()
+const mockData = vi.fn<() => { data: StoreSettings | undefined }>()
 vi.mock('@/hooks/useStoreSettings', () => ({
   useStoreSettings: () => mockData(),
 }))
