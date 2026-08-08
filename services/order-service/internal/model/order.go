@@ -176,6 +176,10 @@ type CreateOrderRequest struct {
 	// DiscountPct é INTENÇÃO. O servidor recalcula o valor e compara com o teto
 	// do cargo — mesma política já aplicada a preço de item e a frete.
 	DiscountPct float64 `json:"discountPct" binding:"omitempty,gte=0,lte=100"`
+	// CouponCode: o cliente do site manda só o CÓDIGO; o servidor resolve tipo,
+	// valor e validade e calcula o desconto sobre o subtotal autoritativo. Nunca
+	// aceitamos o valor do desconto do cliente. Ver internal/coupon.
+	CouponCode string `json:"couponCode" binding:"omitempty,max=40"`
 	// Customer identifica para QUEM é a venda. Pode ser um cadastro leve
 	// existente (CustomerID) e/ou o snapshot dos dados no ato.
 	CustomerID       string `json:"customerId" binding:"omitempty,max=64"`

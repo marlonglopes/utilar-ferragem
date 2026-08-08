@@ -273,6 +273,13 @@ func main() {
 		adminDash.POST("/shipping-rates", shipAdminH.Create)
 		adminDash.PATCH("/shipping-rates/:id", shipAdminH.Update)
 		adminDash.DELETE("/shipping-rates/:id", shipAdminH.Delete)
+
+		// Cupons — admin-only (dinheiro/marketing), mesma fronteira do frete.
+		couponH := handler.NewCouponHandler(database)
+		adminDash.GET("/coupons", couponH.List)
+		adminDash.POST("/coupons", couponH.Create)
+		adminDash.PATCH("/coupons/:id", couponH.Update)
+		adminDash.DELETE("/coupons/:id", couponH.Delete)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

@@ -17,6 +17,7 @@ import (
 	"github.com/utilar/order-service/internal/authclient"
 	"github.com/utilar/order-service/internal/balcao"
 	"github.com/utilar/order-service/internal/catalogclient"
+	"github.com/utilar/order-service/internal/coupon"
 	"github.com/utilar/order-service/internal/fulfillment"
 	"github.com/utilar/order-service/internal/model"
 	"github.com/utilar/order-service/internal/shipping"
@@ -191,6 +192,37 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			"user_id", userID, "request_id", requestID)
 	}
 
+	// CUPOM (site): o cliente manda só o código; o valor sai do subtotal
+	// autoritativo (após o desconto de balcão, que para o web é zero). Cupom é
+	// web-only — não empilha com o desconto negociado do balcão na mesma coluna.
+	var couponAmount float64
+	var couponCode string
+	if raw := strings.TrimSpace(req.CouponCode); raw != "" {
+		if sale.Channel != model.ChannelWeb {
+			BadRequest(c, "cupom só vale no site, não no balcão")
+			return
+		}
+		cp, cerr := h.loadCoupon(ctx, coupon.NormalizeCode(raw))
+		if errors.Is(cerr, coupon.ErrNotFound) {
+			Respond(c, http.StatusUnprocessableEntity, "coupon_invalid", "cupom inválido")
+			return
+		}
+		if cerr != nil {
+			DBError(c, cerr)
+			return
+		}
+		if verr := coupon.Validate(cp, discount.NetSubtotal, time.Now()); verr != nil {
+			Respond(c, http.StatusUnprocessableEntity, "coupon_invalid", verr.Error())
+			return
+		}
+		couponAmount = coupon.Apply(cp, discount.NetSubtotal)
+		couponCode = cp.Code
+	}
+	// Desconto efetivo = balcão + cupom (um dos dois é sempre zero). netSubtotal
+	// é o que o frete e o total enxergam.
+	effectiveDiscount := round2(discount.Amount + couponAmount)
+	netSubtotal := round2(discount.NetSubtotal - couponAmount)
+
 	// FRETE SERVER-SIDE: o valor do request é ignorado. Antes daqui o total era
 	// `subtotal + req.ShippingCost` e mandar shippingCost:0 funcionava.
 	//
@@ -198,7 +230,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	// é "frete grátis" — é a ausência de entrega.
 	shipCost, shipService := 0.0, "pickup"
 	if sale.Channel == model.ChannelWeb {
-		shipCost, shipService, err = h.resolveShipping(ctx, req, discount.NetSubtotal, itemCount, requestID)
+		shipCost, shipService, err = h.resolveShipping(ctx, req, netSubtotal, itemCount, requestID)
 		if err != nil {
 			switch {
 			case errors.Is(err, shipping.ErrInvalidCEP):
@@ -213,7 +245,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			return
 		}
 	}
-	total := round2(discount.NetSubtotal + shipCost)
+	total := round2(netSubtotal + shipCost)
 
 	// ID gerado aqui (em vez do DEFAULT do banco) porque a reserva de estoque
 	// precisa acontecer ANTES do INSERT: se reservássemos depois do commit e a
@@ -289,15 +321,38 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		INSERT INTO orders (
 			id, number, user_id, payment_method, subtotal, shipping_cost, shipping_service, total, stock_reserved,
 			channel, store_id, operator_id, customer_id, customer_name, customer_document, customer_phone,
-			discount_pct, discount_amount, approval_status
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+			discount_pct, discount_amount, approval_status, coupon_code
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
 	`, orderID, orderNumber, sale.OwnerUserID, req.PaymentMethod, subtotal, shipCost, shipService, total, stockReserved,
 		string(sale.Channel), sale.StoreID, sale.OperatorID, sale.CustomerID,
 		sale.CustomerName, sale.CustomerDocument, sale.CustomerPhone,
-		discount.Pct, discount.Amount, discount.ApprovalStatus)
+		discount.Pct, effectiveDiscount, discount.ApprovalStatus, nullIfEmpty(couponCode))
 	if err != nil {
 		DBError(c, err)
 		return
+	}
+
+	// USO DO CUPOM — atômico e na MESMA transação do pedido: o UPDATE condicional
+	// (uses < max_uses) fecha a janela de corrida (dois pedidos disputando o
+	// último uso). 0 linhas = esgotou/expirou/inativou entre a validação e agora
+	// → aborta o pedido inteiro (o rollback do defer desfaz a reserva também).
+	if couponCode != "" {
+		var cid string
+		cerr := tx.QueryRow(`
+			UPDATE coupons SET uses = uses + 1
+			WHERE code = $1 AND active
+			  AND (expires_at IS NULL OR expires_at > now())
+			  AND (max_uses IS NULL OR uses < max_uses)
+			RETURNING id`, couponCode).Scan(&cid)
+		if errors.Is(cerr, sql.ErrNoRows) {
+			Respond(c, http.StatusConflict, "coupon_exhausted",
+				"cupom esgotou agora mesmo; remova o cupom e finalize sem ele")
+			return
+		}
+		if cerr != nil {
+			DBError(c, cerr)
+			return
+		}
 	}
 
 	// items

@@ -1,0 +1,3 @@
+ALTER TABLE orders DROP COLUMN IF EXISTS coupon_code;
+DROP TABLE IF EXISTS coupons;
+DROP TYPE IF EXISTS coupon_type;
