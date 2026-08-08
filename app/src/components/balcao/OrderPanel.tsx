@@ -49,13 +49,17 @@ function OrderLine({ item, onIncrement, onDecrement, onRemove }: LineProps) {
             <Plus className="h-4 w-4" aria-hidden="true" />
           </button>
 
+          {/* Remover: no touch NÃO existe hover, então a lixeira não pode depender
+              dele pra "aparecer" como ação. Fica sempre vermelha e com borda —
+              óbvia como excluir no tablet/celular. */}
           <button
             type="button"
             onClick={() => onRemove(item.productId)}
             aria-label={`Remover ${item.name}`}
-            className="ml-auto flex h-12 w-12 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600"
+            className="ml-auto flex h-12 items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 font-semibold text-red-600 hover:bg-red-50 active:bg-red-100"
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
+            <span className="text-sm">Remover</span>
           </button>
         </div>
       </div>

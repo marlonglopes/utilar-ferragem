@@ -194,6 +194,36 @@ describe('BalcaoPage', () => {
     }
   })
 
+  // O vendedor precisa gerenciar os itens da comanda: remover pelo botão claro
+  // "Remover" (antes era só uma lixeira cinza que dependia de hover — invisível
+  // no toque).
+  it('remove um item da comanda pelo botão Remover', async () => {
+    const user = userEvent.setup()
+    render(<BalcaoPage />, { wrapper })
+
+    useBalcaoStore.getState().addItem({
+      productId: 'p1',
+      sku: 'FER-00001',
+      name: 'Item teste',
+      icon: '⚒',
+      unit: 'un',
+      unitPrice: 100,
+      unitCost: 60,
+      costIsEstimated: false,
+      quantity: 1,
+      stock: 5,
+    })
+    await waitFor(() => {
+      expect(selectActiveComanda(useBalcaoStore.getState()).items).toHaveLength(1)
+    })
+
+    await user.click(screen.getByRole('button', { name: /remover item teste/i }))
+
+    await waitFor(() => {
+      expect(selectActiveComanda(useBalcaoStore.getState()).items).toHaveLength(0)
+    })
+  })
+
   it('permite abrir uma segunda comanda', async () => {
     const user = userEvent.setup()
     render(<BalcaoPage />, { wrapper })

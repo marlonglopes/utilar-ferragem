@@ -243,7 +243,10 @@ export default function BalcaoPage() {
         title="Pedido do balcão"
         className="lg:hidden"
       >
-        <div className="h-[75svh]">{orderPanel}</div>
+        {/* Alta (85svh): a comanda inteira precisa caber pra editar/remover item
+            por item. A lista de itens rola dentro do painel (flex-1), então todos
+            ficam alcançáveis; a altura maior evita a janelinha apertada de antes. */}
+        <div className="h-[85svh]">{orderPanel}</div>
       </Drawer>
 
       <ChargeModal
