@@ -202,7 +202,7 @@ func (h *OrderHandler) Create(c *gin.Context) {
 			BadRequest(c, "cupom só vale no site, não no balcão")
 			return
 		}
-		cp, cerr := h.loadCoupon(ctx, coupon.NormalizeCode(raw))
+		cp, cerr := loadCouponByCode(ctx, h.db, coupon.NormalizeCode(raw))
 		if errors.Is(cerr, coupon.ErrNotFound) {
 			Respond(c, http.StatusUnprocessableEntity, "coupon_invalid", "cupom inválido")
 			return

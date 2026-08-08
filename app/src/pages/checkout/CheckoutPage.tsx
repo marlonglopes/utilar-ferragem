@@ -12,6 +12,7 @@ import { useShippingQuote, type ShippingOption } from '@/hooks/useShippingQuote'
 import { formatCurrency, formatCEP } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { isApiEnabled, isOrderEnabled, orderPostWithJWT } from '@/lib/api'
+import { validateCoupon, type CouponPreview } from '@/lib/couponCheckout'
 import { Input } from '@/components/ui'
 import PixPayment from './PixPayment'
 import BoletoPayment from './BoletoPayment'
@@ -730,13 +731,27 @@ function PaymentStep({
 
 // ─── Order summary sidebar ────────────────────────────────────────────────────
 
-function OrderSummary({ shipping }: { shipping: ShippingOption | null }) {
+function OrderSummary({
+  shipping,
+  coupon,
+  discount,
+  token,
+  onApplyCoupon,
+  onRemoveCoupon,
+}: {
+  shipping: ShippingOption | null
+  coupon: CouponPreview | null
+  discount: number
+  token: string | null
+  onApplyCoupon: (c: CouponPreview) => void
+  onRemoveCoupon: () => void
+}) {
   const { t } = useTranslation('checkout')
   const items = useCartStore((s) => s.items)
 
   const subtotal = items.reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0)
   const shippingCost = shipping?.cost ?? 0
-  const total = subtotal + shippingCost
+  const total = Math.max(0, subtotal - discount) + shippingCost
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col gap-4 lg:sticky lg:top-24">
@@ -755,11 +770,25 @@ function OrderSummary({ shipping }: { shipping: ShippingOption | null }) {
         ))}
       </div>
 
+      <CouponField
+        subtotal={subtotal}
+        coupon={coupon}
+        token={token}
+        onApply={onApplyCoupon}
+        onRemove={onRemoveCoupon}
+      />
+
       <div className="border-t border-gray-100 pt-3 flex flex-col gap-2 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-gray-500">{t('checkout:cart.subtotal')}</span>
           <span className="font-medium text-gray-900">{formatCurrency(subtotal)}</span>
         </div>
+        {discount > 0 && coupon && (
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">Cupom {coupon.code}</span>
+            <span className="font-medium text-green-600">-{formatCurrency(discount)}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <span className="text-gray-500">{t('checkout:cart.shipping')}</span>
           <span className="font-medium text-gray-900">
@@ -784,6 +813,88 @@ function OrderSummary({ shipping }: { shipping: ShippingOption | null }) {
   )
 }
 
+// Campo de cupom no resumo do pedido. Confere o código pelo servidor (preview,
+// sem gastar uso) e mostra o desconto na hora. O valor cobrado é sempre o
+// recalculado no POST /orders — aqui é só a prévia pro cliente.
+function CouponField({
+  subtotal,
+  coupon,
+  token,
+  onApply,
+  onRemove,
+}: {
+  subtotal: number
+  coupon: CouponPreview | null
+  token: string | null
+  onApply: (c: CouponPreview) => void
+  onRemove: () => void
+}) {
+  const [code, setCode] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const apply = useCallback(async () => {
+    setError(null)
+    setLoading(true)
+    try {
+      const preview = await validateCoupon(code, subtotal, token)
+      onApply(preview)
+      setCode('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'não foi possível aplicar o cupom')
+    } finally {
+      setLoading(false)
+    }
+  }, [code, subtotal, token, onApply])
+
+  if (coupon) {
+    return (
+      <div className="border-t border-gray-100 pt-3 flex items-center justify-between text-sm">
+        <span className="text-gray-700">
+          Cupom <span className="font-semibold text-gray-900">{coupon.code}</span> aplicado
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-xs font-medium text-gray-500 hover:text-red-600"
+        >
+          remover
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="border-t border-gray-100 pt-3 flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <Input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              apply()
+            }
+          }}
+          placeholder="Cupom de desconto"
+          aria-label="Cupom de desconto"
+          className="uppercase"
+        />
+        <button
+          type="button"
+          onClick={apply}
+          disabled={loading || code.trim() === ''}
+          className="flex-shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium
+                     text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aplicar'}
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
+
 // ─── CheckoutPage ──────────────────────────────────────────────────────────────
 
 export default function CheckoutPage() {
@@ -799,13 +910,18 @@ export default function CheckoutPage() {
   const [step, setStep] = useState<Step>('address')
   const [address, setAddress] = useState<Address | null>(null)
   const [shipping, setShipping] = useState<ShippingOption | null>(null)
+  // Cupom aplicado (preview). O desconto aqui é só pra EXIBIR — o servidor
+  // recalcula sobre o subtotal autoritativo no POST /orders.
+  const [coupon, setCoupon] = useState<CouponPreview | null>(null)
 
   const subtotal = items.reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0)
   // itemCount = soma das quantidades (não número de linhas): é o que a cotação
   // usa na fórmula `base + por_item × itemCount`.
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0)
   const shippingCost = shipping?.cost ?? 0
-  const total = subtotal + shippingCost
+  // Desconto do cupom, nunca maior que o subtotal (o servidor também trava isso).
+  const discount = Math.min(coupon?.discount ?? 0, subtotal)
+  const total = Math.max(0, subtotal - discount) + shippingCost
 
   const handleAddressDone = useCallback((addr: Address) => {
     setAddress(addr)
@@ -841,6 +957,9 @@ export default function CheckoutPage() {
         // não fonte de verdade — ver docs/shipping-api.md).
         shippingService: shipping?.serviceCode,
         shippingCost,
+        // couponCode é só o CÓDIGO; o desconto em reais é recalculado no servidor
+        // (e o uso é incrementado atomicamente na transação do pedido).
+        couponCode: coupon?.code,
         items: items.map((i) => ({
           productId: i.productId,
           name: i.name,
@@ -868,7 +987,7 @@ export default function CheckoutPage() {
       setCommittedOrderNumber(order.number)
       return order.id
     },
-    [accessToken, address, items, shipping, shippingCost, hasCartIssues]
+    [accessToken, address, items, shipping, shippingCost, coupon, hasCartIssues]
   )
 
   const handlePaymentCreated = useCallback(
@@ -919,7 +1038,14 @@ export default function CheckoutPage() {
         </div>
 
         {/* Order summary */}
-        <OrderSummary shipping={shipping} />
+        <OrderSummary
+          shipping={shipping}
+          coupon={coupon}
+          discount={discount}
+          token={accessToken}
+          onApplyCoupon={setCoupon}
+          onRemoveCoupon={() => setCoupon(null)}
+        />
       </div>
     </div>
   )

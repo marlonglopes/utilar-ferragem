@@ -12,14 +12,15 @@ import (
 	"github.com/utilar/order-service/internal/coupon"
 )
 
-// loadCoupon lê um cupom pelo código (já normalizado) para VALIDAR na criação do
-// pedido. O incremento de uso NÃO é aqui — é o UPDATE condicional dentro da
-// transação do pedido (order.go), que fecha a corrida.
-func (h *OrderHandler) loadCoupon(ctx context.Context, code string) (coupon.Coupon, error) {
+// loadCouponByCode lê um cupom pelo código (já normalizado) para VALIDAR — na
+// criação do pedido e no preview do checkout. O incremento de uso NÃO é aqui — é
+// o UPDATE condicional dentro da transação do pedido (order.go), que fecha a
+// corrida.
+func loadCouponByCode(ctx context.Context, db *sql.DB, code string) (coupon.Coupon, error) {
 	var c coupon.Coupon
 	var maxUses sql.NullInt64
 	var expiresAt sql.NullTime
-	err := h.db.QueryRowContext(ctx, `
+	err := db.QueryRowContext(ctx, `
 		SELECT code, type, value, min_subtotal, max_uses, uses, active, expires_at
 		FROM coupons WHERE code = $1`, code).
 		Scan(&c.Code, &c.Type, &c.Value, &c.MinSubtotal, &maxUses, &c.Uses, &c.Active, &expiresAt)
@@ -101,6 +102,40 @@ func (in couponInput) validateForCreate() (string, error) {
 		return "", errors.New("limite de usos deve ser maior que zero (ou vazio p/ ilimitado)")
 	}
 	return code, nil
+}
+
+// Validate é o PREVIEW do checkout: dado um código e um subtotal, devolve o
+// desconto (sem incrementar uso). O subtotal aqui é o do cliente (referência); o
+// valor cobrado de verdade é recalculado no Create sobre o subtotal autoritativo.
+// Fica sob o grupo autenticado (não admin) — é o cliente conferindo o cupom.
+func (h *CouponHandler) Validate(c *gin.Context) {
+	var req struct {
+		Code     string  `json:"code" binding:"required,max=40"`
+		Subtotal float64 `json:"subtotal" binding:"required,gt=0"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	code := coupon.NormalizeCode(req.Code)
+	cp, err := loadCouponByCode(c.Request.Context(), h.db, code)
+	if errors.Is(err, coupon.ErrNotFound) {
+		Respond(c, http.StatusUnprocessableEntity, "coupon_invalid", "cupom inválido")
+		return
+	}
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	if verr := coupon.Validate(cp, req.Subtotal, time.Now()); verr != nil {
+		Respond(c, http.StatusUnprocessableEntity, "coupon_invalid", verr.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"code":     cp.Code,
+		"type":     cp.Type,
+		"discount": coupon.Apply(cp, req.Subtotal),
+	})
 }
 
 func (h *CouponHandler) List(c *gin.Context) {

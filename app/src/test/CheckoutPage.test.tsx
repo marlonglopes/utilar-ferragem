@@ -178,6 +178,61 @@ describe('CheckoutPage — passo entrega', () => {
   })
 })
 
+describe('CheckoutPage — cupom de desconto', () => {
+  // Carrinho acima do mínimo do cupom de mock (OBRA10: 10%, mín. R$ 100).
+  function addItemAcimaDoMinimo() {
+    useCartStore.getState().addItem({
+      productId: 'p2',
+      sellerId: 's1',
+      sellerName: 'Loja Teste',
+      name: 'Furadeira Bosch',
+      icon: '🔩',
+      priceSnapshot: 100,
+      quantity: 2,
+      stock: 5,
+    })
+  }
+
+  it('aplica cupom válido e abate o desconto do total', async () => {
+    addItemAcimaDoMinimo() // subtotal 200
+    renderCheckout()
+    fireEvent.change(screen.getByLabelText(/cupom de desconto/i), { target: { value: 'obra10' } })
+    fireEvent.click(screen.getByRole('button', { name: /aplicar/i }))
+    // OBRA10 = 10% de 200 → R$ 20 de desconto; total = 180.
+    // (O rótulo "Cupom OBRA10 aplicado" fica dividido entre <span>s, então
+    // confirmamos pelo botão "remover" e pela linha de desconto no resumo.)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /remover/i })).toBeInTheDocument()
+    })
+    expect(screen.getByText(/-R\$\s?20,00/)).toBeInTheDocument()
+  })
+
+  // Regressão: cupom abaixo do pedido mínimo não pode ser aplicado nem abater
+  // nada — o cliente vê o motivo, não um desconto fantasma.
+  it('recusa cupom abaixo do pedido mínimo com mensagem', async () => {
+    addItem() // subtotal 89,90 < 100
+    renderCheckout()
+    fireEvent.change(screen.getByLabelText(/cupom de desconto/i), { target: { value: 'OBRA10' } })
+    fireEvent.click(screen.getByRole('button', { name: /aplicar/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/a partir de/i)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/cupom obra10 aplicado/i)).not.toBeInTheDocument()
+  })
+
+  it('cupom inexistente mostra erro e não aplica', async () => {
+    addItemAcimaDoMinimo()
+    renderCheckout()
+    fireEvent.change(screen.getByLabelText(/cupom de desconto/i), {
+      target: { value: 'NAOEXISTE' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /aplicar/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/cupom inválido/i)).toBeInTheDocument()
+    })
+  })
+})
+
 describe('CheckoutPage — passo pagamento', () => {
   async function goToPayment() {
     addItem()

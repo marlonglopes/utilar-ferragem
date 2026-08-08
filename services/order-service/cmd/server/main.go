@@ -176,6 +176,12 @@ func main() {
 		// Cotação de frete — o carrinho chama com o CEP antes do checkout.
 		// Contrato em docs/shipping-api.md.
 		api.POST("/shipping/quote", shippingH.Quote)
+
+		// Preview de cupom no checkout (autenticado, não admin): confere o código
+		// e devolve o desconto, sem incrementar uso. O valor cobrado é recalculado
+		// no Create sobre o subtotal autoritativo.
+		couponH := handler.NewCouponHandler(database)
+		api.POST("/coupons/validate", couponH.Validate)
 	}
 
 	// PDV de balcão. Fica sob RequireUser (não RequireRole) porque a decisão de

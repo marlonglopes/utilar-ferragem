@@ -47,6 +47,7 @@ const StockPage = lazy(() => import('@/pages/admin/StockPage'))
 const ReturnsPage = lazy(() => import('@/pages/admin/ReturnsPage'))
 const ReviewsPage = lazy(() => import('@/pages/admin/ReviewsPage'))
 const ShippingPage = lazy(() => import('@/pages/admin/ShippingPage'))
+const CouponsPage = lazy(() => import('@/pages/admin/CouponsPage'))
 const PaymentConfigPage = lazy(() => import('@/pages/admin/PaymentConfigPage'))
 const BulkImagesPage = lazy(() => import('@/pages/admin/BulkImagesPage'))
 
@@ -121,6 +122,12 @@ export const adminRoutes: RouteObject[] = [
     // Frete: CRUD das faixas por CEP — o que o cliente paga (só admin).
     path: '/admin/frete',
     element: adminPage(<ShippingPage />),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    // Cupons: descontos do site (dinheiro/marketing → só admin).
+    path: '/admin/cupons',
+    element: adminPage(<CouponsPage />),
     errorElement: <RouteErrorBoundary />,
   },
   {
