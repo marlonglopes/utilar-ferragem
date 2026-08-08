@@ -169,12 +169,14 @@ export default function BalcaoPage() {
     />
   )
 
-  // h-[100dvh] (não h-screen/100vh): no celular o 100vh inclui a área atrás das
+  // h-[100svh] (não h-screen/100vh): no celular o 100vh inclui a área atrás das
   // barras do navegador, e a barra inferior "Ver pedido/Cobrar" escorregava pra
-  // fora da tela (sumia em landscape). dvh = altura VISÍVEL real; h-screen fica
-  // de fallback pra navegador antigo que não entende dvh.
+  // fora da tela (sumia em landscape). svh = MENOR viewport visível (barras à
+  // mostra), então a barra fica garantida em TODA orientação. Classe única de
+  // propósito: empilhar h-screen + h-[100svh] deixaria o vencedor à mercê da
+  // ordem do CSS gerado pelo Tailwind, não do className.
   return (
-    <div className="flex h-screen h-[100dvh] flex-col bg-gray-50">
+    <div className="flex h-[100svh] flex-col bg-gray-50">
       <BalcaoTopBar />
 
       <ComandaTabs
@@ -241,7 +243,7 @@ export default function BalcaoPage() {
         title="Pedido do balcão"
         className="lg:hidden"
       >
-        <div className="h-[75dvh]">{orderPanel}</div>
+        <div className="h-[75svh]">{orderPanel}</div>
       </Drawer>
 
       <ChargeModal
