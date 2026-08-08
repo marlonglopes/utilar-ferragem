@@ -121,6 +121,79 @@ describe('BalcaoPage', () => {
     })
   })
 
+  // MOBILE: a barra inferior (que abre a gaveta do pedido) precisa ser óbvia e
+  // acionável — o vendedor reclamou que "não achava" como fechar a venda no
+  // celular. Rótulo muda conforme há itens e o clique abre a gaveta.
+  it('a barra inferior mostra o rótulo certo e abre a gaveta do pedido', async () => {
+    const user = userEvent.setup()
+    render(<BalcaoPage />, { wrapper })
+
+    const bar = screen.getByRole('button', { name: /abrir o pedido do balcão/i })
+    // Vazia: rótulo curto "Pedido"; não há diálogo aberto ainda.
+    expect(bar).toHaveTextContent(/pedido/i)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    // Com item, o rótulo vira ação.
+    useBalcaoStore.getState().addItem({
+      productId: 'p1',
+      sku: 'FER-00001',
+      name: 'Item teste',
+      icon: '⚒',
+      unit: 'un',
+      unitPrice: 100,
+      unitCost: 60,
+      costIsEstimated: false,
+      quantity: 1,
+      stock: 5,
+    })
+    await waitFor(() => expect(bar).toHaveTextContent(/ver pedido e cobrar/i))
+
+    // Tocar na barra abre a gaveta (diálogo) com o pedido.
+    await user.click(bar)
+    expect(await screen.findByRole('dialog', { name: /pedido do balcão/i })).toBeInTheDocument()
+  })
+
+  // Regressão da queixa do vendedor: no celular, adicionar o 1º item tem que
+  // ABRIR a comanda sozinha (senão o pedido nasce escondido na gaveta). Só em
+  // tela estreita — no desktop o painel já fica fixo ao lado.
+  it('no celular, adicionar o 1º item abre a comanda automaticamente', async () => {
+    const realMatchMedia = window.matchMedia
+    // Simula tela estreita (< lg): matchMedia('(max-width: 1023px)') = match.
+    window.matchMedia = ((q: string) => ({
+      matches: true,
+      media: q,
+      onchange: null,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      dispatchEvent() {
+        return false
+      },
+    })) as unknown as typeof window.matchMedia
+    try {
+      render(<BalcaoPage />, { wrapper })
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+      useBalcaoStore.getState().addItem({
+        productId: 'p1',
+        sku: 'FER-00001',
+        name: 'Item teste',
+        icon: '⚒',
+        unit: 'un',
+        unitPrice: 100,
+        unitCost: 60,
+        costIsEstimated: false,
+        quantity: 1,
+        stock: 5,
+      })
+
+      expect(await screen.findByRole('dialog', { name: /pedido do balcão/i })).toBeInTheDocument()
+    } finally {
+      window.matchMedia = realMatchMedia
+    }
+  })
+
   it('permite abrir uma segunda comanda', async () => {
     const user = userEvent.setup()
     render(<BalcaoPage />, { wrapper })

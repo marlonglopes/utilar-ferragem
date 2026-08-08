@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart } from 'lucide-react'
+import { ShoppingCart, ChevronUp } from 'lucide-react'
 import { Drawer } from '@/components/ui'
+import { cn } from '@/lib/cn'
 import { formatCurrency } from '@/lib/format'
 import { BalcaoTopBar } from '@/components/balcao/BalcaoTopBar'
 import { ComandaTabs } from '@/components/balcao/ComandaTabs'
@@ -69,6 +70,23 @@ export default function BalcaoPage() {
   )
 
   const canCharge = comanda.items.length > 0 && !pricing.blocked && comanda.customer !== null
+
+  // MOBILE: abre a gaveta do pedido sozinha quando o 1º item entra numa comanda
+  // vazia. No celular a comanda mora na gaveta inferior, e sem isso o vendedor
+  // adicionava um produto e "não via nada acontecer" — o pedido nascia escondido.
+  // Só dispara na transição 0→1 (o ref evita reabrir a cada item), então não
+  // atrapalha quem adiciona vários itens seguidos. Restrito a tela estreita
+  // (< lg): no desktop o painel já fica fixo ao lado, abrir a gaveta seria ruído.
+  const prevItemCount = useRef(comanda.items.length)
+  useEffect(() => {
+    const count = comanda.items.length
+    const isNarrow =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 1023px)').matches
+    if (isNarrow && prevItemCount.current === 0 && count > 0) setPanelOpen(true)
+    prevItemCount.current = count
+  }, [comanda.items.length])
 
   const openCharge = useCallback(() => {
     if (!canCharge) return
@@ -177,20 +195,39 @@ export default function BalcaoPage() {
         </aside>
       </div>
 
-      {/* Tela estreita: barra de resumo + gaveta */}
+      {/* Tela estreita: barra de resumo (abre a gaveta) — sempre visível.
+          Alça + seta ↑ deixam claro que é um "bottom sheet" tocável; quando há
+          itens o texto vira ação ("Ver pedido e cobrar") e, quando dá pra cobrar,
+          ganha um anel laranja pra puxar o olho pro próximo passo. */}
       <button
         type="button"
         onClick={() => setPanelOpen(true)}
-        className="flex h-16 shrink-0 items-center justify-between gap-3 border-t border-gray-200 bg-brand-blue px-4 text-white lg:hidden"
+        aria-label="Abrir o pedido do balcão"
+        className={cn(
+          'relative flex h-[70px] shrink-0 flex-col justify-center border-t border-gray-200 bg-brand-blue px-4 text-white shadow-[0_-4px_16px_rgba(0,0,0,0.18)] lg:hidden',
+          canCharge && 'ring-2 ring-inset ring-brand-orange'
+        )}
       >
-        <span className="flex items-center gap-2 font-semibold">
-          <ShoppingCart className="h-5 w-5" aria-hidden="true" />
-          Pedido
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">
-            {pricing.itemCount}
+        {/* alça — afordância universal de gaveta inferior */}
+        <span
+          className="absolute left-1/2 top-1.5 h-1 w-10 -translate-x-1/2 rounded-full bg-white/40"
+          aria-hidden="true"
+        />
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2 font-semibold">
+            <ShoppingCart className="h-5 w-5" aria-hidden="true" />
+            {pricing.itemCount > 0 ? 'Ver pedido e cobrar' : 'Pedido'}
+            {pricing.itemCount > 0 && (
+              <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold">
+                {pricing.itemCount}
+              </span>
+            )}
           </span>
-        </span>
-        <span className="font-display text-lg font-bold">{formatCurrency(pricing.total)}</span>
+          <span className="flex items-center gap-2">
+            <span className="font-display text-lg font-bold">{formatCurrency(pricing.total)}</span>
+            <ChevronUp className="h-5 w-5" aria-hidden="true" />
+          </span>
+        </div>
       </button>
 
       <Drawer
