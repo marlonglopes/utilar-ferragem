@@ -19,6 +19,7 @@ const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
 const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'))
 const AccountPage = lazy(() => import('@/pages/account/AccountPage'))
+const MfaSetupPage = lazy(() => import('@/pages/account/MfaSetupPage'))
 const CheckoutPage = lazy(() => import('@/pages/checkout/CheckoutPage'))
 const OrderConfirmationPage = lazy(() => import('@/pages/checkout/OrderConfirmationPage'))
 const OrderDetailPage = lazy(() => import('@/pages/orders/OrderDetailPage'))
@@ -57,6 +58,9 @@ const router = createBrowserRouter([
       { path: 'entrar', element: page(<LoginPage />) },
       { path: 'cadastro', element: page(<RegisterPage />) },
       { path: 'esqueci-senha', element: page(<ForgotPasswordPage />) },
+      // Ativação de 2FA — fora do ProtectedRoute (que só deixa customer entrar);
+      // a própria página exige login e redireciona pra /entrar se faltar.
+      { path: 'seguranca', element: page(<MfaSetupPage />) },
       {
         path: 'conta',
         element: <ProtectedRoute>{page(<AccountPage />)}</ProtectedRoute>,
