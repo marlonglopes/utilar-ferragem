@@ -74,6 +74,53 @@ func TestPersonas_CatalogAuthzFailClosed(t *testing.T) {
 	}
 }
 
+// Config da loja (aviso da vitrine): o PUT é a VOZ INSTITUCIONAL da loja com o
+// cliente, então é ADMIN-ONLY — nem `vendas` (que mantém o catálogo) muda o
+// banner da home. Prova a fronteira com token real (devMode=false), espelhando
+// o grupo `storeAdmin` de main.go. O GET é público e não entra aqui.
+func TestPersonas_StoreSettingsAuthzFailClosed(t *testing.T) {
+	const secret = "test-secret-at-least-32-chars-long-xx"
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(handler.RequestID())
+	ok := func(c *gin.Context) { c.Status(http.StatusOK) }
+
+	// "admin" = roles.Admin (o mesmo que main.go passa no grupo storeAdmin).
+	storeAdmin := r.Group("/api/v1/admin", handler.RequireRole(secret, false, "admin"))
+	storeAdmin.PUT("/store/settings", ok)
+
+	call := func(role string) int {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/store/settings", nil)
+		if role != "" {
+			req.Header.Set("Authorization", "Bearer "+signToken(t, secret, "u-"+role, role))
+		}
+		r.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	cases := []struct {
+		nome, role string
+		want       int
+	}{
+		{"admin edita o aviso", "admin", http.StatusOK},
+		{"vendas NÃO edita (não é a voz da loja)", "vendas", http.StatusForbidden},
+		{"contador NÃO edita", "contador", http.StatusForbidden},
+		{"almoxarife NÃO edita", "almoxarife", http.StatusForbidden},
+		{"store_operator NÃO edita", "store_operator", http.StatusForbidden},
+		{"customer barrado", "customer", http.StatusForbidden},
+		{"seller barrado", "seller", http.StatusForbidden},
+		{"anônimo 401", "", http.StatusUnauthorized},
+	}
+	for _, tc := range cases {
+		t.Run(tc.nome, func(t *testing.T) {
+			if got := call(tc.role); got != tc.want {
+				t.Errorf("PUT /store/settings como %q → %d, queria %d", tc.role, got, tc.want)
+			}
+		})
+	}
+}
+
 // Estoque (tela do almoxarife): VER é mais amplo que AJUSTAR. Prova que o
 // almoxarife entra (e o custo nunca aparece porque a rota nem devolve), o
 // vendas vê mas não ajusta pelo fluxo com motivo, e o contador fica fora.

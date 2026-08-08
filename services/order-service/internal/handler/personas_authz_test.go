@@ -80,3 +80,60 @@ func TestPersonas_OpsAuthzFailClosed(t *testing.T) {
 		})
 	}
 }
+
+// Fronteira dos cupons, espelhando os grupos de main.go:
+//   - CRUD admin (/api/v1/admin/coupons) é ADMIN-ONLY (desconto = dinheiro/
+//     marketing) — nem vendas cria cupom.
+//   - PREVIEW do checkout (/api/v1/coupons/validate) está sob RequireUser: QUALQUER
+//     usuário autenticado pode conferir um cupom (é o cliente no carrinho). O que
+//     NÃO pode é o anônimo — e o incremento de uso não acontece aqui de qualquer
+//     forma (é a transação do pedido). Prova as duas fronteiras com token real.
+func TestPersonas_CouponAuthzFailClosed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	ok := func(c *gin.Context) { c.Status(http.StatusOK) }
+
+	// Espelha main.go: adminDash = RequireRole(..., "admin"); api = RequireUser(...).
+	adminDash := r.Group("/api/v1/admin", handler.RequireRole(dashSecret, false, "admin"))
+	adminDash.POST("/coupons", ok)
+	api := r.Group("/api/v1", handler.RequireUser(dashSecret, false))
+	api.POST("/coupons/validate", ok)
+
+	call := func(path, role string) int {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, path, nil)
+		if role != "" {
+			req.Header.Set("Authorization", "Bearer "+dashToken(t, role))
+		}
+		r.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	const (
+		crud     = "/api/v1/admin/coupons"
+		validate = "/api/v1/coupons/validate"
+	)
+	cases := []struct {
+		nome, path, role string
+		want             int
+	}{
+		// Criar cupom: só admin.
+		{"admin cria cupom", crud, "admin", http.StatusOK},
+		{"vendas NÃO cria cupom", crud, "vendas", http.StatusForbidden},
+		{"contador NÃO cria cupom", crud, "contador", http.StatusForbidden},
+		{"customer barrado do CRUD", crud, "customer", http.StatusForbidden},
+		{"anônimo 401 no CRUD", crud, "", http.StatusUnauthorized},
+
+		// Preview do checkout: qualquer usuário autenticado (o cliente confere).
+		{"customer confere cupom no checkout", validate, "customer", http.StatusOK},
+		{"admin confere cupom", validate, "admin", http.StatusOK},
+		{"anônimo 401 no preview", validate, "", http.StatusUnauthorized},
+	}
+	for _, tc := range cases {
+		t.Run(tc.nome, func(t *testing.T) {
+			if got := call(tc.path, tc.role); got != tc.want {
+				t.Errorf("POST %s como %q → %d, queria %d", tc.path, tc.role, got, tc.want)
+			}
+		})
+	}
+}
