@@ -139,6 +139,7 @@ export default defineConfig({
       '/api/v1/admin/staff-audit': { target: 'http://localhost:8093', changeOrigin: true }, // auth (atividade)
       '/api/v1/admin/me': { target: 'http://localhost:8093', changeOrigin: true }, // auth
       '/api/v1/admin/coupons': { target: 'http://localhost:8092', changeOrigin: true }, // order (cupons CRUD) — ANTES do catch-all catalog
+      '/api/v1/admin/cashback': { target: 'http://localhost:8092', changeOrigin: true }, // order (config cashback) — ANTES do catch-all catalog
       '/api/v1/admin/store': { target: 'http://localhost:8091', changeOrigin: true }, // catalog (config da loja) — explícito p/ não depender da ordem
       '/api/v1/admin': { target: 'http://localhost:8091', changeOrigin: true }, // catalog catch-all (products, stock, reviews, audit, observability, import)
 
@@ -159,6 +160,7 @@ export default defineConfig({
       '/api/v1/shipping': { target: 'http://localhost:8092', changeOrigin: true },
       '/api/v1/balcao': { target: 'http://localhost:8092', changeOrigin: true },
       '/api/v1/coupons': { target: 'http://localhost:8092', changeOrigin: true }, // order (validate no checkout)
+      '/api/v1/me/cashback': { target: 'http://localhost:8092', changeOrigin: true }, // order (saldo/extrato do cliente)
       // Payment (:8090)
       '/api/v1/payments': { target: 'http://localhost:8090', changeOrigin: true },
       '/api/v1/ledger': { target: 'http://localhost:8090', changeOrigin: true },
