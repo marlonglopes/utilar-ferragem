@@ -29,6 +29,21 @@ export CATALOG_SERVICE_URL="http://localhost:8091"
 export ORDER_SERVICE_URL="http://localhost:8092"
 export PAYMENT_SERVICE_URL="http://localhost:8090"
 
+# ── segredos de dev (gitignored) ──────────────────────────────────────────────
+# .env.dev.local NÃO é versionado (.gitignore cobre .env*). É onde entram chaves
+# REAIS de teste (Stripe, Appmax, Anthropic…) sem sujar o git. Ausente → cai nos
+# placeholders dummy abaixo (a demo roda em "simular confirmação").
+if [ -f "$REPO/.env.dev.local" ]; then
+  set -a; . "$REPO/.env.dev.local"; set +a
+  say "  ${c_dim}• segredos carregados de .env.dev.local${c_rst}"
+fi
+# PSP escolhido (troca fácil: PSP_PROVIDER no .env.dev.local ou no ambiente).
+# stripe | appmax-v1 | mercadopago. Default: stripe.
+: "${PSP_PROVIDER:=stripe}"
+: "${STRIPE_SECRET_KEY:=sk_test_dummy_demo_key_do_not_use}"
+: "${STRIPE_WEBHOOK_SECRET:=whsec_dummy_demo}"
+: "${STRIPE_PUBLISHABLE_KEY:=pk_test_dummy_demo}"
+
 c_green="\033[32m"; c_red="\033[31m"; c_dim="\033[2m"; c_rst="\033[0m"; c_bold="\033[1m"
 say()  { printf "%b\n" "$*"; }
 head() { printf "\n%b════════════════════════════════════════════════════════%b\n%b▶ %s%b\n%b════════════════════════════════════════════════════════%b\n" "$c_dim" "$c_rst" "$c_bold" "$1" "$c_rst" "$c_dim" "$c_rst"; }
@@ -76,7 +91,7 @@ head "serviços Go (5)"
 start_svc auth     8093 services/auth-service
 start_svc catalog  8091 services/catalog-service
 start_svc payment  8090 services/payment-service \
-  'PSP_PROVIDER=stripe STRIPE_SECRET_KEY=sk_test_dummy_demo_key_do_not_use STRIPE_WEBHOOK_SECRET=whsec_dummy_demo STRIPE_PUBLISHABLE_KEY=pk_test_dummy'
+  "PSP_PROVIDER=$PSP_PROVIDER STRIPE_SECRET_KEY=$STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET=$STRIPE_WEBHOOK_SECRET STRIPE_PUBLISHABLE_KEY=$STRIPE_PUBLISHABLE_KEY ${APPMAX_ENV:-}"
 start_svc order    8092 services/order-service 'KAFKA_BROKERS=localhost:19092'
 # Alice roda em mock sem ANTHROPIC_API_KEY (busca real no catálogo em :8091).
 start_svc assistant 8094 services/assistant-service
