@@ -125,12 +125,16 @@ export function OrderPanel({
         </span>
       </div>
 
-      <CustomerBlock customer={comanda.customer} onChange={onCustomerChange} />
-
-      {/* flow: cresce com o conteúdo (a gaveta rola); fixo: rola por dentro. */}
+      {/* Miolo rolável: cliente + itens + negociação numa região só. No layout
+          fixo (tablet) ela rola por dentro e o Cobrar fica ancorado embaixo; no
+          flow (gaveta do celular) ela cresce e quem rola é a gaveta. Juntar tudo
+          aqui evita que a lista de itens — antes sozinha em flex-1 — colapse pra
+          altura 0 em qualquer tela/janela baixa (o bug em que os itens sumiam,
+          tanto no celular quanto no navegador do PC não maximizado). */}
       <div className={cn(flow ? '' : 'min-h-0 flex-1 overflow-y-auto')}>
+        <CustomerBlock customer={comanda.customer} onChange={onCustomerChange} />
         {empty ? (
-          <div className="flex h-full min-h-[140px] flex-col items-center justify-center px-6 text-center">
+          <div className="flex min-h-[140px] flex-col items-center justify-center px-6 py-8 text-center">
             <p className="text-sm font-semibold text-gray-700">Nenhum item</p>
             <p className="mt-1 text-xs text-gray-500">
               Toque nos produtos à esquerda ou leia o código de barras.
@@ -149,14 +153,13 @@ export function OrderPanel({
             ))}
           </ul>
         )}
+        <NegotiationBlock
+          pricing={pricing}
+          onDiscountChange={onDiscountChange}
+          disabled={empty}
+          ceilingFromBackend={ceilingFromBackend}
+        />
       </div>
-
-      <NegotiationBlock
-        pricing={pricing}
-        onDiscountChange={onDiscountChange}
-        disabled={empty}
-        ceilingFromBackend={ceilingFromBackend}
-      />
 
       {/* Totais + Cobrar */}
       <div className="border-t border-gray-200 bg-white p-4">
