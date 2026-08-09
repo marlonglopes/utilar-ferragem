@@ -21,6 +21,7 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
+	"github.com/utilar/order-service/internal/cashback"
 	"github.com/utilar/order-service/internal/fulfillment"
 	"github.com/utilar/order-service/internal/model"
 )
@@ -240,6 +241,16 @@ func (c *Consumer) Handle(ctx context.Context, topic string, payload []byte) err
 		return advErr
 	}
 
+	// CASHBACK: credita ao pagar, na MESMA transação (idempotente com o evento —
+	// replay não credita duas vezes; UNIQUE(order_id) no lote é a 2ª trava). Web
+	// só: o balcão liquida por outro caminho e o cliente de balcão nem sempre tem
+	// conta. Falha real aqui reverte tudo e o evento é retentado — seguro.
+	if target == model.StatusPaid {
+		if err := creditCashback(ctx, tx, orderID); err != nil {
+			return err
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return err
 	}
@@ -269,6 +280,30 @@ func (c *Consumer) Handle(ctx context.Context, topic string, payload []byte) err
 	}
 
 	return nil
+}
+
+// creditCashback credita o cashback do pedido pago. Base = mercadoria paga em
+// dinheiro (total − frete): não acumula sobre frete nem sobre a parte quitada com
+// o próprio cashback (o total já veio reduzido pelo resgate). Programa desligado
+// → no-op. Roda dentro da transação do consumer.
+func creditCashback(ctx context.Context, tx *sql.Tx, orderID string) error {
+	cfg, err := cashback.LoadConfig(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if !cfg.Active {
+		return nil
+	}
+	var customerID string
+	var basis float64
+	err = tx.QueryRowContext(ctx,
+		`SELECT user_id, GREATEST(total - shipping_cost, 0) FROM orders WHERE id = $1`, orderID).
+		Scan(&customerID, &basis)
+	if err != nil {
+		return err
+	}
+	_, err = cashback.CreditEarn(ctx, tx, cfg, customerID, orderID, basis)
+	return err
 }
 
 // targetStatus traduz o topic no estado de destino do pedido.

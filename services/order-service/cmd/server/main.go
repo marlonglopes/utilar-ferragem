@@ -182,6 +182,11 @@ func main() {
 		// no Create sobre o subtotal autoritativo.
 		couponH := handler.NewCouponHandler(database)
 		api.POST("/coupons/validate", couponH.Validate)
+
+		// Cashback do cliente logado: saldo + taxa vigente + extrato. Escopo pelo
+		// JWT (só o próprio saldo). Ver internal/cashback.
+		cashbackH := handler.NewCashbackHandler(database)
+		api.GET("/me/cashback", cashbackH.Me)
 	}
 
 	// PDV de balcão. Fica sob RequireUser (não RequireRole) porque a decisão de
@@ -286,6 +291,12 @@ func main() {
 		adminDash.POST("/coupons", couponH.Create)
 		adminDash.PATCH("/coupons/:id", couponH.Update)
 		adminDash.DELETE("/coupons/:id", couponH.Delete)
+
+		// Cashback — config do programa (liga/desliga, taxa, teto, validade).
+		// Admin-only: é dinheiro/passivo da loja.
+		cashbackH := handler.NewCashbackHandler(database)
+		adminDash.GET("/cashback", cashbackH.GetConfig)
+		adminDash.PUT("/cashback", cashbackH.UpdateConfig)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

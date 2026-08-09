@@ -16,6 +16,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/utilar/order-service/internal/authclient"
 	"github.com/utilar/order-service/internal/balcao"
+	"github.com/utilar/order-service/internal/cashback"
 	"github.com/utilar/order-service/internal/catalogclient"
 	"github.com/utilar/order-service/internal/coupon"
 	"github.com/utilar/order-service/internal/fulfillment"
@@ -309,6 +310,34 @@ func (h *OrderHandler) Create(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
+	// RESGATE DE CASHBACK (web-only, dentro da transação). O cliente pede um
+	// valor; o servidor limita ao menor entre (pedido, saldo real, teto% do
+	// pedido) e CONSOME os lotes com FOR UPDATE — o valor abatido é o realmente
+	// consumido (fecha o TOCTOU). Nunca o corpo do cliente abate direto.
+	var cashbackRedeemed float64
+	if sale.Channel == model.ChannelWeb && req.CashbackRedeem > 0 && sale.OwnerUserID != "" {
+		cfg, cerr := cashback.LoadConfig(ctx, tx)
+		if cerr != nil {
+			DBError(c, cerr)
+			return
+		}
+		if cfg.Active {
+			bal, berr := cashback.BalanceFor(ctx, tx, sale.OwnerUserID)
+			if berr != nil {
+				DBError(c, berr)
+				return
+			}
+			want := cashback.ClampRedeem(cfg, req.CashbackRedeem, bal, netSubtotal)
+			used, rerr := cashback.Redeem(ctx, tx, sale.OwnerUserID, orderID, want)
+			if rerr != nil {
+				DBError(c, rerr)
+				return
+			}
+			cashbackRedeemed = used
+		}
+	}
+	total = round2(total - cashbackRedeemed)
+
 	// número de pedido = ano + 8 chars base32 de crypto/rand (não enumerável)
 	orderNumber := generateOrderNumber(time.Now().Year())
 
@@ -321,12 +350,12 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		INSERT INTO orders (
 			id, number, user_id, payment_method, subtotal, shipping_cost, shipping_service, total, stock_reserved,
 			channel, store_id, operator_id, customer_id, customer_name, customer_document, customer_phone,
-			discount_pct, discount_amount, approval_status, coupon_code
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+			discount_pct, discount_amount, approval_status, coupon_code, cashback_redeemed
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
 	`, orderID, orderNumber, sale.OwnerUserID, req.PaymentMethod, subtotal, shipCost, shipService, total, stockReserved,
 		string(sale.Channel), sale.StoreID, sale.OperatorID, sale.CustomerID,
 		sale.CustomerName, sale.CustomerDocument, sale.CustomerPhone,
-		discount.Pct, effectiveDiscount, discount.ApprovalStatus, nullIfEmpty(couponCode))
+		discount.Pct, effectiveDiscount, discount.ApprovalStatus, nullIfEmpty(couponCode), cashbackRedeemed)
 	if err != nil {
 		DBError(c, err)
 		return

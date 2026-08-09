@@ -180,6 +180,10 @@ type CreateOrderRequest struct {
 	// valor e validade e calcula o desconto sobre o subtotal autoritativo. Nunca
 	// aceitamos o valor do desconto do cliente. Ver internal/coupon.
 	CouponCode string `json:"couponCode" binding:"omitempty,max=40"`
+	// CashbackRedeem: quanto de cashback (em R$) o cliente QUER usar neste pedido.
+	// É só um pedido — o servidor limita ao menor entre isto, o saldo real e o teto
+	// por pedido, e consome os lotes. Nunca confiamos no valor pra abater direto.
+	CashbackRedeem float64 `json:"cashbackRedeem" binding:"omitempty,gte=0"`
 	// Customer identifica para QUEM é a venda. Pode ser um cadastro leve
 	// existente (CustomerID) e/ou o snapshot dos dados no ato.
 	CustomerID       string `json:"customerId" binding:"omitempty,max=64"`

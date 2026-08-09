@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/utilar/order-service/internal/cashback"
 	"github.com/utilar/order-service/internal/catalogclient"
 	"github.com/utilar/order-service/internal/model"
 	"github.com/utilar/order-service/internal/paymentclient"
@@ -578,6 +579,16 @@ func (h *ReturnHandler) Refund(c *gin.Context) {
 	`, returnID); err != nil {
 		DBError(c, err)
 		return
+	}
+
+	// CASHBACK: devolução TOTAL estorna o cashback acumulado do pedido (só o que
+	// o cliente ainda não gastou — ver cashback.Reverse). Devolução parcial mantém:
+	// o cliente ficou com a maior parte da compra. Na mesma transação do refund.
+	if cur.FullReturn {
+		if _, err := cashback.Reverse(c.Request.Context(), tx2, cur.OrderID); err != nil {
+			DBError(c, err)
+			return
+		}
 	}
 
 	// DEFESA 2 — RASTRO, na MESMA transação e FAIL-CLOSED. Estorno é dinheiro
