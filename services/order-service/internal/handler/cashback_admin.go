@@ -5,6 +5,7 @@ package handler
 import (
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -60,30 +61,52 @@ func (h *CashbackHandler) GetConfig(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"active":       cfg.Active,
-		"earnRatePct":  cfg.EarnRatePct,
-		"redeemMaxPct": cfg.RedeemMaxPct,
-		"validityDays": cfg.ValidityDays,
+		"active":            cfg.Active,
+		"earnRatePct":       cfg.EarnRatePct,
+		"redeemMaxPct":      cfg.RedeemMaxPct,
+		"validityDays":      cfg.ValidityDays,
+		"minEarnSubtotal":   cfg.MinEarnSubtotal,
+		"minRedeemSubtotal": cfg.MinRedeemSubtotal,
+		"campaignRatePct":   cfg.CampaignRatePct,
+		"campaignStartsAt":  cfg.CampaignStartsAt,
+		"campaignEndsAt":    cfg.CampaignEndsAt,
 	})
 }
 
-// UpdateConfig PUT /api/v1/admin/cashback — liga/desliga e ajusta taxas (admin).
+// UpdateConfig PUT /api/v1/admin/cashback — liga/desliga e ajusta taxas + regras
+// extras (mínimos, campanha). Admin only.
 func (h *CashbackHandler) UpdateConfig(c *gin.Context) {
 	var req struct {
-		Active       bool    `json:"active"`
-		EarnRatePct  float64 `json:"earnRatePct" binding:"gte=0,lte=100"`
-		RedeemMaxPct float64 `json:"redeemMaxPct" binding:"gte=0,lte=100"`
-		ValidityDays int     `json:"validityDays" binding:"gte=1,lte=3650"`
+		Active            bool       `json:"active"`
+		EarnRatePct       float64    `json:"earnRatePct" binding:"gte=0,lte=100"`
+		RedeemMaxPct      float64    `json:"redeemMaxPct" binding:"gte=0,lte=100"`
+		ValidityDays      int        `json:"validityDays" binding:"gte=1,lte=3650"`
+		MinEarnSubtotal   float64    `json:"minEarnSubtotal" binding:"gte=0"`
+		MinRedeemSubtotal float64    `json:"minRedeemSubtotal" binding:"gte=0"`
+		CampaignRatePct   float64    `json:"campaignRatePct" binding:"gte=0,lte=100"`
+		CampaignStartsAt  *time.Time `json:"campaignStartsAt"`
+		CampaignEndsAt    *time.Time `json:"campaignEndsAt"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		BadRequest(c, err.Error())
 		return
 	}
+	// Janela coerente: se as duas datas vierem, início não pode ser depois do fim.
+	if req.CampaignStartsAt != nil && req.CampaignEndsAt != nil &&
+		req.CampaignStartsAt.After(*req.CampaignEndsAt) {
+		BadRequest(c, "a data de início da campanha não pode ser depois do fim")
+		return
+	}
 	cfg := cashback.Config{
-		Active:       req.Active,
-		EarnRatePct:  req.EarnRatePct,
-		RedeemMaxPct: req.RedeemMaxPct,
-		ValidityDays: req.ValidityDays,
+		Active:            req.Active,
+		EarnRatePct:       req.EarnRatePct,
+		RedeemMaxPct:      req.RedeemMaxPct,
+		ValidityDays:      req.ValidityDays,
+		MinEarnSubtotal:   req.MinEarnSubtotal,
+		MinRedeemSubtotal: req.MinRedeemSubtotal,
+		CampaignRatePct:   req.CampaignRatePct,
+		CampaignStartsAt:  req.CampaignStartsAt,
+		CampaignEndsAt:    req.CampaignEndsAt,
 	}
 	if err := cashback.SaveConfig(c.Request.Context(), h.db, cfg, c.GetString("user_id")); err != nil {
 		DBError(c, err)

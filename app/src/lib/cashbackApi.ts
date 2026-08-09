@@ -26,6 +26,11 @@ export interface CashbackConfig {
   earnRatePct: number
   redeemMaxPct: number
   validityDays: number
+  minEarnSubtotal: number
+  minRedeemSubtotal: number
+  campaignRatePct: number
+  campaignStartsAt: string | null
+  campaignEndsAt: string | null
 }
 
 const MOCK: CashbackInfo = {
@@ -49,7 +54,17 @@ export async function fetchMyCashback(token: string | null): Promise<CashbackInf
 // Admin: config do programa.
 export async function fetchCashbackConfig(): Promise<CashbackConfig> {
   if (!isOrderEnabled) {
-    return { active: true, earnRatePct: 5, redeemMaxPct: 50, validityDays: 90 }
+    return {
+      active: true,
+      earnRatePct: 5,
+      redeemMaxPct: 50,
+      validityDays: 90,
+      minEarnSubtotal: 0,
+      minRedeemSubtotal: 0,
+      campaignRatePct: 0,
+      campaignStartsAt: null,
+      campaignEndsAt: null,
+    }
   }
   return adminGet<CashbackConfig>(ORDER_URL, '/api/v1/admin/cashback')
 }

@@ -32,24 +32,52 @@ type Entry struct {
 // um config DESLIGADO, que é o padrão seguro (não acumula nem deixa resgatar).
 func LoadConfig(ctx context.Context, q rowQ) (Config, error) {
 	var c Config
+	var campRate sql.NullFloat64
+	var campStart, campEnd sql.NullTime
 	err := q.QueryRowContext(ctx, `
-		SELECT active, earn_rate_pct, redeem_max_pct, validity_days
+		SELECT active, earn_rate_pct, redeem_max_pct, validity_days,
+		       min_earn_subtotal, min_redeem_subtotal,
+		       campaign_rate_pct, campaign_starts_at, campaign_ends_at
 		FROM cashback_config WHERE id = 1`).
-		Scan(&c.Active, &c.EarnRatePct, &c.RedeemMaxPct, &c.ValidityDays)
+		Scan(&c.Active, &c.EarnRatePct, &c.RedeemMaxPct, &c.ValidityDays,
+			&c.MinEarnSubtotal, &c.MinRedeemSubtotal,
+			&campRate, &campStart, &campEnd)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Config{}, nil
 	}
-	return c, err
+	if err != nil {
+		return Config{}, err
+	}
+	if campRate.Valid {
+		c.CampaignRatePct = campRate.Float64
+	}
+	if campStart.Valid {
+		t := campStart.Time
+		c.CampaignStartsAt = &t
+	}
+	if campEnd.Valid {
+		t := campEnd.Time
+		c.CampaignEndsAt = &t
+	}
+	return c, nil
 }
 
 // SaveConfig grava o singleton (admin). updatedBy = quem mudou (auditoria leve).
 func SaveConfig(ctx context.Context, q execQ, c Config, updatedBy string) error {
+	var campRate any
+	if c.CampaignRatePct > 0 {
+		campRate = c.CampaignRatePct
+	}
 	_, err := q.ExecContext(ctx, `
 		UPDATE cashback_config SET
 			active=$1, earn_rate_pct=$2, redeem_max_pct=$3, validity_days=$4,
-			updated_at=now(), updated_by=$5
+			min_earn_subtotal=$5, min_redeem_subtotal=$6,
+			campaign_rate_pct=$7, campaign_starts_at=$8, campaign_ends_at=$9,
+			updated_at=now(), updated_by=$10
 		WHERE id = 1`,
-		c.Active, c.EarnRatePct, c.RedeemMaxPct, c.ValidityDays, updatedBy)
+		c.Active, c.EarnRatePct, c.RedeemMaxPct, c.ValidityDays,
+		c.MinEarnSubtotal, c.MinRedeemSubtotal,
+		campRate, c.CampaignStartsAt, c.CampaignEndsAt, updatedBy)
 	return err
 }
 
@@ -69,7 +97,7 @@ func BalanceFor(ctx context.Context, q rowQ, customerID string) (float64, error)
 // por pedido (UNIQUE em order_id); replay do evento não credita de novo. Devolve
 // quanto foi creditado (0 se nada/replay). basis = mercadoria paga (sem frete).
 func CreditEarn(ctx context.Context, tx execQ, cfg Config, customerID, orderID string, basis float64) (float64, error) {
-	amount := Earn(cfg, basis)
+	amount := Earn(cfg, basis, time.Now())
 	if amount <= 0 {
 		return 0, nil
 	}

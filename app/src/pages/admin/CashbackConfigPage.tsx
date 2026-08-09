@@ -4,10 +4,28 @@ import { AdminShell } from '@/components/admin/AdminShell'
 import { ErrorState, LoadingRows, Section } from '@/components/admin/primitives'
 import { useCashbackConfig, useUpdateCashbackConfig } from '@/hooks/useCashback'
 
+// ISO (do servidor) → valor do <input type="datetime-local"> ("YYYY-MM-DDTHH:mm"
+// no fuso local). Vazio quando não há data.
+function toLocalInput(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// valor do datetime-local → ISO (RFC3339) pro servidor; null quando vazio.
+function fromLocalInput(v: string): string | null {
+  if (!v) return null
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
 /**
  * Configuração do programa de cashback — admin only (é dinheiro/passivo da loja).
- * Liga/desliga e ajusta taxa de acúmulo, teto de resgate e validade. As regras
- * são aplicadas no servidor (order-service); aqui só se define a política.
+ * Liga/desliga e ajusta taxa de acúmulo, teto de resgate, validade, pedidos
+ * mínimos e campanha por período. As regras são aplicadas no servidor
+ * (order-service); aqui só se define a política.
  */
 export default function CashbackConfigPage() {
   const { data, isLoading, isError, error, refetch } = useCashbackConfig()
@@ -17,6 +35,11 @@ export default function CashbackConfigPage() {
   const [earn, setEarn] = useState('5')
   const [redeem, setRedeem] = useState('50')
   const [validity, setValidity] = useState('90')
+  const [minEarn, setMinEarn] = useState('0')
+  const [minRedeem, setMinRedeem] = useState('0')
+  const [campRate, setCampRate] = useState('0')
+  const [campStart, setCampStart] = useState('')
+  const [campEnd, setCampEnd] = useState('')
   const [formError, setFormError] = useState('')
   const [saved, setSaved] = useState(false)
 
@@ -26,6 +49,11 @@ export default function CashbackConfigPage() {
       setEarn(String(data.earnRatePct))
       setRedeem(String(data.redeemMaxPct))
       setValidity(String(data.validityDays))
+      setMinEarn(String(data.minEarnSubtotal))
+      setMinRedeem(String(data.minRedeemSubtotal))
+      setCampRate(String(data.campaignRatePct))
+      setCampStart(toLocalInput(data.campaignStartsAt))
+      setCampEnd(toLocalInput(data.campaignEndsAt))
     }
   }, [data])
 
@@ -36,6 +64,9 @@ export default function CashbackConfigPage() {
     const earnPct = Number(earn.replace(',', '.'))
     const redeemPct = Number(redeem.replace(',', '.'))
     const days = Number(validity)
+    const minEarnV = Number(minEarn.replace(',', '.'))
+    const minRedeemV = Number(minRedeem.replace(',', '.'))
+    const campPct = Number(campRate.replace(',', '.'))
     if (!Number.isFinite(earnPct) || earnPct < 0 || earnPct > 100) {
       return setFormError('Taxa de acúmulo deve ficar entre 0 e 100%.')
     }
@@ -45,8 +76,26 @@ export default function CashbackConfigPage() {
     if (!Number.isInteger(days) || days < 1) {
       return setFormError('Validade deve ser de pelo menos 1 dia.')
     }
+    if (!Number.isFinite(campPct) || campPct < 0 || campPct > 100) {
+      return setFormError('Taxa de campanha deve ficar entre 0 e 100%.')
+    }
+    const start = fromLocalInput(campStart)
+    const end = fromLocalInput(campEnd)
+    if (start && end && new Date(start) > new Date(end)) {
+      return setFormError('O início da campanha não pode ser depois do fim.')
+    }
     save.mutate(
-      { active, earnRatePct: earnPct, redeemMaxPct: redeemPct, validityDays: days },
+      {
+        active,
+        earnRatePct: earnPct,
+        redeemMaxPct: redeemPct,
+        validityDays: days,
+        minEarnSubtotal: Number.isFinite(minEarnV) ? minEarnV : 0,
+        minRedeemSubtotal: Number.isFinite(minRedeemV) ? minRedeemV : 0,
+        campaignRatePct: campPct,
+        campaignStartsAt: start,
+        campaignEndsAt: end,
+      },
       {
         onSuccess: () => setSaved(true),
         onError: (err) => setFormError(err instanceof Error ? err.message : 'Falha ao salvar.'),
@@ -108,6 +157,67 @@ export default function CashbackConfigPage() {
                 />
               </label>
             </div>
+
+            {/* Pedidos mínimos */}
+            <div className="flex flex-wrap gap-4 border-t border-gray-100 pt-4">
+              <label className="flex flex-col text-xs font-semibold text-gray-600">
+                Pedido mín. pra acumular (R$)
+                <input
+                  value={minEarn}
+                  onChange={(e) => setMinEarn(e.target.value.replace(/[^\d.,]/g, ''))}
+                  inputMode="decimal"
+                  placeholder="0 = sem mínimo"
+                  className="mt-1 h-10 w-40 rounded-md border border-gray-300 px-2 text-sm"
+                />
+              </label>
+              <label className="flex flex-col text-xs font-semibold text-gray-600">
+                Pedido mín. pra resgatar (R$)
+                <input
+                  value={minRedeem}
+                  onChange={(e) => setMinRedeem(e.target.value.replace(/[^\d.,]/g, ''))}
+                  inputMode="decimal"
+                  placeholder="0 = sem mínimo"
+                  className="mt-1 h-10 w-40 rounded-md border border-gray-300 px-2 text-sm"
+                />
+              </label>
+            </div>
+
+            {/* Campanha por período: taxa turbinada entre datas. Taxa 0 = sem
+                campanha (usa a taxa de acúmulo normal). */}
+            <fieldset className="flex flex-col gap-2 border-t border-gray-100 pt-4">
+              <legend className="text-xs font-semibold text-gray-600">
+                Campanha (taxa turbinada por período — deixe a taxa em 0 pra desligar)
+              </legend>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex flex-col text-xs font-semibold text-gray-600">
+                  Taxa da campanha (%)
+                  <input
+                    value={campRate}
+                    onChange={(e) => setCampRate(e.target.value.replace(/[^\d.,]/g, ''))}
+                    inputMode="decimal"
+                    className="mt-1 h-10 w-32 rounded-md border border-gray-300 px-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col text-xs font-semibold text-gray-600">
+                  Início
+                  <input
+                    type="datetime-local"
+                    value={campStart}
+                    onChange={(e) => setCampStart(e.target.value)}
+                    className="mt-1 h-10 rounded-md border border-gray-300 px-2 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col text-xs font-semibold text-gray-600">
+                  Fim
+                  <input
+                    type="datetime-local"
+                    value={campEnd}
+                    onChange={(e) => setCampEnd(e.target.value)}
+                    className="mt-1 h-10 rounded-md border border-gray-300 px-2 text-sm"
+                  />
+                </label>
+              </div>
+            </fieldset>
 
             <p className="flex items-center gap-1.5 rounded-md bg-amber-50 p-2 text-xs text-amber-800">
               <Coins className="h-4 w-4 flex-shrink-0" aria-hidden="true" />

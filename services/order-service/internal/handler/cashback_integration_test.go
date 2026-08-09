@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -95,6 +96,50 @@ func TestCashback_MoneyPath(t *testing.T) {
 		if !kinds[k] {
 			t.Errorf("histórico sem entrada '%s': %+v", k, hist)
 		}
+	}
+}
+
+// Regras extras (mínimos + campanha) fazem round-trip pelo banco, e a taxa
+// efetiva respeita a janela da campanha.
+func TestCashback_RulesRoundTrip(t *testing.T) {
+	db := dashDB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	// Restaura o singleton ao padrão no fim (banco compartilhado).
+	t.Cleanup(func() {
+		db.Exec(`UPDATE cashback_config SET active=true, earn_rate_pct=5, redeem_max_pct=50,
+			validity_days=90, min_earn_subtotal=0, min_redeem_subtotal=0,
+			campaign_rate_pct=NULL, campaign_starts_at=NULL, campaign_ends_at=NULL WHERE id=1`)
+	})
+
+	start := time.Now().Add(-time.Hour)
+	end := time.Now().Add(time.Hour)
+	in := cashback.Config{
+		Active: true, EarnRatePct: 5, RedeemMaxPct: 50, ValidityDays: 90,
+		MinEarnSubtotal: 100, MinRedeemSubtotal: 50,
+		CampaignRatePct: 12, CampaignStartsAt: &start, CampaignEndsAt: &end,
+	}
+	if err := cashback.SaveConfig(ctx, db, in, "admin-test"); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
+	}
+	got, err := cashback.LoadConfig(ctx, db)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if got.MinEarnSubtotal != 100 || got.MinRedeemSubtotal != 50 || got.CampaignRatePct != 12 {
+		t.Fatalf("regras não persistiram: %+v", got)
+	}
+	if got.CampaignStartsAt == nil || got.CampaignEndsAt == nil {
+		t.Fatalf("datas da campanha não persistiram: %+v", got)
+	}
+	// Campanha ativa agora → taxa efetiva 12 (não a base 5).
+	if r := cashback.EffectiveEarnRate(got, time.Now()); r != 12 {
+		t.Fatalf("taxa efetiva na campanha = %v, quero 12", r)
+	}
+	// Abaixo do mínimo de acúmulo não credita, mesmo na campanha.
+	if a := cashback.Earn(got, 99, time.Now()); a != 0 {
+		t.Fatalf("abaixo do mín. de acúmulo: Earn=%v, quero 0", a)
 	}
 }
 

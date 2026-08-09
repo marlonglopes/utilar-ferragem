@@ -1,10 +1,15 @@
 package cashback
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func cfg() Config {
 	return Config{EarnRatePct: 5, RedeemMaxPct: 50, ValidityDays: 90, Active: true}
 }
+
+var refNow = time.Date(2026, 8, 9, 12, 0, 0, 0, time.UTC)
 
 func TestEarn(t *testing.T) {
 	c := cfg()
@@ -19,7 +24,7 @@ func TestEarn(t *testing.T) {
 		{"base negativa", -10, 0},
 	}
 	for _, tc := range cases {
-		if got := Earn(c, tc.basis); got != tc.want {
+		if got := Earn(c, tc.basis, refNow); got != tc.want {
 			t.Errorf("%s: Earn=%v, quero %v", tc.nome, got, tc.want)
 		}
 	}
@@ -27,8 +32,60 @@ func TestEarn(t *testing.T) {
 	// Programa desligado não acumula.
 	off := c
 	off.Active = false
-	if got := Earn(off, 100); got != 0 {
+	if got := Earn(off, 100, refNow); got != 0 {
 		t.Errorf("programa desligado: Earn=%v, quero 0", got)
+	}
+}
+
+// Pedido mínimo pra acumular: abaixo do mínimo, não gera cashback.
+func TestEarn_MinEarnSubtotal(t *testing.T) {
+	c := cfg()
+	c.MinEarnSubtotal = 100
+	if got := Earn(c, 99.99, refNow); got != 0 {
+		t.Errorf("abaixo do mínimo de acúmulo: Earn=%v, quero 0", got)
+	}
+	if got := Earn(c, 100, refNow); got != 5 {
+		t.Errorf("no mínimo de acúmulo: Earn=%v, quero 5", got)
+	}
+}
+
+// Campanha: taxa turbinada dentro da janela; fora dela, volta pra taxa base.
+func TestEarn_Campaign(t *testing.T) {
+	start := refNow.Add(-24 * time.Hour)
+	end := refNow.Add(24 * time.Hour)
+	c := cfg() // base 5%
+	c.CampaignRatePct = 10
+	c.CampaignStartsAt = &start
+	c.CampaignEndsAt = &end
+
+	// Dentro da janela → 10% de 100 = 10.
+	if got := Earn(c, 100, refNow); got != 10 {
+		t.Errorf("campanha ativa: Earn=%v, quero 10", got)
+	}
+	// Antes de começar → taxa base 5%.
+	if got := Earn(c, 100, start.Add(-time.Hour)); got != 5 {
+		t.Errorf("antes da campanha: Earn=%v, quero 5", got)
+	}
+	// Depois de acabar → taxa base 5%.
+	if got := Earn(c, 100, end.Add(time.Hour)); got != 5 {
+		t.Errorf("depois da campanha: Earn=%v, quero 5", got)
+	}
+	// Taxa de campanha 0 → ignora, usa a base.
+	c.CampaignRatePct = 0
+	if got := Earn(c, 100, refNow); got != 5 {
+		t.Errorf("campanha com taxa 0: Earn=%v, quero 5 (base)", got)
+	}
+}
+
+// Pedido mínimo pra resgatar: abaixo do mínimo, não deixa usar cashback.
+func TestClampRedeem_MinRedeemSubtotal(t *testing.T) {
+	c := cfg()
+	c.MinRedeemSubtotal = 50
+	if got := ClampRedeem(c, 20, 100, 49.99); got != 0 {
+		t.Errorf("pedido abaixo do mínimo de resgate: ClampRedeem=%v, quero 0", got)
+	}
+	if got := ClampRedeem(c, 20, 100, 60); got != 20 {
+		t.Errorf("acima do mínimo de resgate: ClampRedeem=%v, quero 20", got)
 	}
 }
 
