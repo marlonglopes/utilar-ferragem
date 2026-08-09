@@ -36,6 +36,7 @@ const ADMIN_PAGES = [
   '/admin/frete',
   '/admin/cupons',
   '/admin/loja',
+  '/admin/cashback',
   '/admin/pagamento',
 ]
 

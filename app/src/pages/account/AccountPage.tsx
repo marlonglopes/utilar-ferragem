@@ -11,16 +11,90 @@ import {
   Trash2,
   Check,
   Package,
+  Coins,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAddressStore, type Address, type AddressInput } from '@/store/addressStore'
 import { useNavigate } from 'react-router-dom'
 import { Input } from '@/components/ui'
-import { formatCEP } from '@/lib/format'
+import { formatCEP, formatCurrency } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import { useMyCashback } from '@/hooks/useCashback'
 import OrdersTab from './OrdersTab'
 
-type Tab = 'profile' | 'addresses' | 'payment' | 'orders'
+type Tab = 'profile' | 'addresses' | 'payment' | 'orders' | 'cashback'
+
+const CASHBACK_KIND_LABEL: Record<string, string> = {
+  earn: 'Cashback ganho',
+  redeem: 'Usado na compra',
+  reverse: 'Estornado (devolução)',
+  expire: 'Expirado',
+}
+
+function CashbackTab() {
+  const { data, isLoading, isError } = useMyCashback()
+
+  if (isLoading) {
+    return <p className="py-12 text-center text-sm text-gray-400">Carregando…</p>
+  }
+  if (isError || !data) {
+    return (
+      <p className="py-12 text-center text-sm text-gray-500">
+        Não foi possível carregar seu cashback agora.
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Saldo em destaque */}
+      <div className="rounded-xl bg-gradient-to-br from-brand-blue to-brand-blue-dark p-5 text-white">
+        <p className="text-sm text-blue-100">Seu saldo de cashback</p>
+        <p className="mt-1 font-display text-3xl font-bold">{formatCurrency(data.balance)}</p>
+        {data.active && (
+          <p className="mt-2 text-xs text-blue-100">
+            Você ganha {data.earnRatePct}% de volta nas compras e pode usar até {data.redeemMaxPct}%
+            do valor do pedido.
+          </p>
+        )}
+      </div>
+
+      {/* Extrato */}
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-gray-900">Extrato</h3>
+        {data.history.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-400">
+            Ainda sem movimentações. Faça uma compra para começar a acumular.
+          </p>
+        ) : (
+          <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+            {data.history.map((e, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-900">
+                    {CASHBACK_KIND_LABEL[e.kind] ?? e.kind}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {new Date(e.createdAt).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    'flex-shrink-0 font-semibold',
+                    e.amount >= 0 ? 'text-green-600' : 'text-gray-600'
+                  )}
+                >
+                  {e.amount >= 0 ? '+' : '−'}
+                  {formatCurrency(Math.abs(e.amount))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
 
 const EMPTY_ADDR: AddressInput = {
   label: '',
@@ -306,6 +380,7 @@ export default function AccountPage() {
 
   const tabs: { id: Tab; label: string; icon: typeof User }[] = [
     { id: 'orders', label: t('account.orders'), icon: Package },
+    { id: 'cashback', label: 'Cashback', icon: Coins },
     { id: 'profile', label: t('account.profile'), icon: User },
     { id: 'addresses', label: t('account.addresses'), icon: MapPin },
     { id: 'payment', label: t('account.paymentMethods'), icon: CreditCard },
@@ -351,6 +426,7 @@ export default function AccountPage() {
       </div>
 
       {tab === 'orders' && <OrdersTab />}
+      {tab === 'cashback' && <CashbackTab />}
       {tab === 'profile' && <ProfileTab />}
       {tab === 'addresses' && <AddressesTab />}
       {tab === 'payment' && (

@@ -13,6 +13,7 @@ import { formatCurrency, formatCEP } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { isApiEnabled, isOrderEnabled, orderPostWithJWT } from '@/lib/api'
 import { validateCoupon, type CouponPreview } from '@/lib/couponCheckout'
+import { useMyCashback } from '@/hooks/useCashback'
 import { Input } from '@/components/ui'
 import PixPayment from './PixPayment'
 import BoletoPayment from './BoletoPayment'
@@ -738,6 +739,10 @@ function OrderSummary({
   token,
   onApplyCoupon,
   onRemoveCoupon,
+  cashbackAvailable,
+  cashbackApplied,
+  useCashback,
+  onToggleCashback,
 }: {
   shipping: ShippingOption | null
   coupon: CouponPreview | null
@@ -745,13 +750,17 @@ function OrderSummary({
   token: string | null
   onApplyCoupon: (c: CouponPreview) => void
   onRemoveCoupon: () => void
+  cashbackAvailable: number
+  cashbackApplied: number
+  useCashback: boolean
+  onToggleCashback: (v: boolean) => void
 }) {
   const { t } = useTranslation('checkout')
   const items = useCartStore((s) => s.items)
 
   const subtotal = items.reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0)
   const shippingCost = shipping?.cost ?? 0
-  const total = Math.max(0, subtotal - discount) + shippingCost
+  const total = Math.max(0, subtotal - discount - cashbackApplied) + shippingCost
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col gap-4 lg:sticky lg:top-24">
@@ -778,6 +787,27 @@ function OrderSummary({
         onRemove={onRemoveCoupon}
       />
 
+      {/* Resgate de cashback: só aparece se o cliente tem saldo utilizável. O
+          valor exibido é a prévia (teto% do subtotal, limitado ao saldo); o
+          servidor recalcula e consome os lotes no pedido. */}
+      {cashbackAvailable > 0 && (
+        <label className="flex cursor-pointer items-start gap-2 border-t border-gray-100 pt-3 text-sm">
+          <input
+            type="checkbox"
+            checked={useCashback}
+            onChange={(e) => onToggleCashback(e.target.checked)}
+            className="mt-0.5 h-4 w-4"
+          />
+          <span className="text-gray-700">
+            Usar{' '}
+            <span className="font-semibold text-brand-blue">
+              {formatCurrency(cashbackAvailable)}
+            </span>{' '}
+            em cashback neste pedido
+          </span>
+        </label>
+      )}
+
       <div className="border-t border-gray-100 pt-3 flex flex-col gap-2 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-gray-500">{t('checkout:cart.subtotal')}</span>
@@ -787,6 +817,12 @@ function OrderSummary({
           <div className="flex items-center justify-between">
             <span className="text-gray-500">Cupom {coupon.code}</span>
             <span className="font-medium text-green-600">-{formatCurrency(discount)}</span>
+          </div>
+        )}
+        {cashbackApplied > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500">Cashback</span>
+            <span className="font-medium text-green-600">-{formatCurrency(cashbackApplied)}</span>
           </div>
         )}
         <div className="flex items-center justify-between">
@@ -913,6 +949,11 @@ export default function CheckoutPage() {
   // Cupom aplicado (preview). O desconto aqui é só pra EXIBIR — o servidor
   // recalcula sobre o subtotal autoritativo no POST /orders.
   const [coupon, setCoupon] = useState<CouponPreview | null>(null)
+  // Cashback: saldo do cliente + toggle "usar meu cashback". O valor abatido aqui
+  // é só a PRÉVIA; o servidor limita ao menor entre (pedido, saldo, teto%) e
+  // consome os lotes. Nunca abate direto pelo que o cliente manda.
+  const { data: cashback } = useMyCashback()
+  const [useCashback, setUseCashback] = useState(false)
 
   const subtotal = items.reduce((sum, i) => sum + i.priceSnapshot * i.quantity, 0)
   // itemCount = soma das quantidades (não número de linhas): é o que a cotação
@@ -921,7 +962,15 @@ export default function CheckoutPage() {
   const shippingCost = shipping?.cost ?? 0
   // Desconto do cupom, nunca maior que o subtotal (o servidor também trava isso).
   const discount = Math.min(coupon?.discount ?? 0, subtotal)
-  const total = Math.max(0, subtotal - discount) + shippingCost
+  const netSubtotal = Math.max(0, subtotal - discount)
+  // Prévia do resgate: teto% do subtotal líquido, limitado ao saldo.
+  const cashbackAvailable =
+    cashback?.active && cashback.balance > 0
+      ? Math.round(Math.min(cashback.balance, (netSubtotal * cashback.redeemMaxPct) / 100) * 100) /
+        100
+      : 0
+  const cashbackApplied = useCashback ? cashbackAvailable : 0
+  const total = Math.max(0, netSubtotal - cashbackApplied) + shippingCost
 
   const handleAddressDone = useCallback((addr: Address) => {
     setAddress(addr)
@@ -960,6 +1009,9 @@ export default function CheckoutPage() {
         // couponCode é só o CÓDIGO; o desconto em reais é recalculado no servidor
         // (e o uso é incrementado atomicamente na transação do pedido).
         couponCode: coupon?.code,
+        // cashbackRedeem é só um PEDIDO em R$; o servidor limita ao saldo/teto e
+        // consome os lotes. 0 quando o cliente não optou por usar.
+        cashbackRedeem: cashbackApplied,
         items: items.map((i) => ({
           productId: i.productId,
           name: i.name,
@@ -987,7 +1039,7 @@ export default function CheckoutPage() {
       setCommittedOrderNumber(order.number)
       return order.id
     },
-    [accessToken, address, items, shipping, shippingCost, coupon, hasCartIssues]
+    [accessToken, address, items, shipping, shippingCost, coupon, cashbackApplied, hasCartIssues]
   )
 
   const handlePaymentCreated = useCallback(
@@ -1045,6 +1097,10 @@ export default function CheckoutPage() {
           token={accessToken}
           onApplyCoupon={setCoupon}
           onRemoveCoupon={() => setCoupon(null)}
+          cashbackAvailable={cashbackAvailable}
+          cashbackApplied={cashbackApplied}
+          useCashback={useCashback}
+          onToggleCashback={setUseCashback}
         />
       </div>
     </div>

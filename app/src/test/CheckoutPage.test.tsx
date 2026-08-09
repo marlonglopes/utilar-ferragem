@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { I18nextProvider } from 'react-i18next'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import i18n from '@/i18n'
 import CheckoutPage from '@/pages/checkout/CheckoutPage'
 import { useCartStore } from '@/store/cartStore'
@@ -34,12 +35,15 @@ function addItem() {
 }
 
 function renderCheckout() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <I18nextProvider i18n={i18n}>
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <CheckoutPage />
-      </MemoryRouter>
-    </I18nextProvider>
+    <QueryClientProvider client={client}>
+      <I18nextProvider i18n={i18n}>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <CheckoutPage />
+        </MemoryRouter>
+      </I18nextProvider>
+    </QueryClientProvider>
   )
 }
 
@@ -229,6 +233,39 @@ describe('CheckoutPage — cupom de desconto', () => {
     fireEvent.click(screen.getByRole('button', { name: /aplicar/i }))
     await waitFor(() => {
       expect(screen.getByText(/cupom inválido/i)).toBeInTheDocument()
+    })
+  })
+})
+
+describe('CheckoutPage — cashback', () => {
+  // Sem backend (isOrderEnabled=false), fetchMyCashback devolve o mock:
+  // saldo 37,50, ativo, teto 50%. Carrinho de 200 → disponível = min(37,50; 100).
+  function addItem200() {
+    useCartStore.getState().addItem({
+      productId: 'p3',
+      sellerId: 's1',
+      sellerName: 'Loja Teste',
+      name: 'Serra Makita',
+      icon: '🪚',
+      priceSnapshot: 100,
+      quantity: 2,
+      stock: 5,
+    })
+  }
+
+  it('oferece usar o cashback e abate o valor do total', async () => {
+    addItem200()
+    renderCheckout()
+
+    // O toggle aparece com o valor disponível (R$ 37,50).
+    const toggle = await screen.findByRole('checkbox', { name: /usar.*cashback/i })
+    expect(toggle).toBeInTheDocument()
+
+    fireEvent.click(toggle)
+
+    // 200 − 37,50 = 162,50 (sem frete no passo de endereço).
+    await waitFor(() => {
+      expect(screen.getByText(/162,50/)).toBeInTheDocument()
     })
   })
 })
