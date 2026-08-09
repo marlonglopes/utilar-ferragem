@@ -386,10 +386,17 @@ func (h *OrderHandler) Create(c *gin.Context) {
 
 	// items
 	for _, it := range req.Items {
+		// category_id vem do produto AUTORITATIVO (mesma fonte do preço), não do
+		// corpo do cliente — é o que alimenta o cashback por categoria. Vazio
+		// quando o catálogo não está configurado (dev/mock) ou não devolve.
+		categoryID := ""
+		if p := products[it.ProductID]; p != nil {
+			categoryID = p.CategoryID
+		}
 		_, err := tx.Exec(`
-			INSERT INTO order_items (order_id, product_id, name, icon, seller_id, seller_name, quantity, unit_price)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		`, orderID, it.ProductID, it.Name, it.Icon, it.SellerID, it.SellerName, it.Quantity, it.UnitPrice)
+			INSERT INTO order_items (order_id, product_id, name, icon, seller_id, seller_name, quantity, unit_price, category_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		`, orderID, it.ProductID, it.Name, it.Icon, it.SellerID, it.SellerName, it.Quantity, it.UnitPrice, categoryID)
 		if err != nil {
 			DBError(c, err)
 			return

@@ -28,6 +28,9 @@ type Product struct {
 	ID    string  `json:"id"`
 	Name  string  `json:"name"`
 	Price float64 `json:"price"`
+	// CategoryID: usado pelo cashback por categoria (capturado no item do pedido
+	// no Create). Vazio quando o catálogo não devolve.
+	CategoryID string `json:"categoryId"`
 
 	// Stock é float64, não int: a migration 005 do catalog trocou
 	// products.stock para NUMERIC(14,3) pra permitir venda fracionada (2,5 m

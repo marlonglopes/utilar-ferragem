@@ -143,6 +143,58 @@ func TestCashback_RulesRoundTrip(t *testing.T) {
 	}
 }
 
+// Cashback por categoria: taxa de override persiste e o acúmulo por item aplica
+// a taxa certa por categoria (distribuindo o pago proporcionalmente).
+func TestCashback_CategoryEarn(t *testing.T) {
+	db := dashDB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	const cust = "cb-cust-category"
+	cleanup := func() {
+		db.Exec(`DELETE FROM cashback_entries WHERE customer_id=$1`, cust)
+		db.Exec(`DELETE FROM cashback_lots WHERE customer_id=$1`, cust)
+		db.Exec(`DELETE FROM cashback_category_rates WHERE category_id IN ('cbt-ferramentas','cbt-tintas')`)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	// Override: ferramentas 10%; tintas sem override (usa a base 5%).
+	if err := cashback.SaveCategoryRate(ctx, db, "cbt-ferramentas", 10, "admin-test"); err != nil {
+		t.Fatalf("SaveCategoryRate: %v", err)
+	}
+	rates, err := cashback.LoadCategoryRates(ctx, db)
+	if err != nil {
+		t.Fatalf("LoadCategoryRates: %v", err)
+	}
+	if rates["cbt-ferramentas"] != 10 {
+		t.Fatalf("override não persistiu: %+v", rates)
+	}
+
+	cfg := cashback.Config{Active: true, EarnRatePct: 5, RedeemMaxPct: 50, ValidityDays: 90}
+	items := []cashback.ItemLine{
+		{CategoryID: "cbt-ferramentas", LineTotal: 100},
+		{CategoryID: "cbt-tintas", LineTotal: 100},
+	}
+	// 10% de 100 + 5% de 100 = 15 (sem desconto: basisNet == gross == 200).
+	got, err := cashback.CreditEarnItems(ctx, db, cfg, cust, "cb-cat-order", items, 200, rates)
+	if err != nil || got != 15 {
+		t.Fatalf("CreditEarnItems = %v (err=%v), quero 15", got, err)
+	}
+	if bal := balanceOf(t, db, cust); bal != 15 {
+		t.Fatalf("saldo = %v, quero 15", bal)
+	}
+
+	// Remover o override → volta pra base.
+	if err := cashback.DeleteCategoryRate(ctx, db, "cbt-ferramentas"); err != nil {
+		t.Fatalf("DeleteCategoryRate: %v", err)
+	}
+	rates, _ = cashback.LoadCategoryRates(ctx, db)
+	if _, ok := rates["cbt-ferramentas"]; ok {
+		t.Fatalf("override não foi removido: %+v", rates)
+	}
+}
+
 func balanceOf(t *testing.T, db *sql.DB, cust string) float64 {
 	t.Helper()
 	bal, err := cashback.BalanceFor(context.Background(), db, cust)

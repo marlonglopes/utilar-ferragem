@@ -74,4 +74,34 @@ export async function updateCashbackConfig(cfg: CashbackConfig): Promise<void> {
   await adminSend<unknown>(ORDER_URL, '/api/v1/admin/cashback', 'PUT', cfg)
 }
 
+// Overrides de taxa por categoria: mapa categoryId → %. Categoria ausente usa a
+// taxa base.
+export async function fetchCategoryRates(): Promise<Record<string, number>> {
+  if (!isOrderEnabled) return {}
+  const res = await adminGet<{ rates: Record<string, number> }>(
+    ORDER_URL,
+    '/api/v1/admin/cashback/categories'
+  )
+  return res.rates ?? {}
+}
+
+export async function setCategoryRate(categoryId: string, ratePct: number): Promise<void> {
+  if (!isOrderEnabled) return
+  await adminSend<unknown>(
+    ORDER_URL,
+    `/api/v1/admin/cashback/categories/${encodeURIComponent(categoryId)}`,
+    'PUT',
+    { ratePct }
+  )
+}
+
+export async function deleteCategoryRate(categoryId: string): Promise<void> {
+  if (!isOrderEnabled) return
+  await adminSend<unknown>(
+    ORDER_URL,
+    `/api/v1/admin/cashback/categories/${encodeURIComponent(categoryId)}`,
+    'DELETE'
+  )
+}
+
 export const isCashbackAdminEnabled = ORDER_URL !== ''

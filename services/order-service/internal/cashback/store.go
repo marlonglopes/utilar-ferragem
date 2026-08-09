@@ -93,11 +93,23 @@ func BalanceFor(ctx context.Context, q rowQ, customerID string) (float64, error)
 	return bal, err
 }
 
-// CreditEarn credita um lote de cashback pelo pedido pago. Idempotente: um lote
-// por pedido (UNIQUE em order_id); replay do evento não credita de novo. Devolve
-// quanto foi creditado (0 se nada/replay). basis = mercadoria paga (sem frete).
+// CreditEarn credita um lote de cashback pelo pedido pago (taxa achatada sobre a
+// base). Idempotente: um lote por pedido (UNIQUE em order_id). basis = mercadoria
+// paga (sem frete). Usado no caminho simples / testes; o consumer usa
+// CreditEarnItems (por categoria).
 func CreditEarn(ctx context.Context, tx execQ, cfg Config, customerID, orderID string, basis float64) (float64, error) {
-	amount := Earn(cfg, basis, time.Now())
+	return insertEarnLot(ctx, tx, cfg, customerID, orderID, Earn(cfg, basis, time.Now()))
+}
+
+// CreditEarnItems credita o lote calculando o acúmulo POR ITEM (taxa por
+// categoria). Mesma idempotência (UNIQUE order_id). basisNet = total − frete.
+func CreditEarnItems(ctx context.Context, tx execQ, cfg Config, customerID, orderID string, items []ItemLine, basisNet float64, categoryRates map[string]float64) (float64, error) {
+	return insertEarnLot(ctx, tx, cfg, customerID, orderID, EarnByItems(cfg, items, basisNet, categoryRates, time.Now()))
+}
+
+// insertEarnLot grava o lote + a entrada de histórico, de forma idempotente por
+// pedido. amount já calculado. 0 → no-op.
+func insertEarnLot(ctx context.Context, tx execQ, cfg Config, customerID, orderID string, amount float64) (float64, error) {
 	if amount <= 0 {
 		return 0, nil
 	}
@@ -120,6 +132,41 @@ func CreditEarn(ctx context.Context, tx execQ, cfg Config, customerID, orderID s
 		return 0, err
 	}
 	return amount, nil
+}
+
+// LoadCategoryRates lê os overrides de taxa por categoria (mapa categoria→%).
+func LoadCategoryRates(ctx context.Context, q execQ) (map[string]float64, error) {
+	rows, err := q.QueryContext(ctx, `SELECT category_id, rate_pct FROM cashback_category_rates`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[string]float64)
+	for rows.Next() {
+		var cat string
+		var rate float64
+		if err := rows.Scan(&cat, &rate); err != nil {
+			return nil, err
+		}
+		out[cat] = rate
+	}
+	return out, rows.Err()
+}
+
+// SaveCategoryRate faz upsert de um override de taxa por categoria.
+func SaveCategoryRate(ctx context.Context, q execQ, categoryID string, rate float64, updatedBy string) error {
+	_, err := q.ExecContext(ctx, `
+		INSERT INTO cashback_category_rates (category_id, rate_pct, updated_by)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (category_id) DO UPDATE SET rate_pct = EXCLUDED.rate_pct,
+			updated_at = now(), updated_by = EXCLUDED.updated_by`, categoryID, rate, updatedBy)
+	return err
+}
+
+// DeleteCategoryRate remove o override (a categoria volta a usar a taxa base).
+func DeleteCategoryRate(ctx context.Context, q execQ, categoryID string) error {
+	_, err := q.ExecContext(ctx, `DELETE FROM cashback_category_rates WHERE category_id = $1`, categoryID)
+	return err
 }
 
 // Redeem consome cashback FIFO (vence primeiro, gasta primeiro) até `amount`,

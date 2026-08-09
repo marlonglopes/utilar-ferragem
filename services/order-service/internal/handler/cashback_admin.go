@@ -114,3 +114,46 @@ func (h *CashbackHandler) UpdateConfig(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
+
+// GetCategoryRates GET /api/v1/admin/cashback/categories — overrides de taxa por
+// categoria (mapa categoria→%). Categoria ausente usa a taxa base.
+func (h *CashbackHandler) GetCategoryRates(c *gin.Context) {
+	rates, err := cashback.LoadCategoryRates(c.Request.Context(), h.db)
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"rates": rates})
+}
+
+// SetCategoryRate PUT /api/v1/admin/cashback/categories/:id — define/atualiza a
+// taxa de uma categoria.
+func (h *CashbackHandler) SetCategoryRate(c *gin.Context) {
+	categoryID := c.Param("id")
+	if categoryID == "" {
+		BadRequest(c, "categoria obrigatória")
+		return
+	}
+	var req struct {
+		RatePct float64 `json:"ratePct" binding:"gte=0,lte=100"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+	if err := cashback.SaveCategoryRate(c.Request.Context(), h.db, categoryID, req.RatePct, c.GetString("user_id")); err != nil {
+		DBError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// DeleteCategoryRate DELETE /api/v1/admin/cashback/categories/:id — remove o
+// override (a categoria volta a usar a taxa base).
+func (h *CashbackHandler) DeleteCategoryRate(c *gin.Context) {
+	if err := cashback.DeleteCategoryRate(c.Request.Context(), h.db, c.Param("id")); err != nil {
+		DBError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}

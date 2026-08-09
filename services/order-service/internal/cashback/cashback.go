@@ -84,6 +84,55 @@ func Earn(cfg Config, basis float64, now time.Time) float64 {
 	return round2(basis * rate / 100)
 }
 
+// ItemLine é uma linha do pedido pro acúmulo por categoria.
+type ItemLine struct {
+	CategoryID string
+	// LineTotal = preço unitário × quantidade (bruto da linha, antes de desconto).
+	LineTotal float64
+}
+
+// EarnByItems acumula POR ITEM, aplicando a taxa da categoria de cada um (ou a
+// taxa efetiva base quando a categoria não tem override).
+//
+// O acúmulo é sobre o que foi REALMENTE pago (basisNet = total − frete),
+// distribuído entre as linhas na proporção do valor de cada uma. Assim
+// desconto/cupom/cashback reduzem a base de TODAS as linhas proporcionalmente e
+// nunca se acumula sobre o que não foi pago. Categoria com override não pega o
+// turbo da campanha (o override é explícito); categorias sem override seguem a
+// taxa efetiva (campanha, se ativa; senão a base).
+func EarnByItems(cfg Config, items []ItemLine, basisNet float64, categoryRates map[string]float64, now time.Time) float64 {
+	if !cfg.Active || basisNet <= 0 || basisNet < cfg.MinEarnSubtotal {
+		return 0
+	}
+	effRate := EffectiveEarnRate(cfg, now)
+	var gross float64
+	for _, it := range items {
+		if it.LineTotal > 0 {
+			gross += it.LineTotal
+		}
+	}
+	// Sem itens úteis: cai no acúmulo achatado pela taxa efetiva (compat/robustez).
+	if gross <= 0 {
+		if effRate <= 0 {
+			return 0
+		}
+		return round2(basisNet * effRate / 100)
+	}
+	ratio := basisNet / gross
+	var sum float64
+	for _, it := range items {
+		if it.LineTotal <= 0 {
+			continue
+		}
+		rate := effRate
+		if r, ok := categoryRates[it.CategoryID]; ok {
+			rate = r
+		}
+		sum += it.LineTotal * ratio * rate / 100
+	}
+	return round2(sum)
+}
+
 // ClampRedeem devolve quanto do cashback pedido PODE ser resgatado neste pedido:
 // o menor entre o pedido do cliente, o saldo disponível e o teto% do subtotal.
 // Nunca negativo. Respeita o pedido mínimo pra resgatar. É o ponto que impede o

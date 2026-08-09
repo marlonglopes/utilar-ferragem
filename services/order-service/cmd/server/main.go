@@ -297,6 +297,9 @@ func main() {
 		cashbackH := handler.NewCashbackHandler(database)
 		adminDash.GET("/cashback", cashbackH.GetConfig)
 		adminDash.PUT("/cashback", cashbackH.UpdateConfig)
+		adminDash.GET("/cashback/categories", cashbackH.GetCategoryRates)
+		adminDash.PUT("/cashback/categories/:id", cashbackH.SetCategoryRate)
+		adminDash.DELETE("/cashback/categories/:id", cashbackH.DeleteCategoryRate)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

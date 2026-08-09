@@ -4,6 +4,9 @@ import {
   fetchMyCashback,
   fetchCashbackConfig,
   updateCashbackConfig,
+  fetchCategoryRates,
+  setCategoryRate,
+  deleteCategoryRate,
   type CashbackConfig,
 } from '@/lib/cashbackApi'
 
@@ -29,5 +32,27 @@ export function useUpdateCashbackConfig() {
   return useMutation({
     mutationFn: (cfg: CashbackConfig) => updateCashbackConfig(cfg),
     onSuccess: () => qc.invalidateQueries({ queryKey: CFG_KEY }),
+  })
+}
+
+const CAT_KEY = ['admin', 'cashback', 'categories']
+
+export function useCashbackCategoryRates() {
+  return useQuery({ queryKey: CAT_KEY, queryFn: fetchCategoryRates })
+}
+
+export function useSetCategoryRate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ratePct }: { id: string; ratePct: number }) => setCategoryRate(id, ratePct),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CAT_KEY }),
+  })
+}
+
+export function useDeleteCategoryRate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteCategoryRate(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CAT_KEY }),
   })
 }

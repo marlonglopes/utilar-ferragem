@@ -295,14 +295,40 @@ func creditCashback(ctx context.Context, tx *sql.Tx, orderID string) error {
 		return nil
 	}
 	var customerID string
-	var basis float64
+	var basisNet float64
 	err = tx.QueryRowContext(ctx,
 		`SELECT user_id, GREATEST(total - shipping_cost, 0) FROM orders WHERE id = $1`, orderID).
-		Scan(&customerID, &basis)
+		Scan(&customerID, &basisNet)
 	if err != nil {
 		return err
 	}
-	_, err = cashback.CreditEarn(ctx, tx, cfg, customerID, orderID, basis)
+	// Itens (categoria + valor de linha) pro acúmulo por categoria. Distribui o
+	// basisNet (o que foi pago em mercadoria) entre as linhas.
+	rows, err := tx.QueryContext(ctx,
+		`SELECT category_id, unit_price * quantity FROM order_items WHERE order_id = $1`, orderID)
+	if err != nil {
+		return err
+	}
+	var items []cashback.ItemLine
+	for rows.Next() {
+		var it cashback.ItemLine
+		if err := rows.Scan(&it.CategoryID, &it.LineTotal); err != nil {
+			rows.Close()
+			return err
+		}
+		items = append(items, it)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	rates, err := cashback.LoadCategoryRates(ctx, tx)
+	if err != nil {
+		return err
+	}
+	_, err = cashback.CreditEarnItems(ctx, tx, cfg, customerID, orderID, items, basisNet, rates)
 	return err
 }
 

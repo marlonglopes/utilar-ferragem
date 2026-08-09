@@ -77,6 +77,46 @@ func TestEarn_Campaign(t *testing.T) {
 	}
 }
 
+// Acúmulo por categoria: cada linha usa a taxa da sua categoria (ou a base), e o
+// basisNet é distribuído proporcionalmente ao valor das linhas.
+func TestEarnByItems(t *testing.T) {
+	c := cfg()                                     // base 5%
+	rates := map[string]float64{"ferramentas": 10} // override; "tintas" usa a base
+
+	items := []ItemLine{
+		{CategoryID: "ferramentas", LineTotal: 100},
+		{CategoryID: "tintas", LineTotal: 100},
+	}
+
+	// Sem desconto (basisNet == gross == 200): 10% de 100 + 5% de 100 = 15.
+	if got := EarnByItems(c, items, 200, rates, refNow); got != 15 {
+		t.Fatalf("sem desconto: EarnByItems=%v, quero 15", got)
+	}
+
+	// Com 50% de desconto (basisNet 100): distribui proporcional → metade de cada.
+	// 100*0.5*10% + 100*0.5*5% = 5 + 2,5 = 7,5.
+	if got := EarnByItems(c, items, 100, rates, refNow); got != 7.5 {
+		t.Fatalf("com desconto: EarnByItems=%v, quero 7,5", got)
+	}
+
+	// Sem overrides → igual ao acúmulo achatado pela taxa base (5% de 200 = 10).
+	if got := EarnByItems(c, items, 200, map[string]float64{}, refNow); got != 10 {
+		t.Fatalf("sem override: EarnByItems=%v, quero 10", got)
+	}
+
+	// Abaixo do mínimo de acúmulo → zero.
+	cm := c
+	cm.MinEarnSubtotal = 300
+	if got := EarnByItems(cm, items, 200, rates, refNow); got != 0 {
+		t.Fatalf("abaixo do mínimo: EarnByItems=%v, quero 0", got)
+	}
+
+	// Sem itens → cai no achatado pela taxa efetiva (5% de 200 = 10).
+	if got := EarnByItems(c, nil, 200, rates, refNow); got != 10 {
+		t.Fatalf("sem itens: EarnByItems=%v, quero 10", got)
+	}
+}
+
 // Pedido mínimo pra resgatar: abaixo do mínimo, não deixa usar cashback.
 func TestClampRedeem_MinRedeemSubtotal(t *testing.T) {
 	c := cfg()
