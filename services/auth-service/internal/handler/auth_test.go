@@ -38,8 +38,10 @@ func setupTestDB(t *testing.T) (*sql.DB, *config.Config) {
 	if n == 0 {
 		t.Skip("no users in DB — run `make auth-db-seed`")
 	}
-	// DevMode=true pra config.Load aceitar JWT_SECRET vazio em tests.
+	// DevMode=true pra config.Load aceitar JWT_SECRET vazio em tests. APP_ENV=
+	// development é a declaração positiva que o devguard passou a exigir p/ DEV_MODE.
 	t.Setenv("DEV_MODE", "true")
+	t.Setenv("APP_ENV", "development")
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("config.Load: %v", err)
