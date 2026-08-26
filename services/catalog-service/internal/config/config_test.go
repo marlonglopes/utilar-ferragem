@@ -31,6 +31,7 @@ func TestLoadRejectsInsecureJWTSecret(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("DEV_MODE", tc.devMode)
+			t.Setenv("APP_ENV", "development") // DEV_MODE exige declaração positiva de dev
 			t.Setenv("JWT_SECRET", tc.secret)
 			// A1: fora de DEV_MODE o boot exige o segredo de serviço, distinto
 			// do de usuário. Ver service_secret_test.go.
@@ -56,6 +57,7 @@ func TestLoadRejectsInsecureJWTSecret(t *testing.T) {
 
 func TestLoadDevFallbackSecretIsNotUsableInProd(t *testing.T) {
 	t.Setenv("DEV_MODE", "true")
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("JWT_SECRET", "")
 
 	dev, err := Load()

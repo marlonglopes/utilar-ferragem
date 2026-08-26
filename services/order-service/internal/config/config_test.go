@@ -48,6 +48,7 @@ func TestLoad_AcceptsStrongSecretInProd(t *testing.T) {
 func TestLoad_DevModeEnablesXUserIdFallback(t *testing.T) {
 	t.Setenv("JWT_SECRET", "")
 	t.Setenv("DEV_MODE", "true")
+	t.Setenv("APP_ENV", "development")
 
 	cfg, err := Load()
 	if err != nil {

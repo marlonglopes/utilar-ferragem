@@ -12,6 +12,7 @@ import (
 // o header, em silêncio.
 func TestLoad_RecusaDevModeComBancoDeProducao(t *testing.T) {
 	t.Setenv("DEV_MODE", "true")
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("JWT_SECRET", "")
 	t.Setenv("APP_ENV", "")
 	t.Setenv("ALLOWED_ORIGINS", "")
@@ -27,8 +28,8 @@ func TestLoad_RecusaDevModeComBancoDeProducao(t *testing.T) {
 // O guard não pode atrapalhar quem roda local, senão alguém o desliga.
 func TestLoad_PermiteDevModeLocal(t *testing.T) {
 	t.Setenv("DEV_MODE", "true")
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("JWT_SECRET", "")
-	t.Setenv("APP_ENV", "")
 	t.Setenv("ALLOWED_ORIGINS", "http://localhost:5175")
 	t.Setenv("AUTH_DB_URL", "postgres://utilar:utilar@localhost:5432/db?sslmode=disable")
 

@@ -53,11 +53,36 @@ func Check(devMode bool, dbURL string) error {
 		return nil // caminho normal de produção: nada a fazer
 	}
 
+	// DECLARAÇÃO POSITIVA (STRIDE E#5/G2). Os sinais abaixo inferem produção, mas
+	// não pegam "host único, Postgres em localhost, sem APP_ENV" — um deploy de
+	// produção que APARENTA local passava. Exigir que o dev se declare fecha isso:
+	// DEV_MODE só sobe se APP_ENV disser explicitamente que é desenvolvimento.
+	// Ausente ou valor de produção → recusa (ausência não é mais "parece dev").
+	if !isDevEnv(os.Getenv("APP_ENV")) {
+		env := strings.TrimSpace(os.Getenv("APP_ENV"))
+		if env == "" {
+			env = "(vazio)"
+		}
+		return fmt.Errorf("%w (APP_ENV=%s — declare APP_ENV=development para ligar DEV_MODE)",
+			ErrDevModeInProduction, env)
+	}
+
 	if sinais := ProductionSignals(dbURL); len(sinais) > 0 {
 		return fmt.Errorf("%w (sinais de produção: %s)",
 			ErrDevModeInProduction, strings.Join(sinais, "; "))
 	}
 	return nil
+}
+
+// isDevEnv diz se APP_ENV é uma declaração explícita de desenvolvimento. Vazio =
+// NÃO é dev (é o cenário perigoso do deploy que esqueceu de setar).
+func isDevEnv(appEnv string) bool {
+	switch strings.ToLower(strings.TrimSpace(appEnv)) {
+	case "development", "dev", "local", "test", "testing":
+		return true
+	default:
+		return false
+	}
 }
 
 // ProductionSignals devolve a lista de indícios de que este ambiente é produção.

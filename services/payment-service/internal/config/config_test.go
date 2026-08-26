@@ -76,6 +76,7 @@ func TestLoad_MPWebhookSecretRequiredInProd(t *testing.T) {
 func TestLoad_DevModeSkipsWebhookSecretCheck(t *testing.T) {
 	setBaseEnv(t)
 	t.Setenv("DEV_MODE", "true")
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("STRIPE_WEBHOOK_SECRET", "") // vazio mas dev mode
 
 	cfg, err := Load()

@@ -55,6 +55,7 @@ func TestBootOkComServiceSecretProprio(t *testing.T) {
 // roda em ambiente com sinal de produção.
 func TestDevCaiNoSegredoDeUsuario(t *testing.T) {
 	t.Setenv("DEV_MODE", "true")
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("JWT_SECRET", strings.Repeat("a", 64))
 	t.Setenv("SERVICE_JWT_SECRET", "")
 

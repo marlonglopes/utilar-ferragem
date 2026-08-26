@@ -19,6 +19,10 @@ export GOTOOLCHAIN=auto
 
 # ── env de DESENVOLVIMENTO compartilhado ──────────────────────────────────────
 export DEV_MODE=true
+# Declaração POSITIVA de dev: o devguard agora exige APP_ENV=development pra
+# aceitar DEV_MODE=true (senão recusa o boot). Fecha o cenário "produção que
+# aparenta local" (STRIDE E#5/G2).
+export APP_ENV=development
 export JWT_SECRET="dev-utilar-jwt-secret-0123456789abcdef"
 export SERVICE_JWT_SECRET="dev-utilar-service-secret-0123456789abcdef"
 export REDIS_URL="redis://localhost:6379"

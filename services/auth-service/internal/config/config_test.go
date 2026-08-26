@@ -65,6 +65,7 @@ func TestLoad_AcceptsStrongJWTSecretInProd(t *testing.T) {
 func TestLoad_AcceptsAnyJWTSecretInDevMode(t *testing.T) {
 	t.Setenv("JWT_SECRET", "")
 	t.Setenv("DEV_MODE", "true")
+	t.Setenv("APP_ENV", "development")
 
 	cfg, err := Load()
 	if err != nil {

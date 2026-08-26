@@ -63,13 +63,26 @@ func TestCheck_PermiteDesenvolvimentoLocal(t *testing.T) {
 
 	for _, tc := range casos {
 		t.Run(tc.nome, func(t *testing.T) {
-			t.Setenv("APP_ENV", "")
+			t.Setenv("APP_ENV", "development") // declaração positiva de dev
 			t.Setenv("ALLOWED_ORIGINS", tc.cors)
 
 			if err := Check(true, tc.dbURL); err != nil {
 				t.Fatalf("guard barrou desenvolvimento local legítimo: %v", err)
 			}
 		})
+	}
+}
+
+// STRIDE E#5/G2: DEV_MODE sem APP_ENV declarado NÃO é mais "parece dev" — é o
+// cenário perigoso (deploy de produção com Postgres local que esqueceu de setar
+// APP_ENV). Tem que RECUSAR, mesmo com banco local e sem outro sinal.
+func TestCheck_RecusaDevModeSemAppEnv(t *testing.T) {
+	t.Setenv("ALLOWED_ORIGINS", "")
+	for _, appEnv := range []string{"", "production", "prod", "staging"} {
+		t.Setenv("APP_ENV", appEnv)
+		if err := Check(true, dbLocal); err == nil {
+			t.Fatalf("APP_ENV=%q: DEV_MODE foi aceito sem declaração positiva de dev", appEnv)
+		}
 	}
 }
 
@@ -87,7 +100,10 @@ func TestCheck_SemDevModeNuncaBarra(t *testing.T) {
 // A mensagem precisa dizer QUAL sinal disparou. Um erro de boot que só diz
 // "proibido" faz a pessoa desligar o guard em vez de entender o ambiente.
 func TestCheck_MensagemNomeiaOSinal(t *testing.T) {
-	t.Setenv("APP_ENV", "")
+	// APP_ENV=development declara dev, então o guard passa da checagem de APP_ENV
+	// e chega aos SINAIS de produção (banco remoto/TLS) — que é o que este teste
+	// verifica que a mensagem nomeia.
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("ALLOWED_ORIGINS", "")
 
 	err := Check(true, dbRDS)
