@@ -115,7 +115,7 @@ func main() {
 		handler.RequestID(),
 		handler.AccessLog(),
 		handler.SecurityHeaders(),
-		handler.CORS(cfg.AllowedOrigins),
+		handler.CORS(cfg.AllowedOrigins, cfg.DevMode),
 		mreg.Middleware(),
 	)
 

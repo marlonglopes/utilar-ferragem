@@ -21,7 +21,7 @@ import (
 func TestCORS_PermiteIdempotencyKey(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(CORS([]string{"*"}))
+	r.Use(CORS([]string{"*"}, true))
 	r.POST("/api/v1/orders", func(c *gin.Context) { c.Status(http.StatusOK) })
 
 	req := httptest.NewRequest(http.MethodOptions, "/api/v1/orders", nil)

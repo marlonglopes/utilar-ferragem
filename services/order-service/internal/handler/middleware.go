@@ -43,13 +43,16 @@ func AccessLog() gin.HandlerFunc {
 	}
 }
 
-// CORS — whitelist via lista de origens explicitas. Vazio = wildcard (dev/legacy).
-func CORS(allowed []string) gin.HandlerFunc {
+// CORS — whitelist via lista de origens explícitas. Vazio = wildcard SÓ em
+// devMode (STRIDE S): `Access-Control-Allow-Origin: *` num serviço que move
+// dinheiro, ligado em produção sem ALLOWED_ORIGINS, deixaria qualquer site fazer
+// requests com o navegador do cliente. Fora de dev, vazio = nenhuma origem.
+func CORS(allowed []string, devMode bool) gin.HandlerFunc {
 	allowedSet := make(map[string]struct{}, len(allowed))
 	for _, o := range allowed {
 		allowedSet[o] = struct{}{}
 	}
-	wildcard := len(allowed) == 0
+	wildcard := len(allowed) == 0 && devMode
 
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
