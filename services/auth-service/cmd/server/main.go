@@ -161,8 +161,12 @@ func main() {
 
 	// Rotas de serviço — chamadas pelo order-service com token role=service
 	// assinado com o JWT_SECRET compartilhado (mesmo padrão do catalog-service).
+	// InternalAuth (não JWTAuth): aceita o token role=service que o order-service
+	// assina pra resolver o contexto do operador (teto/loja). JWTAuth recusaria a
+	// claim role=service — com ele, GetOperator tomava 401 e o teto degradava
+	// fail-closed. Espelha o RequireInternal do catalog. Ver STRIDE E#5.
 	internal := r.Group("/api/v1/internal",
-		handler.JWTAuth(cfg.JWTSecret, nil),
+		handler.InternalAuth(cfg.JWTSecret, cfg.ServiceVerifier, authH.AccessTokenDenyList()),
 		handler.RequireRole("service", "admin"))
 	{
 		internal.GET("/operators/:userId", storeH.GetOperatorInternal)
