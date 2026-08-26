@@ -132,15 +132,11 @@ func main() {
 		WithMetrics(bizMetrics)
 	ledgerH := handler.NewLedgerHandler(database, poster, closer, reconciler, auditRec)
 
-	// Webhook endpoint provider-agnostic. O `:provider` precisa bater com
-	// gateway.Name() — assim o atacante não consegue forçar webhook pra um
-	// provider inativo.
-	r.POST("/webhooks/:provider", webhookH.Handle)
-
-	// H4 + H1: rate limit + Idempotency-Key em POST /payments.
-	// Sem REDIS_URL (dev): ambos features ficam desligadas — log warn explícito.
+	// H4 + H1: rate limit + Idempotency-Key em POST /payments; e rate limit por IP
+	// no WEBHOOK. Sem REDIS_URL (dev): tudo desligado — log warn explícito.
 	var paymentRL gin.HandlerFunc
 	var paymentIdem gin.HandlerFunc
+	var webhookRL gin.HandlerFunc
 	if cfg.RedisURL != "" {
 		opts, err := redis.ParseURL(cfg.RedisURL)
 		if err != nil {
@@ -155,10 +151,28 @@ func main() {
 			ratelimit.UserKey, // por user_id (limita atacante autenticado, não IP só)
 		)
 		paymentIdem = idempotency.Middleware(idempotency.New(rdb, 24*time.Hour), "payment:create")
+		// STRIDE D#3: sem limite, um flood de webhooks forjados vira um flood de
+		// GetPayment ao PSP (amplificação — pode fazer a Appmax rate-limitar/banir a
+		// conta) + tx no banco. Por IP: o PSP legítimo vem de poucos IPs; 120/min é
+		// folga larga sobre o postback real e ainda corta o flood.
+		webhookRL = ratelimit.Middleware(
+			ratelimit.New(rdb), "payment:webhook",
+			ratelimit.Limit{Max: 120, Window: time.Minute}, ratelimit.IPKey,
+		)
 		slog.Info("rate limit + idempotency enabled", "redis", opts.Addr)
 	} else {
-		slog.Warn("REDIS_URL not set — payment rate limit + idempotency DISABLED (H1, H4 unprotected)")
+		slog.Warn("REDIS_URL not set — payment rate limit + idempotency + webhook limit DISABLED")
 	}
+
+	// Webhook endpoint provider-agnostic. O `:provider` precisa bater com
+	// gateway.Name() — assim o atacante não consegue forçar webhook pra um
+	// provider inativo. Rate-limit por IP (fecha a amplificação pro PSP).
+	webhookChain := []gin.HandlerFunc{}
+	if webhookRL != nil {
+		webhookChain = append(webhookChain, webhookRL)
+	}
+	webhookChain = append(webhookChain, webhookH.Handle)
+	r.POST("/webhooks/:provider", webhookChain...)
 
 	api := r.Group("/api/v1", handler.JWTMiddleware(cfg.JWTSecret))
 	{
