@@ -63,12 +63,12 @@ func AccessLog() gin.HandlerFunc {
 }
 
 // CORS — whitelist via lista de origens. Vazio = wildcard (dev).
-func CORS(allowed []string) gin.HandlerFunc {
+func CORS(allowed []string, devMode bool) gin.HandlerFunc {
 	allowedSet := make(map[string]struct{}, len(allowed))
 	for _, o := range allowed {
 		allowedSet[o] = struct{}{}
 	}
-	wildcard := len(allowed) == 0
+	wildcard := len(allowed) == 0 && devMode
 
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")

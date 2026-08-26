@@ -111,7 +111,7 @@ func main() {
 		mreg.Middleware(),
 		handler.AccessLog(),
 		handler.SecurityHeaders(),
-		handler.CORS(cfg.AllowedOrigins),
+		handler.CORS(cfg.AllowedOrigins, cfg.DevMode),
 	)
 
 	// /metrics: fail-closed por token (ver pkg/metrics.Handler). Sem
@@ -260,10 +260,12 @@ func main() {
 	})
 
 	srv := &http.Server{
-		Addr:         ":" + cfg.Port,
-		Handler:      r,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		Addr:              ":" + cfg.Port,
+		Handler:           r,
+		ReadTimeout:       10 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second, // STRIDE D: fecha slowloris de header
+		MaxHeaderBytes:    1 << 16,         // 64KB — teto de header
+		WriteTimeout:      30 * time.Second,
 	}
 
 	go func() {
