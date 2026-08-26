@@ -202,4 +202,4 @@ Sprints e fases: `SPRINT.md`, `docs/phases/`, `docs/sprints/`.
 - Transação onde houver mais de uma escrita. `rows.Err()` sempre checado.
 - Migrations reversíveis (`.up.sql` + `.down.sql`).
 - Pre-commit: Husky + lint-staged (ESLint + Prettier no que está staged).
-- Node em `.nvmrc` (v20), Go em `go.work` (**1.26.5** — subiu de 1.26.2 pra zerar CVEs de stdlib; `GOTOOLCHAIN=auto` baixa). Go real em `/home/marlon/go/bin`.
+- Node em `.nvmrc` (v20), Go em `go.work` (**1.26.6** — subiu de 1.26.5 pra zerar CVEs de stdlib (GO-2026-6090/5972/5026); `GOTOOLCHAIN=auto` baixa). Go real em `/home/marlon/go/bin`.
