@@ -43,6 +43,18 @@ func AccessLog() gin.HandlerFunc {
 	}
 }
 
+// LimitBody envolve o corpo em http.MaxBytesReader ANTES de qualquer parse
+// (STRIDE D): sem isso, `ShouldBindJSON` lê o corpo inteiro na memória antes de o
+// `binding:"max=100"` rejeitar — um JSON gigante (campos enormes antes do array,
+// ou muito além de 100 itens) é alocado antes da validação. Estourou o teto, a
+// leitura falha e o handler responde 400.
+func LimitBody(max int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, max)
+		c.Next()
+	}
+}
+
 // CORS — whitelist via lista de origens explícitas. Vazio = wildcard SÓ em
 // devMode (STRIDE S): `Access-Control-Allow-Origin: *` num serviço que move
 // dinheiro, ligado em produção sem ALLOWED_ORIGINS, deixaria qualquer site fazer

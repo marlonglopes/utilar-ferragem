@@ -152,8 +152,10 @@ func main() {
 
 	api := r.Group("/api/v1", handler.RequireUser(cfg.JWTSecret, cfg.DevMode))
 	{
-		// Idempotency primeiro (replay rápido), depois rate limit, depois handler.
-		createChain := []gin.HandlerFunc{}
+		// Teto de corpo ANTES de tudo (STRIDE D): 128KB cobre 100 itens + endereço
+		// com folga; acima disso a leitura corta antes de alocar o JSON inteiro.
+		// Idempotency depois (replay rápido), depois rate limit, depois handler.
+		createChain := []gin.HandlerFunc{handler.LimitBody(1 << 17)}
 		if createIdem != nil {
 			createChain = append(createChain, createIdem)
 		}
