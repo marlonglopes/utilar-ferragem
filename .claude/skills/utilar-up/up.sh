@@ -13,6 +13,14 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 RUN_DIR="/tmp/utilar-dev"
 mkdir -p "$RUN_DIR"
 
+# Cores + helpers de saída ANTES de qualquer `say` (o bloco de .env.dev.local
+# abaixo já loga com say/c_dim; com `set -u`, referenciá-los antes de definir
+# aborta o boot com "c_dim: unbound variable" — só quando .env.dev.local existe,
+# por isso passou batido até as chaves da Stripe entrarem).
+c_green="\033[32m"; c_red="\033[31m"; c_dim="\033[2m"; c_rst="\033[0m"; c_bold="\033[1m"
+say()  { printf "%b\n" "$*"; }
+head() { printf "\n%b════════════════════════════════════════════════════════%b\n%b▶ %s%b\n%b════════════════════════════════════════════════════════%b\n" "$c_dim" "$c_rst" "$c_bold" "$1" "$c_rst" "$c_dim" "$c_rst"; }
+
 # Go no PATH (o binário real vive em /usr/local/go/bin; ferramentas em ~/go/bin).
 export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 export GOTOOLCHAIN=auto
@@ -47,10 +55,6 @@ fi
 : "${STRIPE_SECRET_KEY:=sk_test_dummy_demo_key_do_not_use}"
 : "${STRIPE_WEBHOOK_SECRET:=whsec_dummy_demo}"
 : "${STRIPE_PUBLISHABLE_KEY:=pk_test_dummy_demo}"
-
-c_green="\033[32m"; c_red="\033[31m"; c_dim="\033[2m"; c_rst="\033[0m"; c_bold="\033[1m"
-say()  { printf "%b\n" "$*"; }
-head() { printf "\n%b════════════════════════════════════════════════════════%b\n%b▶ %s%b\n%b════════════════════════════════════════════════════════%b\n" "$c_dim" "$c_rst" "$c_bold" "$1" "$c_rst" "$c_dim" "$c_rst"; }
 
 port_up() { curl -sf --max-time 2 "http://localhost:$1/health" >/dev/null 2>&1; }
 
