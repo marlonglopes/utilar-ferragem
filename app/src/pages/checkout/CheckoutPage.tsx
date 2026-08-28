@@ -13,6 +13,7 @@ import { formatCurrency, formatCEP } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { isApiEnabled, isOrderEnabled, orderPostWithJWT } from '@/lib/api'
 import { validateCoupon, type CouponPreview } from '@/lib/couponCheckout'
+import { validateCPF } from '@/lib/cpf'
 import { useMyCashback } from '@/hooks/useCashback'
 import { Input } from '@/components/ui'
 import PixPayment from './PixPayment'
@@ -523,10 +524,14 @@ function PaymentStep({
   const pixTotal = +(total * 0.95).toFixed(2)
   const displayTotal = method === 'pix' ? pixTotal : total
 
-  // Boleto requer CPF + nome (Stripe rejeita sem isso). Validação simples client-side.
+  // Boleto requer CPF + nome. VALIDAÇÃO DE CPF COM DÍGITO VERIFICADOR (validateCPF),
+  // não só contagem de 11 dígitos: antes, "12345678901" (11 dígitos, checksum
+  // inválido) passava daqui e só a Stripe recusava com tax_id_invalid — o cliente
+  // via "payment gateway error" sem entender. Agora barra no cliente com mensagem.
+  const cpfDigits = payerCPF.replace(/\D/g, '')
+  const cpfInvalido = method === 'boleto' && cpfDigits.length > 0 && !validateCPF(payerCPF)
   const boletoReady =
-    method !== 'boleto' ||
-    (payerCPF.replace(/\D/g, '').length === 11 && payerName.trim().length >= 3)
+    method !== 'boleto' || (validateCPF(payerCPF) && payerName.trim().length >= 3)
 
   // Garante que existe um order id real do backend antes de criar payment.
   // Usa cache (committedOrderId) — só cria UMA order por sessão de checkout.
@@ -667,6 +672,7 @@ function PaymentStep({
             placeholder="000.000.000-00"
             maxLength={14}
             required
+            error={cpfInvalido ? 'CPF inválido — confira os números' : undefined}
           />
           <Input
             label="Nome completo"
