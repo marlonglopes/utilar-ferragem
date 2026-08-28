@@ -43,6 +43,16 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+// UpdateProfileRequest — campos editáveis do próprio perfil (PATCH /me). Todos
+// opcionais (ponteiro): só atualiza o que veio. Nome e CPF passam pela MESMA
+// validação do registro (min 2 / check digit). E-mail e senha têm fluxos
+// próprios e NÃO entram aqui.
+type UpdateProfileRequest struct {
+	Name  *string `json:"name,omitempty"`
+	CPF   *string `json:"cpf,omitempty"`
+	Phone *string `json:"phone,omitempty"`
+}
+
 type RefreshRequest struct {
 	RefreshToken string `json:"refreshToken" binding:"required"`
 }

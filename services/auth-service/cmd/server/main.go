@@ -111,6 +111,7 @@ func main() {
 	priv := r.Group("/api/v1", handler.JWTAuth(cfg.JWTSecret, authH.AccessTokenDenyList()))
 	{
 		priv.GET("/me", authH.Me)
+		priv.PATCH("/me", authH.UpdateProfile)
 		priv.POST("/auth/logout", authH.Logout)
 		// Enrollment de MFA (2º fator) — autenticado: quem já entrou ativa o TOTP
 		// da própria conta. Ver internal/handler/mfa.go.

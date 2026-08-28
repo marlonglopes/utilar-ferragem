@@ -17,9 +17,12 @@ import { useAuthStore } from '@/store/authStore'
 import { useAddressStore, type Address, type AddressInput } from '@/store/addressStore'
 import { useNavigate } from 'react-router-dom'
 import { Input } from '@/components/ui'
-import { formatCEP, formatCurrency } from '@/lib/format'
+import { formatCEP, formatCurrency, formatCPF, formatPhone } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import { validateCPF } from '@/lib/cpf'
+import { authPatch, isAuthEnabled } from '@/lib/api'
 import { useMyCashback } from '@/hooks/useCashback'
+import type { User as AuthUser } from '@/store/authStore'
 import OrdersTab from './OrdersTab'
 
 type Tab = 'profile' | 'addresses' | 'payment' | 'orders' | 'cashback'
@@ -123,11 +126,68 @@ async function fetchCEP(cep: string) {
 function ProfileTab() {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
-  const [name, setName] = useState(user?.name ?? '')
-  const [saved, setSaved] = useState(false)
+  const setUser = useAuthStore((s) => s.setUser)
 
-  function save(e: React.FormEvent) {
+  const [name, setName] = useState(user?.name ?? '')
+  const [cpf, setCpf] = useState(user?.cpf ? formatCPF(user.cpf) : '')
+  const [phone, setPhone] = useState(user?.phone ? formatPhone(user.phone) : '')
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  // CPF é usado no boleto e na nota fiscal. Validamos o dígito verificador no
+  // cliente (mesma validateCPF do registro) pra dar erro na hora, mas o campo é
+  // opcional aqui — só barra se preenchido e inválido.
+  const cpfInvalido = cpf.replace(/\D/g, '').length > 0 && !validateCPF(cpf)
+  const nomeInvalido = name.trim().length > 0 && name.trim().length < 2
+  const podeSalvar = !cpfInvalido && !nomeInvalido && name.trim().length >= 2 && !saving
+
+  async function save(e: React.FormEvent) {
     e.preventDefault()
+    setError('')
+    if (!podeSalvar) return
+
+    // Sem backend (mock/dev sem auth): atualiza só o store, pra a UI funcionar.
+    if (!isAuthEnabled || !user?.token) {
+      setUser({
+        ...(user as AuthUser),
+        name: name.trim(),
+        cpf: cpf.replace(/\D/g, '') || undefined,
+        phone: phone.replace(/\D/g, '') || undefined,
+      })
+      flashSaved()
+      return
+    }
+
+    setSaving(true)
+    try {
+      const updated = await authPatch<AuthUser>(
+        '/api/v1/me',
+        {
+          name: name.trim(),
+          cpf: cpf.replace(/\D/g, '') || undefined,
+          phone: phone.replace(/\D/g, '') || undefined,
+        },
+        user.token
+      )
+      // Preserva token/refreshToken (o /me não os devolve) e funde o resto.
+      setUser({ ...(user as AuthUser), ...updated })
+      flashSaved()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao salvar'
+      if (msg.toLowerCase().includes('cpf') && msg.toLowerCase().includes('cadastrado')) {
+        setError('Esse CPF já está cadastrado em outra conta.')
+      } else if (msg.toLowerCase().includes('cpf')) {
+        setError('CPF inválido — confira os números.')
+      } else {
+        setError(msg)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function flashSaved() {
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -139,6 +199,7 @@ function ProfileTab() {
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
+        error={nomeInvalido ? 'Informe o nome completo.' : undefined}
       />
       <Input
         type="email"
@@ -147,16 +208,43 @@ function ProfileTab() {
         disabled
         hint="E-mail não pode ser alterado aqui."
       />
+      <Input
+        label={t('auth.cpf')}
+        value={cpf}
+        onChange={(e) => setCpf(formatCPF(e.target.value))}
+        inputMode="numeric"
+        placeholder="000.000.000-00"
+        maxLength={14}
+        error={cpfInvalido ? 'CPF inválido — confira os números.' : undefined}
+        hint="Usado no boleto e na nota fiscal."
+      />
+      <Input
+        label={t('auth.phone')}
+        value={phone}
+        onChange={(e) => setPhone(formatPhone(e.target.value))}
+        inputMode="tel"
+        autoComplete="tel"
+        placeholder="(11) 99999-9999"
+        maxLength={15}
+      />
+
+      {error && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {error}
+        </p>
+      )}
+
       <button
         type="submit"
+        disabled={!podeSalvar}
         className={cn(
-          'h-10 rounded-xl font-semibold text-sm transition-colors',
+          'h-10 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60',
           saved
             ? 'bg-green-600 text-white'
             : 'bg-brand-orange hover:bg-brand-orange-dark text-gray-900'
         )}
       >
-        {saved ? 'Salvo!' : t('account.saveProfile')}
+        {saved ? 'Salvo!' : saving ? t('loading') : t('account.saveProfile')}
       </button>
     </form>
   )

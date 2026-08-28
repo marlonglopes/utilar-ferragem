@@ -347,6 +347,93 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	c.JSON(http.StatusOK, u)
 }
 
+// UpdateProfile atualiza os dados editáveis do próprio usuário (PATCH /me):
+// nome, CPF e telefone. Escopado ao dono do JWT (user_id do contexto), nunca a
+// um id do corpo.
+//
+// Por que existe: o CPF é essencial pra boleto e nota fiscal — o registro já
+// pede, mas usuários antigos/semeados podem estar sem um CPF válido e não havia
+// como corrigir (o Perfil era um formulário decorativo). Sem isto, o boleto de
+// quem não tem CPF válido no cadastro falha e o cliente fica sem saída.
+//
+// Validação idêntica à do registro: nome min 2, CPF com dígito verificador
+// (validateCPF), unicidade do CPF (idx_users_cpf). E-mail e senha têm fluxos
+// próprios e NÃO passam por aqui.
+func (h *AuthHandler) UpdateProfile(c *gin.Context) {
+	userID := c.GetString("user_id")
+	var req model.UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		BadRequest(c, err.Error())
+		return
+	}
+
+	// Ponteiros: só mexemos no campo que veio no corpo (COALESCE no UPDATE).
+	var name, cpf, phone *string
+
+	if req.Name != nil {
+		n := strings.TrimSpace(*req.Name)
+		if len([]rune(n)) < 2 {
+			BadRequest(c, "nome inválido")
+			return
+		}
+		name = &n
+	}
+
+	// CPF vazio explícito é ignorado — não deixamos LIMPAR um CPF por aqui (o
+	// boleto/NF-e depende dele; remoção seria um fluxo à parte, com confirmação).
+	if req.CPF != nil && strings.TrimSpace(*req.CPF) != "" {
+		norm, ok := validateCPF(*req.CPF)
+		if !ok {
+			BadRequest(c, "invalid CPF")
+			return
+		}
+		cpf = &norm
+	}
+
+	if req.Phone != nil {
+		if p := onlyDigits(*req.Phone); p != "" {
+			phone = &p
+		}
+	}
+
+	if name == nil && cpf == nil && phone == nil {
+		// Nada válido a atualizar — devolve o estado atual (idempotente).
+		u, err := h.loadUser(userID)
+		if err != nil {
+			DBError(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, u)
+		return
+	}
+
+	_, err := h.db.Exec(`
+		UPDATE users SET
+			name  = COALESCE($2, name),
+			cpf   = COALESCE($3, cpf),
+			phone = COALESCE($4, phone)
+		WHERE id = $1
+	`, userID, name, cpf, phone)
+	if err != nil {
+		// O único UNIQUE que este UPDATE pode violar é o do CPF (idx_users_cpf):
+		// outra conta já usa esse CPF.
+		if strings.Contains(err.Error(), "duplicate key") {
+			Conflict(c, "CPF já cadastrado em outra conta")
+			return
+		}
+		DBError(c, err)
+		return
+	}
+
+	u, err := h.loadUser(userID)
+	if err != nil {
+		DBError(c, err)
+		return
+	}
+	logAuthEvent(c.Request.Context(), h.db, c, EventProfileUpdated, userID, nil)
+	c.JSON(http.StatusOK, u)
+}
+
 // -- logout (revoga refresh token) -----------------------------------------
 
 func (h *AuthHandler) Logout(c *gin.Context) {

@@ -20,6 +20,7 @@ const (
 	EventPasswordResetRequested AuthEventType = "password_reset_requested"
 	EventPasswordChanged        AuthEventType = "password_changed"
 	EventEmailVerified          AuthEventType = "email_verified"
+	EventProfileUpdated         AuthEventType = "profile_updated"
 )
 
 // logAuthEvent insere uma linha em auth_events. Falla aberto: erros viram

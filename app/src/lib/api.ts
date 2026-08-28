@@ -508,6 +508,16 @@ export async function authGet<T>(path: string, token: string): Promise<T> {
   return handleResponse<T>(res)
 }
 
+// PATCH autenticado no auth-service (ex.: /api/v1/me pra editar o perfil).
+export async function authPatch<T>(path: string, body: unknown, token: string): Promise<T> {
+  const res = await tunnelFetch(`${AUTH_URL}${path}`, {
+    method: 'PATCH',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(body),
+  })
+  return handleResponse<T>(res)
+}
+
 // Quando auth-service está ligado, o frontend passa o JWT como Bearer para order-service.
 // Essa helper troca X-User-Id por Authorization quando aplicável.
 // Usa fetchWithAutoRefresh: 401 dispara refresh+retry automático.

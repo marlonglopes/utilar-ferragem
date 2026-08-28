@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
@@ -18,12 +19,17 @@ import (
 
 const testJWTSecret = "test-secret-change-me"
 
-func setupTestDB(t *testing.T) (*sql.DB, *config.Config) {
-	t.Helper()
+func authTestDSN() string {
 	dsn := os.Getenv("AUTH_DB_URL")
 	if dsn == "" {
 		dsn = "postgres://utilar:utilar@localhost:5438/auth_service?sslmode=disable"
 	}
+	return dsn
+}
+
+func setupTestDB(t *testing.T) (*sql.DB, *config.Config) {
+	t.Helper()
+	dsn := authTestDSN()
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		t.Skipf("test DB not available: %v", err)
@@ -67,6 +73,7 @@ func setupRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 
 	priv := r.Group("/api/v1", handler.JWTAuth(cfg.JWTSecret, nil))
 	priv.GET("/me", authH.Me)
+	priv.PATCH("/me", authH.UpdateProfile)
 	priv.POST("/auth/logout", authH.Logout)
 	priv.GET("/auth/mfa/status", authH.MFAStatus)
 	priv.POST("/auth/mfa/enroll", authH.EnrollMFA)
@@ -250,6 +257,147 @@ func TestMe_InvalidToken(t *testing.T) {
 	w := do(r, http.MethodGet, "/api/v1/me", "not-a-valid-jwt", nil)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("esperado 401, got %d", w.Code)
+	}
+}
+
+// -- update profile (PATCH /me) --------------------------------------------
+//
+// setupTestDB usa o DB de dev COMPARTILHADO e NÃO reseta. Por isso estes testes
+// criam usuários DESCARTÁVEIS (email único) em vez de mutar o seed test1 — senão
+// um teste polui o CPF do outro. O DELETE do cleanup cascateia (FKs ON DELETE
+// CASCADE), liberando o CPF pro próximo run.
+
+// registerThrowaway cria um usuário novo e agenda a limpeza. Devolve token + id.
+func registerThrowaway(t *testing.T, r *gin.Engine, db *sql.DB) (token, userID string) {
+	t.Helper()
+	email := fmt.Sprintf("pf-%d@utilar.test", time.Now().UnixNano())
+	reg := do(r, http.MethodPost, "/api/v1/auth/register", "", map[string]any{
+		"email": email, "password": "SenhaForte#2026", "name": "Perfil Teste",
+	})
+	if reg.Code != http.StatusCreated {
+		t.Fatalf("register throwaway: %d %s", reg.Code, reg.Body.String())
+	}
+	var res struct {
+		AccessToken string `json:"accessToken"`
+		User        struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	}
+	json.Unmarshal(reg.Body.Bytes(), &res)
+	// Conexão FRESCA no cleanup: o `defer db.Close()` do teste roda ANTES dos
+	// t.Cleanup, então o `db` já está fechado aqui — o DELETE precisa de conexão
+	// própria, senão o usuário (e o CPF que ele segura) vaza pro próximo run.
+	t.Cleanup(func() {
+		cdb, err := sql.Open("postgres", authTestDSN())
+		if err != nil {
+			return
+		}
+		defer cdb.Close()
+		_, _ = cdb.Exec(`DELETE FROM users WHERE id=$1`, res.User.ID)
+	})
+	return res.AccessToken, res.User.ID
+}
+
+func meCPF(t *testing.T, r *gin.Engine, token string) string {
+	t.Helper()
+	w := do(r, http.MethodGet, "/api/v1/me", token, nil)
+	var u struct {
+		CPF *string `json:"cpf"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &u)
+	if u.CPF == nil {
+		return ""
+	}
+	return *u.CPF
+}
+
+// O cliente entra um CPF VÁLIDO no perfil e ele persiste normalizado (o registro
+// já pede CPF, mas usuários antigos podem estar sem — e boleto/NF-e dependem dele).
+func TestUpdateProfile_ValidCPFPersiste(t *testing.T) {
+	db, cfg := setupTestDB(t)
+	defer db.Close()
+	r := setupRouter(db, cfg)
+	token, _ := registerThrowaway(t, r, db)
+
+	w := do(r, http.MethodPatch, "/api/v1/me", token, map[string]any{"cpf": "111.444.777-35"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("PATCH válido: status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := meCPF(t, r, token); got != "11144477735" {
+		t.Errorf("CPF não persistiu normalizado: got %q, want 11144477735", got)
+	}
+}
+
+// CPF com dígito verificador errado (o 12345678901 que causou o bug do boleto) é
+// recusado com 400 — não chega a gravar nem a ir pro PSP.
+func TestUpdateProfile_CPFInvalidoRejeitado(t *testing.T) {
+	db, cfg := setupTestDB(t)
+	defer db.Close()
+	r := setupRouter(db, cfg)
+	token, _ := registerThrowaway(t, r, db)
+
+	w := do(r, http.MethodPatch, "/api/v1/me", token, map[string]any{"cpf": "12345678901"})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("CPF inválido devia dar 400, got %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+// Nome e telefone também são editáveis; o telefone é normalizado pra dígitos.
+func TestUpdateProfile_NomeETelefone(t *testing.T) {
+	db, cfg := setupTestDB(t)
+	defer db.Close()
+	r := setupRouter(db, cfg)
+	token, _ := registerThrowaway(t, r, db)
+
+	w := do(r, http.MethodPatch, "/api/v1/me", token, map[string]any{
+		"name": "Ana Paula Silva", "phone": "(11) 98888-7777",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var u struct {
+		Name  string  `json:"name"`
+		Phone *string `json:"phone"`
+	}
+	res := do(r, http.MethodGet, "/api/v1/me", token, nil)
+	json.Unmarshal(res.Body.Bytes(), &u)
+	if u.Name != "Ana Paula Silva" {
+		t.Errorf("nome não atualizou: %q", u.Name)
+	}
+	if u.Phone == nil || *u.Phone != "11988887777" {
+		t.Errorf("telefone não normalizou: %v", u.Phone)
+	}
+}
+
+// PATCH /me sem token é 401 — escopado ao dono do JWT.
+func TestUpdateProfile_SemToken(t *testing.T) {
+	db, cfg := setupTestDB(t)
+	defer db.Close()
+	r := setupRouter(db, cfg)
+
+	w := do(r, http.MethodPatch, "/api/v1/me", "", map[string]any{"name": "X"})
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("esperado 401, got %d", w.Code)
+	}
+}
+
+// TestRegression_UpdateProfile_CPFDuplicado — dois usuários não podem ter o mesmo
+// CPF (idx_users_cpf). O segundo que tentar ganha 409, não um 500 cru.
+func TestRegression_UpdateProfile_CPFDuplicado(t *testing.T) {
+	db, cfg := setupTestDB(t)
+	defer db.Close()
+	r := setupRouter(db, cfg)
+
+	tokenA, _ := registerThrowaway(t, r, db)
+	tokenB, _ := registerThrowaway(t, r, db)
+
+	if w := do(r, http.MethodPatch, "/api/v1/me", tokenA, map[string]any{"cpf": "111.444.777-35"}); w.Code != http.StatusOK {
+		t.Fatalf("A setar CPF: %d %s", w.Code, w.Body.String())
+	}
+	// B tenta o MESMO CPF → 409.
+	w := do(r, http.MethodPatch, "/api/v1/me", tokenB, map[string]any{"cpf": "11144477735"})
+	if w.Code != http.StatusConflict {
+		t.Fatalf("CPF duplicado devia dar 409, got %d (%s)", w.Code, w.Body.String())
 	}
 }
 
