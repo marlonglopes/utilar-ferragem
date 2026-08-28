@@ -305,8 +305,17 @@ func (h *WebhookHandler) processEvent(
 	// Outbox event (mesmo se status não mudou — algumas confirmations chegam
 	// depois do sync já ter promovido pra confirmed; idempotência fica nos
 	// consumers pelo payment_id).
+	//
+	// order_id é OBRIGATÓRIO no payload: sem ele, o consumer do order-service
+	// cai no fallback de resolver o pedido por `orders.payment_id` — coluna que
+	// NUNCA é populada — acha nada, registra `order_not_found` e o pedido fica
+	// preso em `pending_payment` PARA SEMPRE, mesmo com o pagamento confirmado.
+	// (Bug real pego no E2E Stripe 2026-08-28: cliente paga, webhook fecha 200,
+	// payment vira confirmed, e o pedido nunca avança.) O orderID já vem do
+	// SELECT acima — é fonte de verdade, não do corpo do webhook.
 	outboxPayload, _ := json.Marshal(map[string]any{
 		"payment_id":     paymentID,
+		"order_id":       orderID,
 		"psp_payment_id": event.PSPID,
 		"provider":       provider,
 		"event_type":     event.EventType,

@@ -16,6 +16,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -125,6 +126,71 @@ func TestWebhookIdempotency(t *testing.T) {
 	r.ServeHTTP(w2, httptest.NewRequest(http.MethodPost, "/webhooks/mercadopago", bytes.NewReader(body)))
 	if w2.Code != http.StatusOK {
 		t.Fatalf("duplicate call: want 200, got %d", w2.Code)
+	}
+}
+
+// TestRegression_WebhookOutboxCarriesOrderID trava o bug pego no E2E Stripe
+// (2026-08-28): o payload de payment.confirmed NÃO incluía order_id. O consumer
+// do order-service tenta resolver o pedido por order_id e, na ausência, cai no
+// fallback por `orders.payment_id` — coluna que nunca é populada. Resultado:
+// `order_not_found`, e o pedido fica preso em pending_payment mesmo com o
+// pagamento confirmado. O dinheiro entra, o pedido não avança — o pior modo de
+// falha desta ponte. Este teste exige order_id no payload do evento de confirmação.
+func TestRegression_WebhookOutboxCarriesOrderID(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	const pspID = "test-order-id-in-outbox-001"
+	const orderID = "11111111-1111-1111-1111-111111111111"
+	if _, err := db.Exec(`DELETE FROM webhook_events WHERE psp_payment_id = $1`, pspID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DELETE FROM payments WHERE psp_payment_id = $1`, pspID); err != nil {
+		t.Fatal(err)
+	}
+	// Limpa outbox de execuções anteriores deste order_id pra a asserção ser exata.
+	if _, err := db.Exec(`DELETE FROM payments_outbox WHERE payload_json::text LIKE $1`, "%"+orderID+"%"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO payments (order_id, user_id, method, status, amount, psp_payment_id)
+		VALUES ($1, '00000000-0000-0000-0000-000000000099', 'card', 'pending', 94.90, $2)
+	`, orderID, pspID); err != nil {
+		t.Fatalf("insert payment: %v", err)
+	}
+
+	gw := &mockGateway{
+		name:        "stripe",
+		parsedEvent: &psp.WebhookEvent{EventType: "payment_intent.succeeded", PSPID: pspID, Status: psp.StatusApproved, Amount: 94.90},
+		getResult:   &psp.GetResult{PSPID: pspID, Status: psp.StatusApproved, Amount: 94.90},
+	}
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(handler.RequestID())
+	h := handler.NewWebhookHandler(db, gw)
+	r.POST("/webhooks/:provider", h.Handle)
+
+	body := []byte(`{"type":"payment_intent.succeeded","data":{"object":{"id":"` + pspID + `"}}}`)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/webhooks/stripe", bytes.NewReader(body)))
+	if w.Code != http.StatusOK {
+		t.Fatalf("webhook: want 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+
+	// O evento payment.confirmed no outbox precisa carregar o order_id, senão o
+	// consumer nunca liga o pagamento ao pedido.
+	var payload string
+	err := db.QueryRow(`
+		SELECT payload_json::text FROM payments_outbox
+		WHERE event_type = 'payment.confirmed' AND payload_json::text LIKE $1
+		ORDER BY created_at DESC LIMIT 1
+	`, "%"+pspID+"%").Scan(&payload)
+	if err != nil {
+		t.Fatalf("nenhum evento payment.confirmed no outbox: %v", err)
+	}
+	if !strings.Contains(payload, orderID) {
+		t.Fatalf("payload de payment.confirmed sem order_id — consumer cairia em order_not_found.\npayload = %s", payload)
 	}
 }
 
