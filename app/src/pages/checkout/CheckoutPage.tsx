@@ -671,7 +671,8 @@ function PaymentStep({
             <Receipt className="h-4 w-4 flex-shrink-0 mt-0.5 text-gray-400" />
             <span>
               O boleto será gerado no CPF da sua conta{' '}
-              <span className="font-medium text-gray-800">{formatCPF(user!.cpf!)}</span> ({user!.name}
+              <span className="font-medium text-gray-800">{formatCPF(user!.cpf!)}</span> (
+              {user!.name}
               ).
             </span>
           </p>
