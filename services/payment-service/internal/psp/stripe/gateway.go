@@ -31,10 +31,10 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/stripe/stripe-go/v79"
-	"github.com/stripe/stripe-go/v79/paymentintent"
-	"github.com/stripe/stripe-go/v79/refund"
-	"github.com/stripe/stripe-go/v79/webhook"
+	"github.com/stripe/stripe-go/v86"
+	"github.com/stripe/stripe-go/v86/paymentintent"
+	"github.com/stripe/stripe-go/v86/refund"
+	"github.com/stripe/stripe-go/v86/webhook"
 	"github.com/utilar/payment-service/internal/psp"
 )
 
@@ -222,15 +222,16 @@ func (g *Gateway) VerifyWebhook(body []byte, headers http.Header) error {
 	if sig == "" {
 		return psp.ErrInvalidSignature
 	}
-	// IgnoreAPIVersionMismatch: a stripe-go/v79 espera a API 2024-06-20, mas a
-	// conta emite eventos na versão atual (ex.: 2026-08-26.dahlia) → ConstructEvent
-	// rejeitava a assinatura VÁLIDA só por causa da versão, e o webhook devolvia
-	// 401 (o pagamento nunca confirmava por essa via). Seguro aqui: o webhook é só
-	// GATILHO — status e valor vêm da RECONSULTA autenticada ao PSP (GetPayment),
-	// nunca do corpo do evento; então uma deserialização parcial do body é
-	// irrelevante. A verificação de ASSINATURA (a parte de segurança) segue ativa.
-	_, err := webhook.ConstructEventWithOptions(body, sig, g.webhookSecret,
-		webhook.ConstructEventOptions{IgnoreAPIVersionMismatch: true})
+	// ConstructEvent ESTRITO: valida assinatura (HMAC-SHA256, janela de 5min) E a
+	// versão de API. Isto voltou a ser seguro depois de subir a stripe-go pra v86,
+	// que embute a mesma versão que a conta emite (stripe.APIVersion =
+	// "2026-08-26.dahlia"). Antes, na v79 (API 2024-06-20), a versão divergia da
+	// conta e o ConstructEvent estrito rejeitava a assinatura VÁLIDA → webhook 401
+	// → pagamento não confirmava; por isso usávamos ConstructEventWithOptions com
+	// IgnoreAPIVersionMismatch. Se um dia a conta for movida pra uma versão MAIS
+	// NOVA que a embutida no SDK, isto volta a dar 401 — e o conserto certo é subir
+	// o SDK, não reafrouxar a checagem. Ver TestRegression_VerifyWebhook_*.
+	_, err := webhook.ConstructEvent(body, sig, g.webhookSecret)
 	if err != nil {
 		return fmt.Errorf("%w: %v", psp.ErrInvalidSignature, err)
 	}

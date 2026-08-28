@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stripe/stripe-go/v86"
 	"github.com/utilar/payment-service/internal/psp"
 )
 
@@ -174,42 +175,45 @@ func stripeSignatureHeader(body []byte, secret string, ts int64) string {
 	return fmt.Sprintf("t=%d,v1=%s", ts, hex.EncodeToString(mac.Sum(nil)))
 }
 
-// TestRegression_VerifyWebhook_NewerAPIVersionStillVerifies trava o bug que
-// travava a confirmação de pagamento na conta real: a stripe-go/v79 espera a
-// API 2024-06-20, mas a conta emite eventos numa versão mais nova
-// (ex.: 2026-08-26.dahlia). O ConstructEvent ESTRITO rejeitava a assinatura
-// VÁLIDA só por causa da divergência de versão e o webhook devolvia 401 — o
-// pagamento nunca confirmava por essa via. Com ConstructEventWithOptions
-// (IgnoreAPIVersionMismatch), a assinatura correta passa mesmo com api_version
-// nova. A parte de SEGURANÇA (verificar a assinatura) segue ativa — ver os dois
-// testes de assinatura acima, que continuam rejeitando corpo forjado.
-func TestRegression_VerifyWebhook_NewerAPIVersionStillVerifies(t *testing.T) {
+// TestRegression_VerifyWebhook_AccountAPIVersionVerifies trava o bug original: um
+// evento assinado, criado na versão de API que a CONTA emite, tem que passar no
+// ConstructEvent estrito. Na v79 (API embutida 2024-06-20) a versão da conta
+// (2026-08-26.dahlia) divergia e o SDK rejeitava a assinatura VÁLIDA → webhook
+// 401 → pagamento não confirmava. Subimos pra v86 (embute exatamente a versão da
+// conta), então o estrito volta a casar.
+//
+// O corpo usa stripe.APIVersion (a versão embutida no SDK) DE PROPÓSITO, não uma
+// string fixa: assim o teste continua válido quando o SDK subir de novo — ele
+// sempre testa "evento na versão do SDK verifica", que é a invariante real. Se
+// alguém subir o SDK sem a conta acompanhar (ou vice-versa) e o estrito voltar a
+// 401 em produção, é aqui e no E2E que aparece.
+func TestRegression_VerifyWebhook_AccountAPIVersionVerifies(t *testing.T) {
 	const secret = "whsec_test_regression"
 	g := New("sk_test_dummy", secret)
 
-	// Corpo com api_version FUTURA em relação à que a v79 embute.
-	body := []byte(`{"id":"evt_1","api_version":"2026-08-26.dahlia","type":"payment_intent.succeeded","data":{"object":{"id":"pi_1","status":"succeeded"}}}`)
+	// "object":"event" é obrigatório: a v86 rejeita payload sem ele como se fosse
+	// uma "thin event notification" (evento v2, que não usamos) — eventos snapshot
+	// reais da Stripe sempre trazem esse campo.
+	body := []byte(`{"id":"evt_1","object":"event","api_version":"` + stripe.APIVersion + `","type":"payment_intent.succeeded","data":{"object":{"id":"pi_1","status":"succeeded"}}}`)
 
 	h := http.Header{}
 	h.Set("Stripe-Signature", stripeSignatureHeader(body, secret, time.Now().Unix()))
 
 	if err := g.VerifyWebhook(body, h); err != nil {
-		t.Fatalf("assinatura válida com api_version nova deve passar, got %v", err)
+		t.Fatalf("assinatura válida na versão de API do SDK (%s) deve passar, got %v", stripe.APIVersion, err)
 	}
 }
 
-// TestRegression_VerifyWebhook_TamperedBodyStillRejected garante que relaxar a
-// checagem de VERSÃO não afrouxou a de ASSINATURA: se o corpo for adulterado
-// depois de assinado, a verificação ainda falha. (Sem isso, alguém poderia
-// achar que IgnoreAPIVersionMismatch abriu a porta pra corpo forjado.)
+// TestRegression_VerifyWebhook_TamperedBodyStillRejected garante que a checagem
+// de ASSINATURA continua firme: corpo adulterado depois de assinado é rejeitado.
 func TestRegression_VerifyWebhook_TamperedBodyStillRejected(t *testing.T) {
 	const secret = "whsec_test_regression"
 	g := New("sk_test_dummy", secret)
 
-	original := []byte(`{"id":"evt_1","api_version":"2026-08-26.dahlia","type":"payment_intent.succeeded"}`)
+	original := []byte(`{"id":"evt_1","object":"event","api_version":"` + stripe.APIVersion + `","type":"payment_intent.succeeded"}`)
 	sig := stripeSignatureHeader(original, secret, time.Now().Unix())
 
-	tampered := []byte(`{"id":"evt_1","api_version":"2026-08-26.dahlia","type":"payment_intent.canceled"}`)
+	tampered := []byte(`{"id":"evt_1","object":"event","api_version":"` + stripe.APIVersion + `","type":"payment_intent.canceled"}`)
 	h := http.Header{}
 	h.Set("Stripe-Signature", sig)
 
