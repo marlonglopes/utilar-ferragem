@@ -13,11 +13,16 @@ package stripe
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/utilar/payment-service/internal/psp"
 )
@@ -158,6 +163,58 @@ func TestVerifyWebhook_WithSecret_RejectsBadSignature(t *testing.T) {
 	err := g.VerifyWebhook([]byte(`{}`), h)
 	if !errors.Is(err, psp.ErrInvalidSignature) {
 		t.Errorf("expected ErrInvalidSignature, got %v", err)
+	}
+}
+
+// stripeSignatureHeader monta o header Stripe-Signature `t=TS,v1=HEX` do mesmo
+// jeito que o Stripe assina: HMAC-SHA256 sobre `TS + "." + body`.
+func stripeSignatureHeader(body []byte, secret string, ts int64) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	fmt.Fprintf(mac, "%d.%s", ts, body)
+	return fmt.Sprintf("t=%d,v1=%s", ts, hex.EncodeToString(mac.Sum(nil)))
+}
+
+// TestRegression_VerifyWebhook_NewerAPIVersionStillVerifies trava o bug que
+// travava a confirmação de pagamento na conta real: a stripe-go/v79 espera a
+// API 2024-06-20, mas a conta emite eventos numa versão mais nova
+// (ex.: 2026-08-26.dahlia). O ConstructEvent ESTRITO rejeitava a assinatura
+// VÁLIDA só por causa da divergência de versão e o webhook devolvia 401 — o
+// pagamento nunca confirmava por essa via. Com ConstructEventWithOptions
+// (IgnoreAPIVersionMismatch), a assinatura correta passa mesmo com api_version
+// nova. A parte de SEGURANÇA (verificar a assinatura) segue ativa — ver os dois
+// testes de assinatura acima, que continuam rejeitando corpo forjado.
+func TestRegression_VerifyWebhook_NewerAPIVersionStillVerifies(t *testing.T) {
+	const secret = "whsec_test_regression"
+	g := New("sk_test_dummy", secret)
+
+	// Corpo com api_version FUTURA em relação à que a v79 embute.
+	body := []byte(`{"id":"evt_1","api_version":"2026-08-26.dahlia","type":"payment_intent.succeeded","data":{"object":{"id":"pi_1","status":"succeeded"}}}`)
+
+	h := http.Header{}
+	h.Set("Stripe-Signature", stripeSignatureHeader(body, secret, time.Now().Unix()))
+
+	if err := g.VerifyWebhook(body, h); err != nil {
+		t.Fatalf("assinatura válida com api_version nova deve passar, got %v", err)
+	}
+}
+
+// TestRegression_VerifyWebhook_TamperedBodyStillRejected garante que relaxar a
+// checagem de VERSÃO não afrouxou a de ASSINATURA: se o corpo for adulterado
+// depois de assinado, a verificação ainda falha. (Sem isso, alguém poderia
+// achar que IgnoreAPIVersionMismatch abriu a porta pra corpo forjado.)
+func TestRegression_VerifyWebhook_TamperedBodyStillRejected(t *testing.T) {
+	const secret = "whsec_test_regression"
+	g := New("sk_test_dummy", secret)
+
+	original := []byte(`{"id":"evt_1","api_version":"2026-08-26.dahlia","type":"payment_intent.succeeded"}`)
+	sig := stripeSignatureHeader(original, secret, time.Now().Unix())
+
+	tampered := []byte(`{"id":"evt_1","api_version":"2026-08-26.dahlia","type":"payment_intent.canceled"}`)
+	h := http.Header{}
+	h.Set("Stripe-Signature", sig)
+
+	if err := g.VerifyWebhook(tampered, h); !errors.Is(err, psp.ErrInvalidSignature) {
+		t.Fatalf("corpo adulterado deve ser rejeitado, got %v", err)
 	}
 }
 

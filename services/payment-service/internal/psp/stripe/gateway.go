@@ -222,7 +222,15 @@ func (g *Gateway) VerifyWebhook(body []byte, headers http.Header) error {
 	if sig == "" {
 		return psp.ErrInvalidSignature
 	}
-	_, err := webhook.ConstructEvent(body, sig, g.webhookSecret)
+	// IgnoreAPIVersionMismatch: a stripe-go/v79 espera a API 2024-06-20, mas a
+	// conta emite eventos na versão atual (ex.: 2026-08-26.dahlia) → ConstructEvent
+	// rejeitava a assinatura VÁLIDA só por causa da versão, e o webhook devolvia
+	// 401 (o pagamento nunca confirmava por essa via). Seguro aqui: o webhook é só
+	// GATILHO — status e valor vêm da RECONSULTA autenticada ao PSP (GetPayment),
+	// nunca do corpo do evento; então uma deserialização parcial do body é
+	// irrelevante. A verificação de ASSINATURA (a parte de segurança) segue ativa.
+	_, err := webhook.ConstructEventWithOptions(body, sig, g.webhookSecret,
+		webhook.ConstructEventOptions{IgnoreAPIVersionMismatch: true})
 	if err != nil {
 		return fmt.Errorf("%w: %v", psp.ErrInvalidSignature, err)
 	}
