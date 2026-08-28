@@ -11,20 +11,27 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"testing"
 
 	"github.com/utilar/order-service/internal/catalogclient"
 )
 
 // stubCatalog devolve um produto fixo (price autoritativo) ou um erro fixo.
+//
+// calls é atomic.Int64 de propósito: TestCreate_CouponMaxUsesRace dispara vários
+// Create em paralelo e cada um chama GetByID, então um `int` puro dava data race
+// (o -race pegava `s.calls++` concorrente). Não é bug de produção — é o stub de
+// teste que precisa ser seguro sob concorrência tanto quanto o código que ele
+// exercita.
 type stubCatalog struct {
 	product *catalogclient.Product
 	err     error
-	calls   int
+	calls   atomic.Int64
 }
 
 func (s *stubCatalog) GetByID(ctx context.Context, productID string) (*catalogclient.Product, error) {
-	s.calls++
+	s.calls.Add(1)
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -92,8 +99,8 @@ func TestCreate_PriceTamperBlocked_UsesCatalogPrice(t *testing.T) {
 	}
 	json.Unmarshal(w.Body.Bytes(), &got)
 
-	if cat.calls != 1 {
-		t.Errorf("catalog.GetByID chamado %d vezes, esperado 1", cat.calls)
+	if cat.calls.Load() != 1 {
+		t.Errorf("catalog.GetByID chamado %d vezes, esperado 1", cat.calls.Load())
 	}
 	if len(got.Items) != 1 {
 		t.Fatalf("items = %d, esperado 1", len(got.Items))
