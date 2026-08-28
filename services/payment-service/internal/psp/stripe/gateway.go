@@ -90,13 +90,20 @@ func (g *Gateway) CreatePayment(ctx context.Context, req psp.CreateRequest) (*ps
 
 	switch req.Method {
 	case psp.MethodCard:
-		// PaymentElement na SPA vai lidar com o card input. AutomaticPaymentMethods
-		// permite Stripe oferecer o que estiver habilitado na conta (card + outros).
-		// Em dev com Elements, é o caminho mais flexível.
-		params.AutomaticPaymentMethods = &stripe.PaymentIntentAutomaticPaymentMethodsParams{
-			Enabled:        stripe.Bool(true),
-			AllowRedirects: stripe.String("never"),
-		}
+		// CARTÃO = só cartão. O Utilar TEM o seu próprio seletor de método (as abas
+		// Pix/Boleto/Cartão), então o PaymentIntent do fluxo de cartão precisa ser
+		// card-only — igual pix→["pix"] e boleto→["boleto"] logo abaixo.
+		//
+		// Antes usávamos AutomaticPaymentMethods (Stripe oferece TUDO que a conta tem
+		// habilitado), e o PaymentElement renderizava o SEU próprio seletor com abas
+		// Cartão/Boleto POR CIMA das abas do Utilar — o cliente via "Boleto" em dois
+		// lugares e uma tela dentro da outra. Escopar em ["card"] faz o Element
+		// mostrar só o formulário de cartão, sem seletor duplicado.
+		//
+		// Trade-off consciente: carteiras (Apple/Google Pay/Link) exigem
+		// AutomaticPaymentMethods e ficam de fora por ora — entram depois, com uma
+		// decisão de como encaixam nas abas, não de esgueirar um 2º seletor.
+		params.PaymentMethodTypes = stripe.StringSlice([]string{"card"})
 		if req.PayerEmail != "" {
 			params.ReceiptEmail = stripe.String(req.PayerEmail)
 		}
