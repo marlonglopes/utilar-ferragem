@@ -179,11 +179,19 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 			"request_id", c.GetString("request_id"))
 	}
 
-	// M6: pra boleto, CPF + Name são obrigatórios em prod (MP rejeita vazio).
-	// Buscamos do auth-service via JWT em vez de confiar no body.
+	// M6: pra boleto, CPF + Name são obrigatórios em prod (o PSP rejeita vazio).
+	// O CADASTRO do auth-service é FALLBACK, não override: o CPF/nome que o pagador
+	// digitou no formulário é o que vale para ESTE boleto e tem precedência. O
+	// cadastro só preenche quando o form vem vazio.
+	//
+	// Antes o cadastro SOBRESCREVIA o form — e aí um usuário de teste com CPF
+	// inválido salvo no perfil (12345678901) fazia TODO boleto falhar com
+	// tax_id_invalid, mesmo o cliente digitando um CPF válido no checkout. A
+	// intenção original do M6 era garantir CPF/nome NÃO-VAZIOS (o PSP rejeita
+	// vazio), não descartar o que o cliente informou.
 	payerName := req.PayerName
 	payerCPF := req.PayerCPF
-	if req.Method == "boleto" && h.authClient != nil {
+	if req.Method == "boleto" && h.authClient != nil && (payerName == "" || payerCPF == "") {
 		jwt := extractBearerToken(c)
 		u, err := h.authClient.Me(c.Request.Context(), jwt)
 		if err != nil {
@@ -191,10 +199,10 @@ func (h *PaymentHandler) Create(c *gin.Context) {
 				"error", err, "request_id", c.GetString("request_id"))
 			// Fail-soft: segue com o do body (PSP rejeita se vazio em prod).
 		} else {
-			if u.Name != "" {
+			if payerName == "" && u.Name != "" {
 				payerName = u.Name
 			}
-			if u.CPF != nil && *u.CPF != "" {
+			if payerCPF == "" && u.CPF != nil && *u.CPF != "" {
 				payerCPF = *u.CPF
 			}
 		}

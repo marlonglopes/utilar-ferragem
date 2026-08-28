@@ -19,10 +19,22 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/utilar/payment-service/internal/authclient"
 	"github.com/utilar/payment-service/internal/handler"
 	"github.com/utilar/payment-service/internal/orderclient"
 	"github.com/utilar/payment-service/internal/psp"
 )
+
+// stubUserLookup devolve um User de cadastro fixo (pra testar precedência do CPF
+// do formulário sobre o do cadastro no boleto).
+type stubUserLookup struct {
+	user *authclient.User
+	err  error
+}
+
+func (s *stubUserLookup) Me(ctx context.Context, jwt string) (*authclient.User, error) {
+	return s.user, s.err
+}
 
 // --- mocks ----------------------------------------------------------------
 
@@ -385,5 +397,89 @@ func TestCreate_ProdWithoutOrderClient_Returns500(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("want 500 in prod without orderClient, got %d", w.Code)
+	}
+}
+
+// setupBoletoRouter monta o handler COM authClient stub (os outros testes passam
+// nil). Necessário pra exercitar a lógica de precedência de CPF do boleto.
+func setupBoletoRouter(t *testing.T, gw psp.Gateway, oc handler.OrderLookup, auth handler.UserLookup) (*gin.Engine, func()) {
+	t.Helper()
+	db := setupTestDB(t)
+	_, _ = db.Exec(`DELETE FROM payments WHERE order_id = $1`, testOrderID)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(handler.RequestID())
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", testUserID)
+		c.Set("user_email", "test@utilar.dev")
+		c.Next()
+	})
+	pH := handler.NewPaymentHandler(db, gw, oc, auth, false)
+	r.POST("/api/v1/payments", pH.Create)
+
+	return r, func() {
+		_, _ = db.Exec(`DELETE FROM payments WHERE order_id = $1`, testOrderID)
+		db.Close()
+	}
+}
+
+func boletoReq(cpf, name string) *http.Request {
+	body, _ := json.Marshal(map[string]any{
+		"order_id":   testOrderID,
+		"method":     "boleto",
+		"amount":     100.00,
+		"payer_cpf":  cpf,
+		"payer_name": name,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/payments", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer fake-jwt")
+	req.Header.Set("Content-Type", "application/json")
+	return req
+}
+
+// TestRegression_BoletoUsaCPFDoFormularioNaoDoCadastro trava o bug pego no demo
+// (2026-08-28): o cliente digitava um CPF VÁLIDO no checkout, mas o payment-service
+// SOBRESCREVIA com o CPF do cadastro do usuário logado. Como o usuário de teste
+// tinha um CPF inválido salvo (12345678901), TODO boleto falhava na Stripe com
+// tax_id_invalid ("CPF inválido") mesmo o cliente acertando o número. O CPF do
+// FORM tem que ter precedência.
+func TestRegression_BoletoUsaCPFDoFormularioNaoDoCadastro(t *testing.T) {
+	gw := &stubGatewayCapture{stubGateway: &stubGateway{}}
+	badCPF := "12345678901" // o CPF inválido salvo no perfil de teste
+	auth := &stubUserLookup{user: &authclient.User{Name: "Cadastro Antigo", CPF: &badCPF}}
+	r, cleanup := setupBoletoRouter(t, gw, pendingOrder(100.00), auth)
+	defer cleanup()
+
+	const formCPF = "54045797068" // válido e diferente do cadastro
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, boletoReq(formCPF, "Ana Silva"))
+
+	if gw.lastReq.PayerCPF != formCPF {
+		t.Fatalf("boleto deve usar o CPF do FORM (%s), não o do cadastro (%s); PSP recebeu %q",
+			formCPF, badCPF, gw.lastReq.PayerCPF)
+	}
+	if gw.lastReq.PayerName != "Ana Silva" {
+		t.Fatalf("boleto deve usar o NOME do form (Ana Silva); PSP recebeu %q", gw.lastReq.PayerName)
+	}
+}
+
+// TestBoletoUsaCadastroQuandoFormVazio garante que o FALLBACK do M6 sobrevive: se
+// o form não manda CPF, o do cadastro preenche (o PSP rejeita boleto sem CPF).
+func TestBoletoUsaCadastroQuandoFormVazio(t *testing.T) {
+	gw := &stubGatewayCapture{stubGateway: &stubGateway{}}
+	cadCPF := "54045797068"
+	auth := &stubUserLookup{user: &authclient.User{Name: "Do Cadastro", CPF: &cadCPF}}
+	r, cleanup := setupBoletoRouter(t, gw, pendingOrder(100.00), auth)
+	defer cleanup()
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, boletoReq("", "")) // form vazio → cai no cadastro
+
+	if gw.lastReq.PayerCPF != cadCPF {
+		t.Fatalf("form vazio deve cair no CPF do cadastro (%s); PSP recebeu %q", cadCPF, gw.lastReq.PayerCPF)
+	}
+	if gw.lastReq.PayerName != "Do Cadastro" {
+		t.Fatalf("form vazio deve cair no nome do cadastro; PSP recebeu %q", gw.lastReq.PayerName)
 	}
 }
