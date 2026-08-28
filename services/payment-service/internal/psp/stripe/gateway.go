@@ -142,7 +142,7 @@ func (g *Gateway) CreatePayment(ctx context.Context, req psp.CreateRequest) (*ps
 
 	pi, err := paymentintent.New(params)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", psp.ErrUpstream, err)
+		return nil, classifyCreateError(err)
 	}
 
 	// #nosec G117 — `pi` inclui client_secret, que é deliberadamente público
@@ -158,6 +158,40 @@ func (g *Gateway) CreatePayment(ctx context.Context, req psp.CreateRequest) (*ps
 		ClientData:   extractClientData(pi),
 		RawPayload:   raw,
 	}, nil
+}
+
+// clientFixableStripeCodes — códigos de erro da Stripe que são culpa do INPUT do
+// cliente (CPF/cartão/valor), não da nossa infra. Viram 400 com mensagem
+// acionável em vez de 502 "payment gateway error". O caso que motivou isto: um
+// CPF inválido no boleto (tax_id_invalid) devolvia "payment gateway error"
+// genérico e o cliente não sabia que era o CPF. Só os CÓDIGOS (enums estáveis)
+// entram na mensagem — nunca o texto cru do erro, que pode ecoar PII (ver a nota
+// AV1-H5 no handler).
+var clientFixableStripeCodes = map[string]bool{
+	"tax_id_invalid":       true, // CPF/CNPJ do boleto não passa no dígito verificador
+	"card_declined":        true,
+	"expired_card":         true,
+	"incorrect_cvc":        true,
+	"incorrect_number":     true,
+	"invalid_number":       true,
+	"invalid_expiry_month": true,
+	"invalid_expiry_year":  true,
+	"incorrect_zip":        true,
+	"postal_code_invalid":  true,
+	"amount_too_small":     true,
+	"amount_too_large":     true,
+}
+
+// classifyCreateError separa erro de INPUT do cliente (→ ErrInvalidRequest, 400)
+// de falha real do gateway (→ ErrUpstream, 502). Sem isso, tudo virava 502 e o
+// comprador via "payment gateway error" mesmo quando o problema era o CPF dele.
+func classifyCreateError(err error) error {
+	var se *stripe.Error
+	if errors.As(err, &se) && clientFixableStripeCodes[string(se.Code)] {
+		// Passa só o code (estável, sem PII); clientSafePSPMessage traduz.
+		return fmt.Errorf("%w: stripe_%s", psp.ErrInvalidRequest, se.Code)
+	}
+	return fmt.Errorf("%w: %v", psp.ErrUpstream, err)
 }
 
 // GetPayment consulta um PaymentIntent no Stripe.

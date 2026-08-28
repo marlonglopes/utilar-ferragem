@@ -222,6 +222,38 @@ func TestRegression_VerifyWebhook_TamperedBodyStillRejected(t *testing.T) {
 	}
 }
 
+// TestRegression_ClassifyCreateError_TaxIDInvalidIsClientError trava o bug do
+// boleto: um CPF inválido (Stripe code tax_id_invalid) devolvia "payment gateway
+// error" genérico (502) porque o gateway embrulhava TUDO como ErrUpstream. Deve
+// virar ErrInvalidRequest (400) com o código estável na mensagem, pro handler
+// traduzir em "CPF inválido".
+func TestRegression_ClassifyCreateError_TaxIDInvalidIsClientError(t *testing.T) {
+	stripeErr := &stripe.Error{Code: "tax_id_invalid", Type: stripe.ErrorTypeInvalidRequest}
+	got := classifyCreateError(stripeErr)
+	if !errors.Is(got, psp.ErrInvalidRequest) {
+		t.Fatalf("tax_id_invalid deve virar ErrInvalidRequest (400), got %v", got)
+	}
+	if !strings.Contains(got.Error(), "stripe_tax_id_invalid") {
+		t.Fatalf("mensagem deve conter o código estável, got %q", got.Error())
+	}
+}
+
+// TestClassifyCreateError_UnknownErrorStaysUpstream — o que NÃO é input do
+// cliente (rede, 500 da Stripe, código desconhecido) continua ErrUpstream (502).
+// Allowlist, não denylist: erro novo não vira "culpa do cliente" por omissão.
+func TestClassifyCreateError_UnknownErrorStaysUpstream(t *testing.T) {
+	for _, e := range []error{
+		errors.New("connection refused"),
+		&stripe.Error{Code: "api_error", Type: stripe.ErrorTypeAPI},
+		&stripe.Error{Code: "", Type: stripe.ErrorTypeInvalidRequest},
+	} {
+		got := classifyCreateError(e)
+		if !errors.Is(got, psp.ErrUpstream) {
+			t.Errorf("erro %v deveria continuar ErrUpstream (502), got %v", e, got)
+		}
+	}
+}
+
 func TestParseWebhookEvent_PaymentIntentSucceeded(t *testing.T) {
 	g := New("sk_test_dummy", "")
 

@@ -69,6 +69,13 @@ func TestErrosDeValidacaoContinuamAcionaveisParaOCliente(t *testing.T) {
 		"card via appmax-v1 requires a tokenized card (CardToken)": "cartão",
 		"unsupported method \"crypto\"":                            "forma de pagamento",
 		"amount deve ser > 0":                                      "valor",
+		// Stripe: códigos mapeados no gateway (classifyCreateError). O boleto com
+		// CPF inválido (tax_id_invalid) precisa dizer "CPF" — foi o bug que dava
+		// "payment gateway error" genérico pro comprador. Ver TestRegression abaixo.
+		"stripe_tax_id_invalid":   "cpf",
+		"stripe_card_declined":    "cartão",
+		"stripe_expired_card":     "cartão",
+		"stripe_amount_too_small": "mínimo",
 	}
 	for erroInterno, esperado := range casos {
 		msg := clientSafePSPMessage(fmt.Errorf("%w: %s", psp.ErrInvalidRequest, erroInterno))

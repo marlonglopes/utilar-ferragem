@@ -24,6 +24,24 @@ func clientSafePSPMessage(err error) string {
 	msg := strings.ToLower(err.Error())
 
 	switch {
+	// Stripe: CPF/CNPJ do boleto não passa no dígito verificador (código
+	// tax_id_invalid, mapeado no gateway pra stripe_tax_id_invalid). É o dado do
+	// próprio cliente malformado — seguro e útil dizer exatamente o que é.
+	case strings.Contains(msg, "tax_id_invalid"):
+		return "CPF inválido — confira os números e tente de novo"
+	// Stripe: cartão recusado/inválido. Deliberadamente NÃO revela o porquê
+	// (saldo, roubo, CVC) — só diz que foi recusado e o que fazer. Revelar o
+	// motivo ajuda o fraudador a calibrar a próxima tentativa (mesma razão do
+	// genericPSPMessage).
+	case strings.Contains(msg, "card_declined"), strings.Contains(msg, "expired_card"),
+		strings.Contains(msg, "incorrect_cvc"), strings.Contains(msg, "incorrect_number"),
+		strings.Contains(msg, "invalid_number"), strings.Contains(msg, "invalid_expiry"),
+		strings.Contains(msg, "incorrect_zip"), strings.Contains(msg, "postal_code_invalid"):
+		return "cartão recusado ou dados inválidos; confira os dados ou use outro cartão"
+	case strings.Contains(msg, "amount_too_small"):
+		return "valor abaixo do mínimo aceito para esta forma de pagamento"
+	case strings.Contains(msg, "amount_too_large"):
+		return "valor acima do máximo aceito para esta forma de pagamento"
 	case strings.Contains(msg, "payer_cpf"), strings.Contains(msg, "requires payer_cpf"):
 		return "CPF é obrigatório para esta forma de pagamento"
 	case strings.Contains(msg, "payer_name"):
