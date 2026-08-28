@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
-import { Check, ChevronRight, Loader2, Plus } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { Check, ChevronRight, Loader2, Plus, Receipt } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { CartIssues } from '@/components/cart/CartIssues'
 import { useCartAvailability } from '@/hooks/useCartAvailability'
@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useAddressStore, type Address as StoredAddress } from '@/store/addressStore'
 import { usePayment, type PaymentMethod } from '@/hooks/usePayment'
 import { useShippingQuote, type ShippingOption } from '@/hooks/useShippingQuote'
-import { formatCurrency, formatCEP } from '@/lib/format'
+import { formatCurrency, formatCEP, formatCPF } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { isApiEnabled, isOrderEnabled, orderPostWithJWT } from '@/lib/api'
 import { validateCoupon, type CouponPreview } from '@/lib/couponCheckout'
@@ -524,14 +524,15 @@ function PaymentStep({
   const pixTotal = +(total * 0.95).toFixed(2)
   const displayTotal = method === 'pix' ? pixTotal : total
 
-  // Boleto requer CPF + nome. VALIDAÇÃO DE CPF COM DÍGITO VERIFICADOR (validateCPF),
-  // não só contagem de 11 dígitos: antes, "12345678901" (11 dígitos, checksum
-  // inválido) passava daqui e só a Stripe recusava com tax_id_invalid — o cliente
-  // via "payment gateway error" sem entender. Agora barra no cliente com mensagem.
-  const cpfDigits = payerCPF.replace(/\D/g, '')
-  const cpfInvalido = method === 'boleto' && cpfDigits.length > 0 && !validateCPF(payerCPF)
-  const boletoReady =
-    method !== 'boleto' || (validateCPF(payerCPF) && payerName.trim().length >= 3)
+  // Boleto: SEM formulário de CPF/nome. O boleto é gerado com os dados do usuário
+  // LOGADO — o cadastro já tem CPF + nome, e o boleto exige um CPF de pagador que
+  // vem da conta, não faz sentido pedir de novo. O backend espelha isso (form
+  // vazio → cai no cadastro; ver payment.go). Se a conta NÃO tiver um CPF válido,
+  // o botão fica travado e mostramos um aviso pra completar o cadastro (o PSP
+  // recusa boleto sem CPF válido — barrar aqui evita erro no meio do pagamento).
+  const accountCPFReady =
+    !!user?.cpf && validateCPF(user.cpf) && (user?.name ?? '').trim().length >= 3
+  const boletoReady = method !== 'boleto' || accountCPFReady
 
   // Garante que existe um order id real do backend antes de criar payment.
   // Usa cache (committedOrderId) — só cria UMA order por sessão de checkout.
@@ -663,26 +664,26 @@ function PaymentStep({
         </p>
       )}
 
-      {method === 'boleto' && !activeResult && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Input
-            label="CPF do pagador"
-            value={payerCPF}
-            onChange={(e) => setPayerCPF(e.target.value)}
-            placeholder="000.000.000-00"
-            maxLength={14}
-            required
-            error={cpfInvalido ? 'CPF inválido — confira os números' : undefined}
-          />
-          <Input
-            label="Nome completo"
-            value={payerName}
-            onChange={(e) => setPayerName(e.target.value)}
-            placeholder="Como no documento"
-            required
-          />
-        </div>
-      )}
+      {method === 'boleto' &&
+        !activeResult &&
+        (accountCPFReady ? (
+          <p className="flex items-start gap-2 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+            <Receipt className="h-4 w-4 flex-shrink-0 mt-0.5 text-gray-400" />
+            <span>
+              O boleto será gerado no CPF da sua conta{' '}
+              <span className="font-medium text-gray-800">{formatCPF(user!.cpf!)}</span> ({user!.name}
+              ).
+            </span>
+          </p>
+        ) : (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Para pagar com boleto, adicione um CPF válido no seu{' '}
+            <Link to="/conta" className="underline font-medium">
+              cadastro
+            </Link>
+            .
+          </p>
+        ))}
 
       {/* Resultado/UI específico por método */}
       {activeResult && method === 'pix' && (
