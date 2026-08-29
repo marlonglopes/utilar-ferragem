@@ -127,3 +127,47 @@ func TestLoad_AppmaxAcceptsWithoutWebhookSecretInProd(t *testing.T) {
 		t.Errorf("expected access token to be loaded")
 	}
 }
+
+// SWITCH Stripe→Appmax v1: o provider recomendado (OAuth2, Payment Split,
+// parcelamento) precisa validar como fail-closed — sem client id/secret e sem as
+// URLs em prod, o boot recusa. Trava o switch pra não subir apontando pro lugar
+// errado (ou cobrar de verdade num deploy que ia pro sandbox).
+func TestLoad_AppmaxV1RequiresClientCredsInProd(t *testing.T) {
+	setBaseEnv(t)
+	t.Setenv("PSP_PROVIDER", "appmax-v1")
+	// sem CLIENT_ID/SECRET → erro
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for missing APPMAX_V1_CLIENT_ID/SECRET in prod, got nil")
+	}
+}
+
+func TestLoad_AppmaxV1RequiresURLsInProd(t *testing.T) {
+	setBaseEnv(t)
+	t.Setenv("PSP_PROVIDER", "appmax-v1")
+	t.Setenv("APPMAX_V1_CLIENT_ID", "cid")
+	t.Setenv("APPMAX_V1_CLIENT_SECRET", "csecret")
+	// creds ok, mas sem AUTH_URL/API_URL em prod → erro (evita apontar pro ambiente errado)
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for missing APPMAX_V1_AUTH_URL/API_URL in prod, got nil")
+	}
+}
+
+func TestLoad_AppmaxV1AcceptsWithFullCreds(t *testing.T) {
+	setBaseEnv(t)
+	t.Setenv("PSP_PROVIDER", "appmax-v1")
+	t.Setenv("APPMAX_V1_CLIENT_ID", "cid")
+	t.Setenv("APPMAX_V1_CLIENT_SECRET", "csecret")
+	t.Setenv("APPMAX_V1_AUTH_URL", "https://sandbox.appmax.com.br/oauth")
+	t.Setenv("APPMAX_V1_API_URL", "https://sandbox.appmax.com.br")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.PSPProvider != "appmax-v1" {
+		t.Errorf("expected provider=appmax-v1, got %q", cfg.PSPProvider)
+	}
+	if cfg.AppmaxV1ClientID != "cid" || cfg.AppmaxV1ClientSecret != "csecret" {
+		t.Errorf("expected appmax-v1 creds to be loaded")
+	}
+}

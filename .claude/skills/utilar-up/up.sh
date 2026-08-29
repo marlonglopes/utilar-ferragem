@@ -50,11 +50,22 @@ if [ -f "$REPO/.env.dev.local" ]; then
   say "  ${c_dim}• segredos carregados de .env.dev.local${c_rst}"
 fi
 # PSP escolhido (troca fácil: PSP_PROVIDER no .env.dev.local ou no ambiente).
-# stripe | appmax-v1 | mercadopago. Default: stripe.
+# stripe | appmax-v1 | mercadopago. Default: stripe. Ver .env.dev.local.example
+# e docs/psp-switch.md pra o que cada provider exige.
 : "${PSP_PROVIDER:=stripe}"
 : "${STRIPE_SECRET_KEY:=sk_test_dummy_demo_key_do_not_use}"
 : "${STRIPE_WEBHOOK_SECRET:=whsec_dummy_demo}"
 : "${STRIPE_PUBLISHABLE_KEY:=pk_test_dummy_demo}"
+# Appmax v1 (AppStore/OAuth2) — defaults VAZIOS de propósito: com PSP_PROVIDER=
+# appmax-v1 e sem estas creds, o config.Load é fail-closed (não sobe apontando pro
+# lugar errado). Preencha no .env.dev.local pra trocar. `${VAR:=}` evita o unbound
+# do `set -u` quando o provider é stripe.
+: "${APPMAX_V1_CLIENT_ID:=}"
+: "${APPMAX_V1_CLIENT_SECRET:=}"
+: "${APPMAX_V1_AUTH_URL:=}"
+: "${APPMAX_V1_API_URL:=}"
+: "${APPMAX_V1_EXTERNAL_ID:=}"
+: "${APPMAX_WEBHOOK_SECRET:=}"
 
 port_up() { curl -sf --max-time 2 "http://localhost:$1/health" >/dev/null 2>&1; }
 
@@ -99,7 +110,7 @@ head "serviços Go (5)"
 start_svc auth     8093 services/auth-service
 start_svc catalog  8091 services/catalog-service
 start_svc payment  8090 services/payment-service \
-  "PSP_PROVIDER=$PSP_PROVIDER STRIPE_SECRET_KEY=$STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET=$STRIPE_WEBHOOK_SECRET STRIPE_PUBLISHABLE_KEY=$STRIPE_PUBLISHABLE_KEY ${APPMAX_ENV:-}"
+  "PSP_PROVIDER=$PSP_PROVIDER STRIPE_SECRET_KEY=$STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET=$STRIPE_WEBHOOK_SECRET STRIPE_PUBLISHABLE_KEY=$STRIPE_PUBLISHABLE_KEY APPMAX_V1_CLIENT_ID=$APPMAX_V1_CLIENT_ID APPMAX_V1_CLIENT_SECRET=$APPMAX_V1_CLIENT_SECRET APPMAX_V1_AUTH_URL=$APPMAX_V1_AUTH_URL APPMAX_V1_API_URL=$APPMAX_V1_API_URL APPMAX_V1_EXTERNAL_ID=$APPMAX_V1_EXTERNAL_ID APPMAX_WEBHOOK_SECRET=$APPMAX_WEBHOOK_SECRET"
 start_svc order    8092 services/order-service 'KAFKA_BROKERS=localhost:19092'
 # Alice roda em mock sem ANTHROPIC_API_KEY (busca real no catálogo em :8091).
 start_svc assistant 8094 services/assistant-service
