@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { usePayment, type PaymentMethod, type PaymentResult } from '@/hooks/usePayment'
 import { isOrderEnabled, orderPostWithJWT, isApiError, apiErrorDetails } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
@@ -164,6 +164,10 @@ export function useBalcaoCheckout() {
   const [submitting, setSubmitting] = useState(false)
   const [orderError, setOrderError] = useState('')
   const [outcome, setOutcome] = useState<BalcaoChargeOutcome | null>(null)
+  // Guarda SÍNCRONA contra cobrança em duplicidade. `submitting` é STATE (atualiza
+  // depois do await e do re-render), então um duplo-toque rápido no tablet passaria
+  // batido e criaria DOIS pedidos + DOIS PaymentIntents. O ref é lido/setado no ato.
+  const chargingRef = useRef(false)
 
   /**
    * Cria o pedido no order-service com o contrato de balcão.
@@ -242,6 +246,8 @@ export function useBalcaoCheckout() {
 
   const charge = useCallback(
     async (input: BalcaoChargeInput): Promise<BalcaoChargeOutcome | null> => {
+      // Duplo-toque / cobrança já em voo → ignora (antes de qualquer await/estado).
+      if (chargingRef.current) return null
       if (input.pricing.blocked) {
         setOrderError('Desconto abaixo do custo — cobrança bloqueada.')
         return null
@@ -256,6 +262,9 @@ export function useBalcaoCheckout() {
         return null
       }
 
+      // Validações passaram: trava a cobrança de forma SÍNCRONA (o ref só é lido/
+      // setado aqui) — um 2º toque durante os awaits abaixo bate no guard acima.
+      chargingRef.current = true
       setOrderError('')
       setSubmitting(true)
       try {
@@ -356,6 +365,7 @@ export function useBalcaoCheckout() {
         return null
       } finally {
         setSubmitting(false)
+        chargingRef.current = false
       }
     },
     [createOrder, payment, settleExternal]

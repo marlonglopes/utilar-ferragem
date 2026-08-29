@@ -257,6 +257,7 @@ export default function BalcaoPage() {
         submitting={checkout.submitting}
         error={checkout.error}
         paymentResult={checkout.paymentResult}
+        cardholderName={comanda.customer?.name}
         onConfirm={handleConfirm}
         onDone={handleDone}
         onCardConfirmed={checkout.markConfirmed}

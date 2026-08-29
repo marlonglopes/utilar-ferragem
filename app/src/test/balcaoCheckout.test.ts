@@ -132,6 +132,38 @@ describe('useBalcaoCheckout — payload do pedido', () => {
     expect(result.current.outcome?.external?.settled).toBe(true)
   })
 
+  // REGRESSÃO: duplo-toque no tablet não pode gerar 2 pedidos/2 cobranças. O
+  // guard é um ref SÍNCRONO (setado antes do 1º await), então a 2ª chamada
+  // concorrente bate nele e é ignorada — mesmo enquanto a 1ª ainda está em voo.
+  it('não cobra em duplicidade: 2 charges concorrentes = 1 cobrança', async () => {
+    let releaseOrder!: (v: unknown) => void
+    orderPostWithJWT
+      .mockImplementationOnce(() => new Promise((r) => (releaseOrder = r))) // createOrder da 1ª
+      .mockResolvedValue({ id: 'ord-x', number: 'BAL-X' }) // settleExternal
+    const { result } = renderHook(() => useBalcaoCheckout())
+    const items = [item()]
+    const input = {
+      items,
+      pricing: pricingFor(items, 0),
+      customer: CUSTOMER,
+      method: 'external' as const,
+      nsu: '999',
+    }
+
+    let r2: unknown
+    await act(async () => {
+      const p1 = result.current.charge(input) // trava o chargingRef síncrono
+      const p2 = result.current.charge(input) // bate no guard → null imediato
+      r2 = await p2
+      releaseOrder({ id: 'ord-x', number: 'BAL-X', approvalStatus: 'not_required' })
+      await p1
+    })
+
+    expect(r2).toBeNull() // a 2ª cobrança foi ignorada
+    // Só a 1ª rodou: createOrder + settleExternal = 2 chamadas (não 4).
+    expect(orderPostWithJWT).toHaveBeenCalledTimes(2)
+  })
+
   it('cliente avulso (sem cadastro) vai sem customerId, só com o snapshot', async () => {
     orderPostWithJWT.mockResolvedValue({ id: 'ord-2', number: 'BAL-0002' })
 

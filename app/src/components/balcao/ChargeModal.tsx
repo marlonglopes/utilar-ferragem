@@ -39,6 +39,9 @@ export interface ChargeModalProps {
   submitting: boolean
   error: string
   paymentResult: PaymentResult | null
+  /** Nome pra pré-preencher "Nome no cartão" — o do CLIENTE da comanda (o titular
+   * do cartão, não o operador). Editável no form. */
+  cardholderName?: string
   onConfirm: (method: BalcaoPaymentMethod, nsu?: string) => void
   onDone: () => void
   /** Marca o pagamento de cartão como confirmado (chamado pelo CardPayment). */
@@ -61,6 +64,7 @@ export function ChargeModal({
   submitting,
   error,
   paymentResult,
+  cardholderName,
   onConfirm,
   onDone,
   onCardConfirmed,
@@ -165,6 +169,7 @@ export function ChargeModal({
               <CardPayment
                 result={paymentResult}
                 amount={pricing.total}
+                defaultCardholderName={cardholderName}
                 onConfirmed={() => onCardConfirmed?.()}
                 onFailed={setCardError}
                 onSimulateConfirm={onSimulateConfirm}
