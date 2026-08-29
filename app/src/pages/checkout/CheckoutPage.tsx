@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, Link } from 'react-router-dom'
 import { Check, ChevronRight, Loader2, Plus, Receipt } from 'lucide-react'
@@ -512,6 +512,14 @@ function PaymentStep({
   const [committedOrderId, setCommittedOrderId] = useState<string | null>(null)
   const [orderError, setOrderError] = useState<string | null>(null)
 
+  // GUARDAS SÍNCRONAS contra duplicação (refs, não state — state atualiza DEPOIS
+  // do await, então invocações concorrentes escapam da checagem). Bug real: o
+  // StrictMode do React 18 dispara o effect 2x em dev + o total recalcula →
+  // criávamos VÁRIOS pedidos e VÁRIOS PaymentIntents "Incompleto" na Stripe pra
+  // uma compra só. O ref é setado ANTES do await, então a 2ª invocação bate nele.
+  const orderInFlightRef = useRef<Promise<string | null> | null>(null) // pedido em criação
+  const cardIntentSigRef = useRef<string | null>(null) // assinatura do último intent de cartão iniciado
+
   // U2: invalida o pedido cacheado quando:
   // (a) ensureOrderId muda — items/endereço/frete diferentes, OU
   // (b) method muda — Bug A: order tem paymentMethod gravado no DB que precisa
@@ -519,6 +527,8 @@ function PaymentStep({
   //     reusada pra `pix`/`boleto`. Cria nova order com método novo.
   useEffect(() => {
     setCommittedOrderId(null)
+    orderInFlightRef.current = null
+    cardIntentSigRef.current = null
   }, [ensureOrderId, method])
 
   const pixTotal = +(total * 0.95).toFixed(2)
@@ -535,19 +545,28 @@ function PaymentStep({
   const boletoReady = method !== 'boleto' || accountCPFReady
 
   // Garante que existe um order id real do backend antes de criar payment.
-  // Usa cache (committedOrderId) — só cria UMA order por sessão de checkout.
-  async function getOrCreateOrderId(): Promise<string | null> {
-    if (committedOrderId) return committedOrderId
-    setOrderError(null)
-    try {
-      const id = await ensureOrderId(method)
-      setCommittedOrderId(id)
-      return id
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao criar pedido'
-      setOrderError(msg)
-      return null
-    }
+  // Usa cache (committedOrderId) E um ref com a promessa EM VOO: chamadas
+  // concorrentes (effect + clique, ou StrictMode) reusam a MESMA promessa em vez
+  // de cada uma criar um pedido. Sem isso, o `if (committedOrderId)` não segura —
+  // o state só atualiza depois do await, e as concorrentes passam batido.
+  function getOrCreateOrderId(): Promise<string | null> {
+    if (committedOrderId) return Promise.resolve(committedOrderId)
+    if (orderInFlightRef.current) return orderInFlightRef.current
+    const p = (async (): Promise<string | null> => {
+      setOrderError(null)
+      try {
+        const id = await ensureOrderId(method)
+        setCommittedOrderId(id)
+        return id
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Erro ao criar pedido'
+        setOrderError(msg)
+        orderInFlightRef.current = null // falhou → permite nova tentativa
+        return null
+      }
+    })()
+    orderInFlightRef.current = p
+    return p
   }
 
   async function handleConfirm() {
@@ -589,10 +608,21 @@ function PaymentStep({
     if (result && result.method === 'card' && result.status !== 'creating') return
     // Já está em criação? Não dispara duplicado.
     if (result?.status === 'creating') return
+    // GUARDA SÍNCRONA: assinatura do intent pretendido (método+total). Setada
+    // ANTES do await — a 2ª invocação (StrictMode/re-render) com a mesma
+    // assinatura bate aqui e NÃO cria outro PaymentIntent. Total novo (frete
+    // diferente) muda a assinatura e aí sim recria — que é o certo.
+    const sig = `card:${displayTotal}`
+    if (cardIntentSigRef.current === sig) return
+    cardIntentSigRef.current = sig
     void (async () => {
       const orderId = await getOrCreateOrderId()
-      if (!orderId) return
-      await createPayment(orderId, 'card', displayTotal)
+      if (!orderId) {
+        cardIntentSigRef.current = null // falhou o pedido → permite retry
+        return
+      }
+      const r = await createPayment(orderId, 'card', displayTotal)
+      if (!r) cardIntentSigRef.current = null // falhou o intent → permite retry
     })()
     // Disparamos quando o método muda OU o total muda (ex: shipping diferente).
     // eslint-disable-next-line react-hooks/exhaustive-deps
