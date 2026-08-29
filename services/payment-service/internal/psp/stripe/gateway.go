@@ -107,21 +107,14 @@ func (g *Gateway) CreatePayment(ctx context.Context, req psp.CreateRequest) (*ps
 		if req.PayerEmail != "" {
 			params.ReceiptEmail = stripe.String(req.PayerEmail)
 		}
-		// PARCELAMENTO (installments BR): habilita a OFERTA de parcelas. O
-		// PaymentElement renderiza o seletor "Parcelamento" sozinho quando a Stripe
-		// devolve `available_plans` (o plano escolhido vai no confirm — nada de UI
-		// extra do nosso lado). Habilitar é inócuo quando não há planos: com a conta
-		// não ativada, `available_plans` vem vazio e o cliente vê só 1x. Ao ativar a
-		// capability BR de parcelamento, 2x–12x aparecem sem tocar em código.
-		// "Sem juros" vs "com juros" é configuração da CONTA (planos merchant-funded
-		// no dashboard) — decisão de negócio, não deste código.
-		params.PaymentMethodOptions = &stripe.PaymentIntentPaymentMethodOptionsParams{
-			Card: &stripe.PaymentIntentPaymentMethodOptionsCardParams{
-				Installments: &stripe.PaymentIntentPaymentMethodOptionsCardInstallmentsParams{
-					Enabled: stripe.Bool(true),
-				},
-			},
-		}
+		// PARCELAMENTO **não** é habilitado aqui: a Stripe só oferece card
+		// installments para contas Stripe MÉXICO (e Japão / Mastercard Installments)
+		// — a doc é explícita: "A Stripe só aceita parcelamento para contas da Stripe
+		// Mexico". Numa conta BR, `card.installments.enabled=true` só devolve
+		// `available_plans: []` (não muda com ativação — a Stripe não tem o produto
+		// pro BR). Parcelamento brasileiro exige PSP brasileiro (Appmax/MP/…): o
+		// payment-service já modela `Installments` (1..12) e o gateway appmaxv1 o
+		// processa. No Stripe, o cartão brasileiro sai à vista (1x).
 
 	case psp.MethodPix:
 		params.PaymentMethodTypes = stripe.StringSlice([]string{"pix"})
