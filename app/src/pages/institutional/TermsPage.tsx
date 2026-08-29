@@ -100,8 +100,7 @@ export default function TermsPage() {
           </li>
           <li>
             Aceitamos <strong>Pix</strong>, <strong>boleto bancário</strong> e{' '}
-            <strong>cartão de crédito</strong>, com as condições de parcelamento exibidas no
-            checkout.
+            <strong>cartão de crédito à vista</strong>.
           </li>
           <li>
             O pedido só é encaminhado para separação após a confirmação do pagamento pela

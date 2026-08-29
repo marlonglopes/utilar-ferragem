@@ -44,7 +44,6 @@ export function ProductCard({ product, className }: ProductCardProps) {
     cashbackAmount,
     badge,
     badgeLabel,
-    installments,
     stock,
     images,
   } = product
@@ -129,12 +128,11 @@ export function ProductCard({ product, className }: ProductCardProps) {
               )}
             </p>
           )}
-          <p className="text-base font-bold text-gray-900">
-            {formatCurrency(price)}
-            {installments && (
-              <span className="ml-1 text-xs font-normal text-gray-500">em {installments}x</span>
-            )}
-          </p>
+          {/* SEM "em Nx": operamos no Stripe, que NÃO parcela cartão no Brasil
+              (só à vista). Prometer parcelamento no card do produto e não
+              entregar no checkout enganaria o cliente. Volta se/quando um PSP
+              brasileiro (Appmax) assumir o cartão — ver docs/psp-switch.md. */}
+          <p className="text-base font-bold text-gray-900">{formatCurrency(price)}</p>
 
           {cashbackAmount && (
             <p className="text-xs font-semibold text-brand-orange mt-1">

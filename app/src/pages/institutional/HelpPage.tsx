@@ -45,7 +45,7 @@ const SECTIONS: FaqSection[] = [
     items: [
       {
         q: 'Quais formas de pagamento vocês aceitam?',
-        a: 'Pix, boleto bancário e cartão de crédito. As condições de parcelamento disponíveis aparecem no checkout antes de você confirmar a compra.',
+        a: 'Pix, boleto bancário e cartão de crédito à vista. No Pix, o pagamento é confirmado na hora e com desconto.',
       },
       {
         q: 'Quanto tempo leva para o pagamento ser confirmado?',
