@@ -39,9 +39,11 @@ function renderWith(props: Partial<Parameters<typeof CardPayment>[0]> & { result
   const onFailed = props.onFailed ?? vi.fn()
   const utils = render(
     <I18nextProvider i18n={i18n}>
+      {/* nome do titular pré-preenchido (fluxo logado) → botão de pagar habilitado */}
       <CardPayment
         result={props.result}
         amount={props.amount ?? 99.9}
+        defaultCardholderName={props.defaultCardholderName ?? 'Ana Silva'}
         onConfirmed={onConfirmed}
         onFailed={onFailed}
         onSimulateConfirm={props.onSimulateConfirm}
@@ -107,6 +109,31 @@ describe('CardPayment — Stripe Elements', () => {
       expect(onFailed).toHaveBeenCalledWith('Cartão recusado pelo emissor')
       expect(screen.getByText(/cartão recusado pelo emissor/i)).toBeInTheDocument()
     })
+  })
+
+  // O nome do titular (name:'never' no Element) TEM que ir no confirm, senão a
+  // Stripe rejeita. Suporta pagar com o cartão de outra pessoa: o campo é editável.
+  it('passa o Nome no cartão em billing_details no confirmPayment', async () => {
+    confirmPaymentMock.mockClear() // o reset é beforeAll; limpa as chamadas dos testes anteriores
+    confirmPaymentMock.mockResolvedValueOnce({
+      paymentIntent: { status: 'succeeded' },
+      error: undefined,
+    })
+    renderWith({ result: stripeResult, defaultCardholderName: 'João Convidado' })
+
+    await screen.findByTestId('payment-element')
+    fireEvent.click(screen.getByRole('button', { name: /pagar/i }))
+
+    await waitFor(() => expect(confirmPaymentMock).toHaveBeenCalledTimes(1))
+    const arg = confirmPaymentMock.mock.calls[0][0]
+    expect(arg.confirmParams.payment_method_data.billing_details.name).toBe('João Convidado')
+  })
+
+  // Sem nome do titular, o botão fica travado (não dá pra confirmar sem ele).
+  it('botão de pagar fica desabilitado sem Nome no cartão', async () => {
+    renderWith({ result: stripeResult, defaultCardholderName: '' })
+    await screen.findByTestId('payment-element')
+    expect(screen.getByRole('button', { name: /pagar/i })).toBeDisabled()
   })
 
   it('status=confirmed → exibe checkmark de pagamento confirmado', () => {

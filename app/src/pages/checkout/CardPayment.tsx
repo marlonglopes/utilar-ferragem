@@ -6,11 +6,16 @@ import type { Appearance, StripeElementsOptions } from '@stripe/stripe-js'
 import { isApiEnabled } from '@/lib/api'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { formatCurrency } from '@/lib/format'
+import { Input } from '@/components/ui'
 import type { PaymentResult } from '@/hooks/usePayment'
 
 interface Props {
   result: PaymentResult
   amount: number
+  // Nome pra pré-preencher "Nome no cartão" (ex.: o da conta). SEMPRE editável —
+  // o cliente pode pagar com o cartão de outra pessoa, então o titular não é
+  // necessariamente o dono da conta.
+  defaultCardholderName?: string
   onSimulateConfirm?: () => void
   onConfirmed: () => void
   onFailed: (msg: string) => void
@@ -19,6 +24,7 @@ interface Props {
 export default function CardPayment({
   result,
   amount,
+  defaultCardholderName,
   onSimulateConfirm,
   onConfirmed,
   onFailed,
@@ -47,6 +53,7 @@ export default function CardPayment({
       <StripeCardForm
         clientSecret={result.clientSecret}
         amount={amount}
+        defaultCardholderName={defaultCardholderName}
         onConfirmed={onConfirmed}
         onFailed={onFailed}
       />
@@ -111,11 +118,13 @@ const appearance: Appearance = {
 function StripeCardForm({
   clientSecret,
   amount,
+  defaultCardholderName,
   onConfirmed,
   onFailed,
 }: {
   clientSecret: string
   amount: number
+  defaultCardholderName?: string
   onConfirmed: () => void
   onFailed: (msg: string) => void
 }) {
@@ -127,17 +136,24 @@ function StripeCardForm({
 
   return (
     <Elements stripe={stripePromise} options={options}>
-      <CardFormInner amount={amount} onConfirmed={onConfirmed} onFailed={onFailed} />
+      <CardFormInner
+        amount={amount}
+        defaultCardholderName={defaultCardholderName}
+        onConfirmed={onConfirmed}
+        onFailed={onFailed}
+      />
     </Elements>
   )
 }
 
 function CardFormInner({
   amount,
+  defaultCardholderName,
   onConfirmed,
   onFailed,
 }: {
   amount: number
+  defaultCardholderName?: string
   onConfirmed: () => void
   onFailed: (msg: string) => void
 }) {
@@ -148,6 +164,12 @@ function CardFormInner({
   const [submitting, setSubmitting] = useState(false)
   const [elementReady, setElementReady] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  // Nome do TITULAR do cartão. Pré-preenchido com o nome da conta por conveniência,
+  // mas editável: o cliente pode pagar com o cartão de outra pessoa. Coletamos aqui
+  // (name:'never' no Element) e passamos no confirm — o Element de cartão não mostra
+  // esse campo por padrão (a rede não exige nome pra autorizar).
+  const [cardName, setCardName] = useState((defaultCardholderName ?? '').trim())
+  const nameOk = cardName.trim().length >= 2
 
   // Timeout pra detectar falha de carregamento do Element (publishable key inválida etc)
   useEffect(() => {
@@ -168,6 +190,12 @@ function CardFormInner({
       elements,
       confirmParams: {
         return_url: window.location.href, // só usado se algum método precisar redirect
+        // name está como 'never' no Element, então o titular vai aqui (a Stripe
+        // rejeita se um campo desabilitado não for informado no confirm). O CEP
+        // (address:'if_required') o Element coleta sozinho — não precisa passar.
+        payment_method_data: {
+          billing_details: { name: cardName.trim() },
+        },
       },
       redirect: 'if_required',
     })
@@ -229,13 +257,31 @@ function CardFormInner({
         </p>
       )}
 
-      <div className="min-h-[280px]">
-        <PaymentElement options={{ layout: 'tabs' }} onReady={() => setElementReady(true)} />
+      <Input
+        label="Nome no cartão"
+        value={cardName}
+        onChange={(e) => setCardName(e.target.value)}
+        placeholder="Como impresso no cartão"
+        autoComplete="cc-name"
+        required
+        hint="Pode ser diferente do titular da conta."
+      />
+
+      <div className="min-h-[240px]">
+        {/* name:'never' → coletamos "Nome no cartão" acima; address:'if_required' →
+            a Stripe pede só o CEP de cobrança quando precisa (AVS/antifraude). */}
+        <PaymentElement
+          options={{
+            layout: 'tabs',
+            fields: { billingDetails: { name: 'never', address: 'if_required' } },
+          }}
+          onReady={() => setElementReady(true)}
+        />
       </div>
 
       <button
         type="submit"
-        disabled={!stripe || !elementReady || submitting}
+        disabled={!stripe || !elementReady || submitting || !nameOk}
         className="h-11 rounded-xl bg-brand-orange hover:bg-brand-orange-dark text-gray-900 font-semibold text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {submitting ? (

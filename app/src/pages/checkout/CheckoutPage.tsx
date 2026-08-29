@@ -699,6 +699,7 @@ function PaymentStep({
         <CardPayment
           result={activeResult}
           amount={displayTotal}
+          defaultCardholderName={user?.name ?? ''}
           onSimulateConfirm={!isApiEnabled ? simulateConfirm : undefined}
           onConfirmed={handleStripeConfirmed}
           onFailed={(msg) => markFailed(msg)}
