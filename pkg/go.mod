@@ -3,7 +3,7 @@ module github.com/utilar/pkg
 go 1.26.5
 
 require (
-	github.com/alicebob/miniredis/v2 v2.37.0
+	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/oklog/ulid/v2 v2.1.1
